@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Impressum – Kladdy</title>
+  <meta name="robots" content="noindex">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="bilder/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <script>try{var d=new URLSearchParams(location.search).get('darstellung')||localStorage.getItem('kladdy-darstellung');if(d==='hell'||d==='dunkel')document.documentElement.setAttribute('data-mode',d==='dunkel'?'dark':'light')}catch(e){}document.documentElement.classList.add('js')</script>
+  <script src="seite.js" defer></script>
+  <!--
+    MUSTER OHNE GEWÄHR – KEINE RECHTSBERATUNG.
+    Alle Platzhalter in eckigen Klammern (gelb markiert; im Code ein span mit der Klasse „platzhalter“)
+    durch deine Angaben ersetzen und dabei auch die span-Hülle entfernen. Solange noch Platzhalter da sind,
+    zeigt die Seite oben einen gelben Hinweisbalken.
+    Grundlage: § 5 Digitale-Dienste-Gesetz (DDG). Wenn du eine Umsatzsteuer-Identifikationsnummer hast,
+    musst du sie angeben (dann den Absatz „Umsatzsteuer“ anpassen).
+  -->
+</head>
+<body class="recht-seite">
+  <a class="ueberspringen" href="#inhalt">Zum Inhalt springen</a>
+  <svg class="sprite" aria-hidden="true" focusable="false">
+    <defs>
+      <linearGradient id="logo-verlauf" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6366f1"/><stop offset="1" stop-color="#b742b9"/></linearGradient>
+    </defs>
+    <symbol id="i-logo" viewBox="0 0 32 32"><rect width="32" height="32" rx="9" fill="url(#logo-verlauf)"/><path d="M10 8.5h9.5l3 3V23a1 1 0 0 1-1 1H10a1 1 0 0 1-1-1V9.5a1 1 0 0 1 1-1z" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><path d="M12.5 15h7M12.5 19h4.5" stroke="#fff" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.5 13.2A8.5 8.5 0 1 1 10.8 3.5a6.6 6.6 0 0 0 9.7 9.7z"/></symbol>
+    <symbol id="i-chevL" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  </svg>
+  <div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
+
+  <header class="kopf">
+    <div class="innen kopf-innen">
+      <a class="marke" href="index.html">
+        <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><use href="#i-logo"/></svg>
+        <b>Kladdy</b>
+      </a>
+      <div class="kopf-aktionen">
+        <a class="zurueck" href="index.html"><svg class="ic" aria-hidden="true"><use href="#i-chevL"/></svg>Zur Startseite</a>
+        <button type="button" class="icon-btn" data-darstellung aria-label="Dunkle Darstellung" title="Dunkle Darstellung">
+          <svg class="ic ic-mond" aria-hidden="true"><use href="#i-moon"/></svg>
+          <svg class="ic ic-sonne" aria-hidden="true"><use href="#i-sun"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="inhalt" class="innen" tabindex="-1">
+    <article class="recht">
+      <h1>Impressum</h1>
+      <p class="unterzeile">Angaben gemäß § 5 Digitale-Dienste-Gesetz (DDG)</p>
+
+      <div class="karte">
+        <h2>Anbieter</h2>
+        <address>
+          <span class="platzhalter">[Vorname Nachname]</span><br>
+          <span class="platzhalter">[Name deines Gewerbes – optional, sonst Zeile löschen]</span><br>
+          <span class="platzhalter">[Straße Hausnummer]</span><br>
+          <span class="platzhalter">[PLZ Ort]</span><br>
+          Deutschland
+        </address>
+
+        <h2>Kontakt</h2>
+        <p>
+          E-Mail: <span class="platzhalter">[name@example.de]</span><br>
+          Telefon: <span class="platzhalter">[optional: Telefonnummer – sonst Zeile löschen]</span>
+        </p>
+
+        <h2>Umsatzsteuer</h2>
+        <p>Kleinunternehmer im Sinne von § 19 UStG – es wird keine Umsatzsteuer berechnet. Eine Umsatzsteuer-Identifikationsnummer ist nicht vergeben.</p>
+
+        <h2>Hinweis</h2>
+        <p>Kladdy ist ein Hilfsmittel zur Ordnung der eigenen Buchhaltung. Es bietet keine Steuer- oder Rechtsberatung; alle Angaben ohne Gewähr.</p>
+
+        <p class="muster-hinweis">Muster ohne Gewähr – keine Rechtsberatung.</p>
+      </div>
+    </article>
+  </main>
+
+  <footer class="fuss">
+    <div class="innen fuss-innen">
+      <div class="fuss-marke">
+        <a class="marke" href="index.html">
+          <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><use href="#i-logo"/></svg>
+          <b>Kladdy</b>
+        </a>
+        <span>© <span data-jahr>2026</span></span>
+      </div>
+      <nav aria-label="Rechtliches">
+        <ul>
+          <li><a href="impressum.html" aria-current="page">Impressum</a></li>
+          <li><a href="datenschutz.html">Datenschutz</a></li>
+        </ul>
+      </nav>
+      <p class="fuss-hinweis"><span>Keine Steuerberatung. Alle Angaben ohne Gewähr.</span></p>
+    </div>
+  </footer>
+</body>
+</html>

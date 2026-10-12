@@ -1,0 +1,85 @@
+/* Kladdy – Prototyp · Vorlagen (Block-Baukasten) */
+.vl-layout { display: grid; grid-template-columns: minmax(320px, 400px) minmax(0, 1fr); gap: var(--gap); align-items: start; }
+.ic.rot90 { transform: rotate(90deg); }
+
+/* Bausteinliste */
+.vl-blocks { list-style: none; margin: 0 -8px; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.vl-blk {
+  position: relative; display: flex; align-items: center; gap: 8px; padding: 7px 6px 7px 4px; border-radius: var(--radius-sm); cursor: pointer;
+  transition: background .2s, opacity .2s, box-shadow .2s;
+}
+.vl-blk:hover { background: var(--hover); }
+.vl-blk.on { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); }
+.vl-blk.aus .vl-meta, .vl-blk.aus .vl-ic { opacity: .45; }
+.vl-blk.aus .vl-meta b { text-decoration: line-through; }
+.vl-blk.dragging { opacity: .35; }
+.vl-blk.drop-before { box-shadow: inset 0 2px 0 var(--accent); }
+.vl-blk.drop-after { box-shadow: inset 0 -2px 0 var(--accent); }
+.vl-grip { color: var(--muted); cursor: grab; display: grid; place-items: center; width: 18px; opacity: .5; transition: opacity .2s; }
+.vl-blk:hover .vl-grip { opacity: 1; }
+.vl-grip .ic { width: 16px; height: 16px; }
+.vl-ic { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; flex: none; background: var(--surface-2); border: 1px solid var(--border); color: var(--accent); }
+.vl-ic .ic { width: 16px; height: 16px; }
+.vl-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.vl-meta b { font-size: .86rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vl-meta small { font-size: .72rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vl-blk .icon-btn { opacity: 0; transition: opacity .15s, background .2s, color .2s; }
+.vl-blk:hover .icon-btn, .vl-blk.on .icon-btn, .vl-blk.aus .icon-btn[data-action="vl-toggle"] { opacity: 1; }
+.vl-del:hover { color: var(--neg); }
+.vl-empty { padding: 14px 10px; color: var(--muted); font-size: .84rem; }
+.vl-saved { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; color: var(--pos); font-weight: 600; opacity: 0; }
+.vl-saved .ic { width: 12px; height: 12px; }
+.vl-saved.flash { animation: vlSaved 1.8s var(--ease); }
+@keyframes vlSaved { 10%, 70% { opacity: 1; } }
+
+/* Baustein hinzufügen */
+.vl-add { position: relative; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.vl-add > .btn { width: 100%; }
+.vl-palette {
+  position: absolute; left: -8px; right: -8px; top: calc(100% + 8px); z-index: 20; padding: 8px; border-radius: 16px;
+  background: var(--surface); border: 1px solid var(--border-strong); box-shadow: var(--shadow-lg);
+  opacity: 0; transform: translateY(-6px) scale(.985); transform-origin: top center; pointer-events: none;
+  transition: opacity .18s var(--ease), transform .25s var(--ease);
+}
+.vl-palette.open { opacity: 1; transform: none; pointer-events: auto; }
+.vl-pal-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 6px 8px 8px; }
+.vl-pal-head b { font-size: .84rem; }
+.vl-pal-head small { font-size: .72rem; color: var(--muted); }
+.vl-pal-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; max-height: 360px; overflow-y: auto; }
+.vl-pal-item { display: flex; align-items: flex-start; gap: 9px; padding: 9px; border-radius: 11px; text-align: left; transition: background .15s; }
+.vl-pal-item:hover { background: var(--accent-soft); }
+.vl-pal-item > .ic { color: var(--accent); margin-top: 1px; }
+.vl-pal-item span { display: flex; flex-direction: column; min-width: 0; }
+.vl-pal-item b { font-size: .8rem; font-weight: 650; }
+.vl-pal-item small { font-size: .7rem; color: var(--muted); line-height: 1.35; }
+
+/* Einstellungen */
+.vl-ph { display: flex; flex-wrap: wrap; gap: 4px; }
+.vl-ph .chip { font-family: var(--mono); font-size: .68rem; padding: 2px 7px; }
+.vl-ph .chip:hover { border-color: var(--accent-line); color: var(--accent); }
+
+/* Pflichtangaben */
+.vl-check { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: .83rem; }
+.vl-check li { display: flex; align-items: flex-start; gap: 8px; }
+.vl-check li .ic { width: 16px; height: 16px; margin-top: 1px; }
+.vl-check li.ok .ic { color: var(--pos); }
+.vl-check li.bad .ic { color: var(--neg); }
+.vl-check li.bad { color: var(--text); }
+.vl-check small { display: block; color: var(--muted); font-size: .73rem; }
+
+/* Vorschau */
+.vl-right { position: sticky; top: calc(var(--topbar-h) + 14px); display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.vl-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.vl-doc { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); }
+.vl-doc .select { min-width: 220px; }
+.vl-stage { overflow: hidden; background: color-mix(in srgb, var(--surface-2) 70%, transparent); }
+.vl-paper { position: relative; padding: 28px; }
+.vl-scale { transform-origin: top left; width: max-content; }
+.vl-scale .sheet { box-shadow: 0 30px 60px -30px rgb(0 0 0 / .55), 0 0 0 1px rgb(0 0 0 / .06); }
+.vl-latex { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.vl-code { margin: 0; max-height: calc(100vh - 260px); overflow: auto; padding: 14px 16px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); font: 12px/1.6 var(--mono); color: var(--text-2); white-space: pre; tab-size: 2; }
+.tx-c { color: var(--muted); font-style: italic; }
+.tx-k { color: var(--accent); font-weight: 600; }
+.tx-b { color: var(--series-2); }
+
+@media (max-width: 1100px) { .vl-layout { grid-template-columns: minmax(0, 1fr); } .vl-right { position: static; } }

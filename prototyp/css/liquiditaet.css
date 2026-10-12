@@ -1,0 +1,103 @@
+/* Kladdy – Prototyp · Liquidität (Reiter der Auswertung)
+ * Einleitung unter dem Umschalter, Kachel „Engster Moment“, Vorschau-Diagramm mit Hinweis bei Engpass,
+ * Annahmen mit Regler, Planposten und die Tabelle „Erwartete Zahlungen“.
+ */
+
+.liq-intro { margin: calc(var(--gap) * -.45) 0 0; font-size: .86rem; }
+
+/* ---------- Kennzahlen ---------- */
+.liq-eng .kpi-val { display: flex; align-items: center; gap: 6px; }
+.liq-eng .kpi-val .ic { width: 20px; height: 20px; stroke-width: 2.2; }
+.liq-eng.ok .kpi-val { font-size: 1.15rem; }
+.liq-eng-t { font-size: .74rem; line-height: 1.4; color: var(--text-2); }
+.liq-eng.neg { border-color: color-mix(in oklab, var(--neg) 38%, var(--border)); }
+
+/* ---------- Diagramm ---------- */
+.liq-legend { justify-content: flex-end; gap: 6px 14px; font-size: .74rem; }
+.liq-legend i.ln { width: 14px; height: 2px; border-radius: 1px; background: var(--accent); }
+.liq-legend i.dt { width: 8px; height: 8px; border-radius: 50%; }
+.liq-legend i.neg-area { width: 14px; height: 9px; border-radius: 2px; background: color-mix(in oklab, var(--neg) 26%, transparent); box-shadow: inset 0 -2px 0 var(--neg); }
+
+.liq-banner { display: flex; align-items: center; gap: 12px; margin-top: 14px; padding: 11px 14px; border-radius: 12px; font-size: .84rem; line-height: 1.45; }
+.liq-banner { border: 1px solid color-mix(in oklab, var(--neg) 40%, transparent); background: color-mix(in oklab, var(--neg) 9%, transparent); animation: rise .45s var(--ease) both; }
+.liq-banner > .ic { color: var(--neg); width: 20px; height: 20px; flex: none; }
+.liq-banner-t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.liq-banner-t span { color: var(--text-2); }
+.liq-banner-a { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; max-width: 46%; }
+.liq-banner-a .chip { font-weight: 600; color: var(--text); background: var(--surface); padding: 5px 11px; transition: border-color .15s, background .15s; }
+.liq-banner-a .chip:hover { border-color: var(--accent-line); background: var(--accent-soft); }
+.liq-banner-a .chip .ic { width: 14px; height: 14px; color: var(--accent); }
+.no-anim .liq-banner { animation: none; }
+
+/* ---------- Annahmen ---------- */
+.liq-reset { padding: 6px 10px; font-size: .78rem; }
+.liq-opts { display: flex; flex-direction: column; }
+.liq-opts .toggle-row { padding: 9px 0; border-bottom: 1px dashed var(--border); cursor: pointer; transition: opacity .2s; }
+.liq-opts .toggle-row:first-child { padding-top: 0; }
+.liq-opts .toggle-row > span:first-child { min-width: 0; }
+.liq-opts .toggle-row small { margin-top: 1px; }
+.liq-opts .toggle-row.sub { padding-left: 16px; position: relative; }
+.liq-opts .toggle-row.sub::before { content: ""; position: absolute; left: 4px; top: 8px; bottom: 50%; width: 7px; border-left: 1px solid var(--border-strong); border-bottom: 1px solid var(--border-strong); border-bottom-left-radius: 5px; }
+.liq-opts .toggle-row.off { opacity: .4; pointer-events: none; }
+.liq-sl { display: flex; flex-direction: column; gap: 10px; padding-top: 16px; }
+.liq-sl-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: .88rem; font-weight: 550; }
+.liq-sl-head output { font-family: var(--num-font); font-variant-numeric: tabular-nums; font-weight: 700; color: var(--text); white-space: nowrap; }
+.liq input[type="range"] { --fill: 0%; background: linear-gradient(90deg, var(--accent) var(--fill), var(--surface-3) var(--fill)); }
+.liq input[type="range"]:disabled { opacity: .4; cursor: not-allowed; }
+.liq-linkbtn { color: var(--accent); font-weight: 600; font-size: inherit; }
+.liq-linkbtn:hover { text-decoration: underline; }
+
+/* ---------- Planposten ---------- */
+.liq-plan { list-style: none; margin: -6px 0 0; padding: 0; display: flex; flex-direction: column; }
+.liq-plan li { display: grid; grid-template-columns: 70px minmax(0, 1fr) auto 30px; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: .85rem; transition: opacity .2s; }
+.liq-plan li.out { opacity: .5; }
+.liq-plan-d { display: flex; flex-direction: column; line-height: 1.25; }
+.liq-plan-d b { font-family: var(--num-font); font-variant-numeric: tabular-nums; font-weight: 650; }
+.liq-plan-d small { color: var(--muted); font-size: .72rem; white-space: nowrap; }
+.liq-plan-t { min-width: 0; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-height: 1.3; }
+.liq-plan li > b { font-family: var(--num-font); font-variant-numeric: tabular-nums; font-weight: 650; white-space: nowrap; }
+.liq-plan .icon-btn { opacity: .45; }
+.liq-plan li:hover .icon-btn, .liq-plan .icon-btn:focus-visible { opacity: 1; }
+.liq-plan .icon-btn:hover { color: var(--neg); }
+.liq-plan-empty { font-size: .84rem; color: var(--muted); padding: 4px 0 2px; }
+.liq-pf { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--border); }
+.liq-pf-row.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.liq-pf-row.two.wide { grid-template-columns: minmax(0, 1fr) auto; }
+.liq-pf .seg { width: 100%; }
+
+/* ---------- Erwartete Zahlungen ---------- */
+/* .row ist im Kern auch eine Flex-Hilfsklasse → Tabellenzeilen ausdrücklich als Zeile darstellen */
+.liq .fin-table tr.row { display: table-row; }
+.liq-avgtoggle { gap: 10px; font-size: .8rem; color: var(--text-2); cursor: pointer; }
+.liq-avgtoggle .switch { transform: scale(.85); transform-origin: right center; }
+.liq-table td.liq-d { color: var(--text-2); width: 1%; }
+.liq-table td.liq-what { width: 100%; max-width: 0; }
+.liq-what-in { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.liq-what-in > a, .liq-what-in > .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.liq-what-in > a { font-weight: 600; }
+.liq-what-in > a:hover { color: var(--accent); text-decoration: underline; }
+.liq-what-in .pill { flex: none; font-style: normal; }
+.liq-ic { --c: var(--muted); width: 24px; height: 24px; border-radius: 7px; flex: none; display: grid; place-items: center; color: var(--c); background: color-mix(in oklab, var(--c) 15%, transparent); }
+.liq-ic .ic { width: 14px; height: 14px; }
+.liq-ic[data-art="rechnung"] { --c: var(--accent); }
+.liq-ic[data-art="wiederkehrend"] { --c: var(--series-1); }
+.liq-ic[data-art="plan"] { --c: var(--warn); }
+.liq-table tr.grp td { padding-top: 8px; padding-bottom: 8px; }
+.liq-table tr.grp td.num.neg-v { color: var(--neg); }
+.liq-table tr.grp td.num { letter-spacing: 0; text-transform: none; font-family: var(--num-font); font-variant-numeric: tabular-nums; }
+.liq-table tbody tr:not(.grp):hover td { background: var(--hover); }
+.liq-table tr.liq-avg td { color: var(--muted); font-style: italic; }
+.liq-table tr.liq-avg .liq-ic { opacity: .7; }
+.liq-table th:nth-child(3) { min-width: 96px; }
+.liq-table th:nth-child(4) { min-width: 150px; }
+
+@media (max-width: 1100px) { .liq-banner { flex-wrap: wrap; } .liq-banner-a { max-width: none; justify-content: flex-start; } }
+/* Einspaltig: Annahmen und Planposten direkt unter das Diagramm (sonst erst nach der langen Tabelle) */
+@media (max-width: 1100px) {
+  .liq .grid-main > .stack { display: contents; }
+  .liq .grid-main > .stack:first-child > :first-child { order: 0; }
+  .liq .grid-main > .stack:last-child > * { order: 1; }
+  .liq .grid-main > .stack:last-child > .proto-note { order: 3; }
+  .liq .grid-main > .stack:first-child > :last-child { order: 2; }
+}
+@media (max-width: 600px) { .liq-legend { justify-content: flex-start; } }

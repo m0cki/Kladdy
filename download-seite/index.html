@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kladdy – Ein- und Ausgänge, Quittungen und Termine für dein Kleingewerbe auf dem Mac</title>
+  <meta name="description" content="Mac-App für Kleinunternehmer (§ 19 UStG): Ein- und Ausgänge, Quittungen, Rechnungen, Termine und Kunden. Alles bleibt auf deinem Mac – kein Konto, kein Abo.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="bilder/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <!-- Darstellung (hell/dunkel) sofort setzen, damit nichts aufblitzt. Gespeichert wird nur, wenn du den Umschalter benutzt. -->
+  <script>try{var d=new URLSearchParams(location.search).get('darstellung')||localStorage.getItem('kladdy-darstellung');if(d==='hell'||d==='dunkel')document.documentElement.setAttribute('data-mode',d==='dunkel'?'dark':'light')}catch(e){}document.documentElement.classList.add('js')</script>
+  <script src="seite.js" defer></script>
+</head>
+<body data-seite="start">
+  <a class="ueberspringen" href="#inhalt">Zum Inhalt springen</a>
+
+  <!-- Symbole (wie im App-Prototyp) -->
+  <svg class="sprite" aria-hidden="true" focusable="false">
+    <defs>
+      <linearGradient id="logo-verlauf" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6366f1"/><stop offset="1" stop-color="#b742b9"/></linearGradient>
+    </defs>
+    <symbol id="i-logo" viewBox="0 0 32 32"><rect width="32" height="32" rx="9" fill="url(#logo-verlauf)"/><path d="M10 8.5h9.5l3 3V23a1 1 0 0 1-1 1H10a1 1 0 0 1-1-1V9.5a1 1 0 0 1 1-1z" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><path d="M12.5 15h7M12.5 19h4.5" stroke="#fff" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-swap" viewBox="0 0 24 24"><path d="M7 4 3.5 7.5 7 11M3.5 7.5h13M17 13l3.5 3.5L17 20M20.5 16.5h-13"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></symbol>
+    <symbol id="i-invoice" viewBox="0 0 24 24"><path d="M14.5 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7.5z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.2a6.5 6.5 0 0 1 3.5 5.8"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V4M4 20h16"/><rect x="7.5" y="11" width="3" height="6" rx="1"/><rect x="13" y="7" width="3" height="10" rx="1"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M4.5 15v3a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.5 13.2A8.5 8.5 0 1 1 10.8 3.5a6.6 6.6 0 0 0 9.7 9.7z"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+    <symbol id="i-user-off" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0M3.5 3.5l17 17"/></symbol>
+    <symbol id="i-cloud-off" viewBox="0 0 24 24"><path d="M7 18.5h10.5a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.6 9.1 4.75 4.75 0 0 0 7 18.5zM3.5 3.5l17 17"/></symbol>
+    <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7z"/><circle cx="12" cy="12" r="3"/><path d="M3.5 3.5l17 17"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3.5 7a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.6 3.5 5.4 3.5 8.5s-1 5.9-3.5 8.5c-2.5-2.6-3.5-5.4-3.5-8.5s1-5.9 3.5-8.5z"/></symbol>
+    <symbol id="i-drive" viewBox="0 0 24 24"><rect x="3.5" y="13" width="17" height="7" rx="2"/><path d="M5.5 13 8 5h8l2.5 8M7.5 16.5h.01"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3.5 19.5 6v5.5c0 4.6-3.1 8-7.5 9.5-4.4-1.5-7.5-4.9-7.5-9.5V6z"/><path d="m8.8 12 2.2 2.2 4.2-4.4"/></symbol>
+    <symbol id="i-mac" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="12" rx="2"/><path d="M9 20h6M12 16.5V20"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20.5 12a8.5 8.5 0 0 1-14.9 5.6M3.5 12a8.5 8.5 0 0 1 14.9-5.6"/><path d="M18.5 3v3.6h-3.6M5.5 21v-3.6h3.6"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.5v.01"/></symbol>
+  </svg>
+
+  <!-- dekorativer Farbverlauf im Hintergrund (wie in der App) -->
+  <div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
+
+  <header class="kopf">
+    <div class="innen kopf-innen">
+      <a class="marke" href="#top" aria-label="Kladdy – nach oben">
+        <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><use href="#i-logo"/></svg>
+        <b>Kladdy</b>
+      </a>
+      <nav class="nav" aria-label="Hauptnavigation">
+        <ul>
+          <li><a href="#funktionen">Funktionen</a></li>
+          <li><a href="#daten">Deine Daten</a></li>
+          <li><a href="#installieren">Installieren</a></li>
+          <li><a href="#fragen">Fragen</a></li>
+        </ul>
+      </nav>
+      <div class="kopf-aktionen">
+        <button type="button" class="icon-btn" data-darstellung aria-label="Dunkle Darstellung" title="Dunkle Darstellung">
+          <svg class="ic ic-mond" aria-hidden="true"><use href="#i-moon"/></svg>
+          <svg class="ic ic-sonne" aria-hidden="true"><use href="#i-sun"/></svg>
+        </button>
+        <a class="btn-primary klein" href="#installieren" data-download>
+          <svg class="ic" aria-hidden="true"><use href="#i-download"/></svg>Download
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main id="inhalt" tabindex="-1">
+    <!-- ============ Hero ============ -->
+    <section class="hero" id="top" aria-labelledby="hero-titel">
+      <div class="innen">
+        <h1 id="hero-titel" class="einblenden">Ein- und Ausgänge, Quittungen und Termine <span class="verlauf">– für dein Kleingewerbe auf dem Mac.</span></h1>
+        <p class="hero-unter einblenden" style="--i:1">Für Kleinunternehmer nach § 19 UStG.<br> Alles bleibt auf deinem Mac – kein Konto, kein Abo.</p>
+        <div class="hero-aktionen einblenden" style="--i:2">
+          <div class="download-block">
+            <a class="btn-primary gross" href="#installieren" data-download>
+              <svg class="ic" aria-hidden="true"><use href="#i-download"/></svg>Download für Mac
+            </a>
+            <p class="download-meta" data-download-meta>macOS 14 (Sonoma) oder neuer · Mac mit Apple-Chip</p>
+          </div>
+          <a class="btn gross" href="#installieren">So installierst du es<svg class="ic" aria-hidden="true"><use href="#i-arrow"/></svg></a>
+        </div>
+        <p class="beispiel-hinweis" data-beispiel hidden>
+          <svg class="ic" aria-hidden="true"><use href="#i-info"/></svg>
+          <span>Beispielmodus: Repository in <code>seite.js</code> eintragen – dann zeigt der Download-Knopf auf die neueste Version.</span>
+        </p>
+
+        <figure class="fenster hero-bild einblenden" style="--i:3">
+          <div class="fenster-leiste" aria-hidden="true"><span></span><span></span><span></span></div>
+          <picture>
+            <source srcset="bilder/ein-ausgaenge-dunkel.webp" media="(prefers-color-scheme: dark)" data-dunkel>
+            <img src="bilder/ein-ausgaenge-hell.webp" width="2560" height="1600" fetchpriority="high"
+                 alt="Kladdy mit der Liste der Ein- und Ausgänge: Datum, Beleg-Nummer, Beschreibung, Kategorie, Zahlungsweg und Betrag.">
+          </picture>
+        </figure>
+      </div>
+    </section>
+
+    <!-- ============ Funktionen ============ -->
+    <section class="abschnitt" id="funktionen" aria-labelledby="funktionen-titel">
+      <div class="innen">
+        <div class="abschnitt-kopf einblenden">
+          <p class="augenbraue">Funktionen</p>
+          <h2 id="funktionen-titel">Fünf Bereiche, mehr braucht es nicht</h2>
+          <p class="lead">So wie das Menü der App: Du erfasst, was rein- und rausgeht, schreibst Quittungen und Rechnungen und hast am Jahresende alles für die EÜR beisammen.</p>
+        </div>
+
+        <ul class="funktionen">
+          <li class="karte einblenden">
+            <span class="symbol"><svg class="ic" aria-hidden="true"><use href="#i-swap"/></svg></span>
+            <h3>Ein- &amp; Ausgänge</h3>
+            <p>Alle geschäftlichen Zahlungen in einer ruhigen Liste, jeweils mit Zahlungsweg. Zieh ein Beleg-PDF aufs Fenster – Betrag und Datum werden erkannt und vorausgefüllt.</p>
+            <ul class="haken">
+              <li>Bar, Überweisung/Karte oder PayPal</li>
+              <li>Beleg per Drag &amp; Drop ablegen</li>
+              <li>Filter und Suche</li>
+            </ul>
+          </li>
+          <li class="karte einblenden" style="--i:1">
+            <span class="symbol"><svg class="ic" aria-hidden="true"><use href="#i-calendar"/></svg></span>
+            <h3>Termine</h3>
+            <p>Trag deine Kundentermine ein und bereite die Quittung gleich mit vor. Nach dem Termin hakst du ihn ab und stellst die Quittung aus.</p>
+            <ul class="haken">
+              <li>Quittung vorbereiten, nach dem Termin ausstellen</li>
+              <li>Bei Absage wird die Vorbereitung verworfen</li>
+            </ul>
+          </li>
+          <li class="karte einblenden" style="--i:2">
+            <span class="symbol"><svg class="ic" aria-hidden="true"><use href="#i-invoice"/></svg></span>
+            <h3>Rechnungen &amp; Quittungen</h3>
+            <p>Eine Eingabemaske mit Live-Vorschau, laufende Nummern und ein Check der Pflichtangaben. Drucken oder als PDF speichern.</p>
+            <ul class="haken">
+              <li>GiroCode: Kunden bezahlen per Banking-App</li>
+              <li>Vorlagen-Baukasten</li>
+              <li>Dein eigenes Firmenlogo</li>
+            </ul>
+          </li>
+          <li class="karte einblenden">
+            <span class="symbol"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>
+            <h3>Kunden</h3>
+            <p>Zu jedem Kunden siehst du den Verlauf: wann du dort warst, was du gemacht hast, Betrag und Beleg. Dazu Kontaktdaten und eine Notiz wie „Hund im Garten“.</p>
+            <ul class="haken">
+              <li>Verlauf aus Quittungen und Rechnungen</li>
+              <li>Notiz und Kontaktdaten</li>
+            </ul>
+          </li>
+          <li class="karte einblenden" style="--i:1">
+            <span class="symbol"><svg class="ic" aria-hidden="true"><use href="#i-chart"/></svg></span>
+            <h3>Auswertung</h3>
+            <p>Der Überblick über dein Jahr, was in den nächsten Wochen rein- und rausgeht, und alles für die Steuererklärung.</p>
+            <ul class="haken">
+              <li>Überblick und Liquidität (30, 60, 90 Tage)</li>
+              <li>Eigene Kennzahlen per Formel</li>
+              <li>EÜR und Export (CSV/PDF) fürs Finanzamt</li>
+            </ul>
+          </li>
+        </ul>
+
+        <div class="galerie einblenden">
+          <div class="galerie-kopf">
+            <h3 id="galerie-titel">So sieht es aus</h3>
+            <div class="reiter" role="tablist" aria-labelledby="galerie-titel">
+              <button type="button" role="tab" id="reiter-buchungen" aria-controls="bild-buchungen" aria-selected="true">Ein- &amp; Ausgänge</button>
+              <button type="button" role="tab" id="reiter-termine" aria-controls="bild-termine" aria-selected="false" tabindex="-1">Termine</button>
+              <button type="button" role="tab" id="reiter-rechnung" aria-controls="bild-rechnung" aria-selected="false" tabindex="-1">Rechnung</button>
+              <button type="button" role="tab" id="reiter-auswertung" aria-controls="bild-auswertung" aria-selected="false" tabindex="-1">Auswertung</button>
+            </div>
+          </div>
+
+          <figure class="galerie-panel aktiv" id="bild-buchungen" role="tabpanel" aria-labelledby="reiter-buchungen">
+            <div class="fenster">
+              <div class="fenster-leiste" aria-hidden="true"><span></span><span></span><span></span></div>
+              <picture>
+                <source srcset="bilder/beleg-erkennen-dunkel.webp" media="(prefers-color-scheme: dark)" data-dunkel>
+                <img src="bilder/beleg-erkennen-hell.webp" width="2560" height="1600" loading="lazy"
+                     alt="Erfassen-Fenster nach dem Ablegen eines Kassenbons: Betrag, Datum, Geschäft, Kategorie und Beleg-Nummer sind aus dem PDF erkannt und vorausgefüllt.">
+              </picture>
+            </div>
+            <figcaption>Beleg-PDF aufs Fenster gezogen: Betrag, Datum und Geschäft sind schon ausgefüllt.</figcaption>
+          </figure>
+          <figure class="galerie-panel" id="bild-termine" role="tabpanel" aria-labelledby="reiter-termine">
+            <div class="fenster">
+              <div class="fenster-leiste" aria-hidden="true"><span></span><span></span><span></span></div>
+              <picture>
+                <source srcset="bilder/termine-dunkel.webp" media="(prefers-color-scheme: dark)" data-dunkel>
+                <img src="bilder/termine-hell.webp" width="2560" height="1600" loading="lazy"
+                     alt="Terminübersicht mit Wochenleiste, einem Termin zum Nachtragen und den Terminen von heute und morgen, teils mit vorbereiteter Quittung.">
+              </picture>
+            </div>
+            <figcaption>Termine der nächsten Tage – mit vorbereiteter Quittung.</figcaption>
+          </figure>
+          <figure class="galerie-panel" id="bild-rechnung" role="tabpanel" aria-labelledby="reiter-rechnung">
+            <div class="fenster">
+              <div class="fenster-leiste" aria-hidden="true"><span></span><span></span><span></span></div>
+              <picture>
+                <source srcset="bilder/rechnung-dunkel.webp" media="(prefers-color-scheme: dark)" data-dunkel>
+                <img src="bilder/rechnung-hell.webp" width="2560" height="1600" loading="lazy"
+                     alt="Rechnung RE-2026-009 mit Live-Vorschau: zwei Positionen, Gesamtbetrag, Hinweis auf § 19 UStG und GiroCode zum Bezahlen.">
+              </picture>
+            </div>
+            <figcaption>Rechnung mit laufender Nummer, Live-Vorschau und GiroCode.</figcaption>
+          </figure>
+          <figure class="galerie-panel" id="bild-auswertung" role="tabpanel" aria-labelledby="reiter-auswertung">
+            <div class="fenster">
+              <div class="fenster-leiste" aria-hidden="true"><span></span><span></span><span></span></div>
+              <picture>
+                <source srcset="bilder/auswertung-dunkel.webp" media="(prefers-color-scheme: dark)" data-dunkel>
+                <img src="bilder/auswertung-hell.webp" width="2560" height="1600" loading="lazy"
+                     alt="Auswertung mit Kleinunternehmer-Status, Kennzahlen des Jahres und Diagrammen zu Einnahmen, Ausgaben und Überschuss.">
+              </picture>
+            </div>
+            <figcaption>Auswertung: Einnahmen, Ausgaben und Überschuss im Vergleich zum Vorjahr.</figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ Deine Daten ============ -->
+    <section class="abschnitt" id="daten" aria-labelledby="daten-titel">
+      <div class="innen">
+        <div class="abschnitt-kopf einblenden">
+          <p class="augenbraue">Deine Daten</p>
+          <h2 id="daten-titel">Deine Daten bleiben auf deinem Mac</h2>
+          <p class="lead">Kladdy ist eine reine Mac-App. Deine Buchungen, Kunden und Belege werden nirgendwohin übertragen.</p>
+        </div>
+
+        <ul class="nein-leiste einblenden" aria-label="Was es nicht gibt">
+          <li class="nein"><svg class="ic" aria-hidden="true"><use href="#i-user-off"/></svg>Kein Konto</li>
+          <li class="nein"><svg class="ic" aria-hidden="true"><use href="#i-cloud-off"/></svg>Keine Cloud</li>
+          <li class="nein"><svg class="ic" aria-hidden="true"><use href="#i-eye-off"/></svg>Kein Tracking</li>
+        </ul>
+
+        <div class="daten-raster">
+          <article class="karte einblenden">
+            <span class="symbol"><svg class="ic" aria-hidden="true"><use href="#i-folder"/></svg></span>
+            <h3>Alles in einem Ordner</h3>
+            <p>Eine Datenbank-Datei und deine Belege – ganz normale Dateien auf deinem Mac:</p>
+            <code class="pfad">~/Library/Application Support/de.kladdy.desktop/</code>
+            <p class="klein">Im Finder kommst du über <b>Gehe zu → Gehe zu Ordner …</b> (<kbd>⇧</kbd><kbd>⌘</kbd><kbd>G</kbd>) dorthin.</p>
+          </article>
+          <article class="karte einblenden" style="--i:1">
+            <span class="symbol"><svg class="ic" aria-hidden="true"><use href="#i-globe"/></svg></span>
+            <h3>Nur zwei Verbindungen ins Internet</h3>
+            <ul class="verbindungen">
+              <li><span class="nr" aria-hidden="true">1</span><b>Update-Prüfung</b><span>Höchstens einmal am Tag lädt die App die kleine Datei <code>latest.json</code> von GitHub, um zu sehen, ob es eine neue Version gibt.</span></li>
+              <li><span class="nr" aria-hidden="true">2</span><b>Dein erstes PDF</b><span>Der eingebaute Textsatz (Tectonic) lädt einmalig Schriften und Satzpakete herunter. Danach geht das auch offline.</span></li>
+            </ul>
+          </article>
+          <article class="karte einblenden" style="--i:2">
+            <span class="symbol"><svg class="ic" aria-hidden="true"><use href="#i-drive"/></svg></span>
+            <h3>Backups, wohin du willst</h3>
+            <p>Du wählst selbst, wo dein Backup liegt: USB-Stick, externe Festplatte oder iCloud Drive. Liegt es nur auf demselben Mac, erinnert dich die App daran.</p>
+            <p>Vor jedem Update legt die App automatisch ein Backup an.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ Installieren ============ -->
+    <section class="abschnitt" id="installieren" aria-labelledby="installieren-titel">
+      <div class="innen">
+        <div class="abschnitt-kopf einblenden">
+          <p class="augenbraue">Installieren</p>
+          <h2 id="installieren-titel">In vier Schritten startklar</h2>
+          <p class="lead">Keine Installation im eigentlichen Sinn, keine Admin-Rechte: herunterladen, in „Programme“ ziehen, einmal freigeben.</p>
+          <p class="download-status" data-download-status role="status" hidden></p>
+        </div>
+
+        <ol class="schritte">
+          <li class="schritt karte einblenden">
+            <h3>Datei herunterladen</h3>
+            <p>Lade die aktuelle Version herunter. In deinem Download-Ordner landet eine Datei wie <code>Kladdy_1.0.0_aarch64.dmg</code>.</p>
+            <div class="schritt-aktion">
+              <a class="btn" href="#installieren" data-download><svg class="ic" aria-hidden="true"><use href="#i-download"/></svg>Download für Mac</a>
+            </div>
+          </li>
+          <li class="schritt karte einblenden" style="--i:1">
+            <h3>In „Programme“ ziehen</h3>
+            <p>Öffne die <code>.dmg</code>-Datei per Doppelklick und zieh <b>Kladdy</b> auf den Ordner <b>Programme</b>. Danach kannst du die <code>.dmg</code> auswerfen und löschen.</p>
+            <div class="dmg-illu" role="img" aria-label="Zeichnung: Das Kladdy-Symbol wird auf den Ordner Programme gezogen.">
+              <figure>
+                <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><use href="#i-logo"/></svg>
+                <span>Kladdy</span>
+              </figure>
+              <svg class="pfeil" viewBox="0 0 44 24" aria-hidden="true"><path d="M3 12h36M31 5l8 7-8 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <figure>
+                <svg class="ordner" viewBox="0 0 52 48" aria-hidden="true"><path d="M4 10a4 4 0 0 1 4-4h11.5l4 5H44a4 4 0 0 1 4 4v25a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z" fill="#4f9cf0"/><path d="M4 17h44v23a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z" fill="#78b6f8"/><path d="M21 36l5-11 5 11M22.8 32.5h6.4" fill="none" stroke="#2f6fc0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>Programme</span>
+              </figure>
+            </div>
+          </li>
+          <li class="schritt karte breit einblenden">
+            <div class="schritt-text">
+              <h3>Beim ersten Start einmal freigeben</h3>
+              <p>Öffne Kladdy aus „Programme“. macOS meldet, dass die App nicht geöffnet wurde – klick auf <b>Fertig</b> (nicht auf „In den Papierkorb legen“). Dann:</p>
+              <ol>
+                <li><b>Systemeinstellungen</b> öffnen (Apple-Menü oben links).</li>
+                <li><b>Datenschutz &amp; Sicherheit</b> wählen und nach unten scrollen bis „Sicherheit“.</li>
+                <li>Bei der Meldung, dass „Kladdy“ blockiert wurde, auf <b>Dennoch öffnen</b> klicken.</li>
+                <li>Mit deinem Passwort oder Touch ID bestätigen und, falls gefragt, noch einmal <b>Dennoch öffnen</b> wählen.</li>
+              </ol>
+              <p class="klein muted">Das musst du nur ein einziges Mal machen. Der Rechtsklick → „Öffnen“ reicht seit macOS 15 nicht mehr; der Weg über die Systemeinstellungen funktioniert auf allen Versionen.</p>
+            </div>
+            <figure class="illu">
+              <div class="illu-fenster" role="img" aria-label="Illustration der Systemeinstellungen, Bereich Datenschutz und Sicherheit: Unter „Sicherheit“ steht „Kladdy wurde blockiert, um deinen Mac zu schützen.“ Daneben ist der Knopf „Dennoch öffnen“ hervorgehoben.">
+                <span class="illu-marke">Illustration</span>
+                <div class="illu-leiste"><i></i><i></i><i></i></div>
+                <div class="illu-koerper">
+                  <div class="illu-seite">
+                    <span style="--w:62%"></span><span style="--w:48%"></span><span style="--w:70%"></span><span style="--w:55%"></span>
+                    <span class="aktiv">Datenschutz &amp; Sicherheit</span>
+                    <span style="--w:44%"></span><span style="--w:66%"></span>
+                  </div>
+                  <div class="illu-haupt">
+                    <div class="illu-titel">Datenschutz &amp; Sicherheit</div>
+                    <div class="illu-gruppe">
+                      <div class="illu-zeile"><span class="strich" style="--w:46%"></span><span class="strich kurz"></span></div>
+                      <div class="illu-zeile"><span class="strich" style="--w:34%"></span><span class="strich kurz"></span></div>
+                    </div>
+                    <div class="illu-label">Sicherheit</div>
+                    <div class="illu-gruppe">
+                      <div class="illu-zeile"><span class="strich" style="--w:52%"></span><span class="strich" style="--w:26%"></span></div>
+                      <div class="illu-zeile blockiert">
+                        <span>„Kladdy“ wurde blockiert, um deinen Mac zu schützen.</span>
+                        <span class="illu-knopf">Dennoch öffnen<svg class="illu-zeiger" viewBox="0 0 24 24"><path d="M5 3l14 8.5-6 1.3 3.6 6.7-2.6 1.4-3.6-6.8L5 18z" fill="#fff" stroke="#111" stroke-width="1.3" stroke-linejoin="round"/></svg></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <figcaption>Gezeichnet und vereinfacht – je nach macOS-Version sieht es etwas anders aus.</figcaption>
+            </figure>
+          </li>
+          <li class="schritt karte breit einblenden">
+            <div class="schritt-text">
+              <h3>Fertig – Updates kommen in der App</h3>
+              <p>Ab jetzt startet Kladdy ganz normal. Gibt es eine neue Version, meldet sich die App mit „Version 1.2 ist da“. Ein Klick auf <b>Jetzt aktualisieren</b> genügt; vorher legt die App automatisch ein Backup an. Du musst nichts neu herunterladen.</p>
+            </div>
+            <div class="toast-illu" role="img" aria-label="Zeichnung des Hinweises in der App: Version 1.2 ist da – Was ist neu? – Jetzt aktualisieren.">
+              <div class="toast" aria-hidden="true">
+                <svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg>
+                <span>Version 1.2 ist da</span>
+                <span class="toast-link">Was ist neu?</span>
+                <span class="toast-knopf">Jetzt aktualisieren</span>
+              </div>
+            </div>
+          </li>
+        </ol>
+
+        <div class="install-info">
+          <article class="karte einblenden">
+            <h3><svg class="ic" aria-hidden="true"><use href="#i-shield"/></svg>Warum warnt macOS beim ersten Start?</h3>
+            <p>Apps von Entwicklern im Apple-Entwicklerprogramm werden von Apple geprüft („notarisiert“). Das Programm kostet 99 $ im Jahr – Kladdy ist ein kleines Projekt und nimmt nicht daran teil. Deshalb kennt macOS die App nicht und fragt einmal nach.</p>
+            <p>Die App ist trotzdem signiert, und jedes Update ist kryptografisch geprüft: Kladdy installiert nur Updates, deren Signatur zum Schlüssel passt, der in der App hinterlegt ist.</p>
+          </article>
+          <article class="karte einblenden" style="--i:1">
+            <h3><svg class="ic" aria-hidden="true"><use href="#i-mac"/></svg>Systemvoraussetzungen</h3>
+            <dl class="anforderungen">
+              <div><dt>Mac</dt><dd>Mac mit Apple-Chip (M1 oder neuer)<small>Intel-Macs nur, wenn beim Download eine Universal-Version angeboten wird.</small></dd></div>
+              <div><dt>macOS</dt><dd>macOS 14 (Sonoma) oder neuer</dd></div>
+              <div><dt>Internet</dt><dd>Nur für Updates und einmalig für das erste PDF</dd></div>
+            </dl>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ Was ist neu ============ -->
+    <section class="abschnitt" id="neu" aria-labelledby="neu-titel">
+      <div class="innen">
+        <div class="abschnitt-kopf einblenden">
+          <p class="augenbraue">Was ist neu</p>
+          <h2 id="neu-titel">Die letzten Versionen</h2>
+        </div>
+        <div class="releases" data-releases aria-live="polite">
+          <article class="release karte beispiel einblenden">
+            <div class="release-kopf">
+              <h3>Version 1.0.0</h3>
+              <span class="badge warn">Beispiel</span>
+            </div>
+            <div class="release-text">
+              <p>Erste Version.</p>
+              <ul>
+                <li>Ein- &amp; Ausgänge mit Zahlungsweg, Belege per Drag &amp; Drop</li>
+                <li>Termine mit vorbereiteter Quittung</li>
+                <li>Rechnungen und Quittungen mit laufender Nummer und GiroCode</li>
+                <li>Kunden mit Verlauf</li>
+                <li>Auswertung mit EÜR und Export</li>
+              </ul>
+            </div>
+          </article>
+          <p class="releases-fuss" data-releases-fuss>Das ist ein Beispiel. Sobald das GitHub-Repository eingetragen ist, stehen hier die echten Versionshinweise.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ Fragen ============ -->
+    <section class="abschnitt" id="fragen" aria-labelledby="fragen-titel">
+      <div class="innen">
+        <div class="abschnitt-kopf einblenden">
+          <p class="augenbraue">Fragen</p>
+          <h2 id="fragen-titel">Häufige Fragen</h2>
+        </div>
+        <div class="fragen">
+          <details class="frage karte einblenden">
+            <summary>Kostet das etwas?</summary>
+            <div class="frage-text"><p>Nein. Kladdy ist kostenlos – ohne Abo, ohne Werbung, ohne Konto.</p></div>
+          </details>
+          <details class="frage karte einblenden">
+            <summary>Brauche ich ein Konto?</summary>
+            <div class="frage-text"><p>Nein. Du lädst die App herunter und legst los. Es gibt keine Anmeldung – weder bei uns noch bei einem anderen Dienst.</p></div>
+          </details>
+          <details class="frage karte einblenden">
+            <summary>Wo liegen meine Daten?</summary>
+            <div class="frage-text">
+              <p>Nur auf deinem Mac, im Ordner <code>~/Library/Application Support/de.kladdy.desktop/</code>: eine Datenbank-Datei (SQLite) und deine Belege.</p>
+              <p>Im Finder kommst du über <b>Gehe zu → Gehe zu Ordner …</b> (<kbd>⇧</kbd><kbd>⌘</kbd><kbd>G</kbd>) dorthin.</p>
+            </div>
+          </details>
+          <details class="frage karte einblenden">
+            <summary>Wie sichere ich meine Daten?</summary>
+            <div class="frage-text">
+              <p>In der App unter <b>Einstellungen → Daten &amp; Backup</b>. Wähle als Ziel einen USB-Stick, eine externe Festplatte oder iCloud Drive.</p>
+              <p>Liegt dein Backup nur auf demselben Mac, erinnert dich die App daran – geht der Mac kaputt, wäre das Backup sonst mit weg.</p>
+            </div>
+          </details>
+          <details class="frage karte einblenden">
+            <summary>Ersetzt die App einen Steuerberater?</summary>
+            <div class="frage-text">
+              <p>Nein. Kladdy hilft dir, Ordnung zu halten und die Zahlen für die EÜR zusammenzustellen. Das ist keine Steuerberatung, alle Angaben sind ohne Gewähr.</p>
+              <p>Wenn du unsicher bist, frag eine Steuerberaterin, einen Steuerberater oder dein Finanzamt.</p>
+            </div>
+          </details>
+          <details class="frage karte einblenden">
+            <summary>Gibt es das für Windows oder iPhone?</summary>
+            <div class="frage-text"><p>Nein, Kladdy gibt es nur für den Mac.</p></div>
+          </details>
+          <details class="frage karte einblenden">
+            <summary>Warum warnt macOS beim ersten Start?</summary>
+            <div class="frage-text">
+              <p>Weil die App nicht bei Apple notarisiert ist – dafür bräuchte es das Apple-Entwicklerprogramm (99 $ im Jahr). Du gibst die App einmal in den Systemeinstellungen frei, danach startet sie ganz normal.</p>
+              <p><a href="#installieren">So gibst du die App frei</a></p>
+            </div>
+          </details>
+          <details class="frage karte einblenden">
+            <summary>Was passiert bei einem Update mit meinen Daten?</summary>
+            <div class="frage-text"><p>Sie bleiben, wo sie sind. Vor jedem Update legt die App automatisch ein Backup an. Falls eine neue Version das Datenformat erweitert, passt sie es beim ersten Start selbst an.</p></div>
+          </details>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="fuss">
+    <div class="innen fuss-innen">
+      <div class="fuss-marke">
+        <a class="marke" href="#top">
+          <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><use href="#i-logo"/></svg>
+          <b>Kladdy</b>
+        </a>
+        <span>© <span data-jahr>2026</span></span>
+      </div>
+      <nav aria-label="Rechtliches und Quellcode">
+        <ul>
+          <li><a href="impressum.html">Impressum</a></li>
+          <li><a href="datenschutz.html">Datenschutz</a></li>
+          <li><a href="https://github.com/" data-quellcode>Quellcode auf GitHub</a></li>
+        </ul>
+      </nav>
+      <p class="fuss-hinweis">
+        <span>Keine Steuerberatung. Alle Angaben ohne Gewähr.</span>
+        <span class="fuss-platzhalter" data-impressum-hinweis hidden>Impressum und Datenschutz enthalten noch Platzhalter.</span>
+      </p>
+    </div>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Datenschutz – Kladdy</title>
+  <meta name="robots" content="noindex">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="bilder/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <script>try{var d=new URLSearchParams(location.search).get('darstellung')||localStorage.getItem('kladdy-darstellung');if(d==='hell'||d==='dunkel')document.documentElement.setAttribute('data-mode',d==='dunkel'?'dark':'light')}catch(e){}document.documentElement.classList.add('js')</script>
+  <script src="seite.js" defer></script>
+  <!--
+    MUSTER OHNE GEWÄHR – KEINE RECHTSBERATUNG.
+    Passt zu dieser Seite, wie sie ist: statisch bei GitHub Pages, keine Cookies, kein Tracking, keine externen
+    Schriften, Abruf der Versionsinfos über api.github.com. Wenn du etwas hinzufügst (Kontaktformular,
+    Statistik, eingebettete Videos …), musst du diese Erklärung anpassen.
+    Alle Platzhalter in eckigen Klammern (gelb markiert; im Code ein span mit der Klasse „platzhalter“)
+    ausfüllen und die span-Hülle entfernen. Solange noch Platzhalter da sind, erscheint oben ein gelber Balken.
+  -->
+</head>
+<body class="recht-seite">
+  <a class="ueberspringen" href="#inhalt">Zum Inhalt springen</a>
+  <svg class="sprite" aria-hidden="true" focusable="false">
+    <defs>
+      <linearGradient id="logo-verlauf" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6366f1"/><stop offset="1" stop-color="#b742b9"/></linearGradient>
+    </defs>
+    <symbol id="i-logo" viewBox="0 0 32 32"><rect width="32" height="32" rx="9" fill="url(#logo-verlauf)"/><path d="M10 8.5h9.5l3 3V23a1 1 0 0 1-1 1H10a1 1 0 0 1-1-1V9.5a1 1 0 0 1 1-1z" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><path d="M12.5 15h7M12.5 19h4.5" stroke="#fff" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.5 13.2A8.5 8.5 0 1 1 10.8 3.5a6.6 6.6 0 0 0 9.7 9.7z"/></symbol>
+    <symbol id="i-chevL" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  </svg>
+  <div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
+
+  <header class="kopf">
+    <div class="innen kopf-innen">
+      <a class="marke" href="index.html">
+        <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><use href="#i-logo"/></svg>
+        <b>Kladdy</b>
+      </a>
+      <div class="kopf-aktionen">
+        <a class="zurueck" href="index.html"><svg class="ic" aria-hidden="true"><use href="#i-chevL"/></svg>Zur Startseite</a>
+        <button type="button" class="icon-btn" data-darstellung aria-label="Dunkle Darstellung" title="Dunkle Darstellung">
+          <svg class="ic ic-mond" aria-hidden="true"><use href="#i-moon"/></svg>
+          <svg class="ic ic-sonne" aria-hidden="true"><use href="#i-sun"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="inhalt" class="innen" tabindex="-1">
+    <article class="recht">
+      <h1>Datenschutz</h1>
+      <p class="unterzeile">Für diese Website und die App Kladdy</p>
+
+      <div class="karte">
+        <h2>Kurz gesagt</h2>
+        <ul>
+          <li>Diese Website setzt keine Cookies, nutzt kein Tracking und lädt keine externen Schriften.</li>
+          <li>Sie liegt bei GitHub Pages. GitHub verarbeitet dabei technisch nötige Daten wie deine IP-Adresse.</li>
+          <li>Die App Kladdy speichert alles lokal auf deinem Mac und überträgt keine Geschäftsdaten.</li>
+        </ul>
+
+        <h2>Verantwortlich</h2>
+        <address>
+          <span class="platzhalter">[Vorname Nachname]</span><br>
+          <span class="platzhalter">[Straße Hausnummer]</span><br>
+          <span class="platzhalter">[PLZ Ort]</span><br>
+          E-Mail: <span class="platzhalter">[name@example.de]</span>
+        </address>
+
+        <h2>Hosting bei GitHub Pages</h2>
+        <p>Diese Website wird von GitHub Pages ausgeliefert. Anbieter ist die GitHub, Inc., 88 Colin P. Kelly Jr. Street, San Francisco, CA 94107, USA (ein Unternehmen von Microsoft).</p>
+        <p>Wenn du die Seite aufrufst, verarbeitet GitHub technisch notwendige Daten in Server-Protokollen (Logfiles): deine IP-Adresse, Datum und Uhrzeit, die aufgerufene Seite oder Datei, die übertragene Datenmenge, die zuvor besuchte Seite (Referrer) sowie Browser und Betriebssystem. Das ist nötig, um die Seite auszuliefern und Angriffe abzuwehren. Ich selbst habe keinen Zugriff auf diese Protokolle.</p>
+        <p>Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO; das berechtigte Interesse liegt in einer sicheren und zuverlässigen Bereitstellung der Website. Wie lange GitHub die Daten speichert, legt GitHub fest – Einzelheiten stehen in der <a href="https://docs.github.com/de/site-policy/privacy-policies/github-general-privacy-statement" rel="noopener">Datenschutzerklärung von GitHub</a>.</p>
+        <p>Dabei können Daten in die USA übermittelt werden. Grundlage dafür sind die Garantien, die GitHub in seiner Datenschutzerklärung nennt – das EU-U.S. Data Privacy Framework (Angemessenheitsbeschluss der EU-Kommission vom 10. Juli 2023, Art. 45 DSGVO) bzw. Standardvertragsklauseln (Art. 46 DSGVO). <span class="platzhalter">[Vor dem Veröffentlichen prüfen: Ist „GitHub, Inc.“ auf dataprivacyframework.gov als aktiv gelistet? Sonst den Satz auf Standardvertragsklauseln beschränken.]</span></p>
+
+        <h2>Abruf der Versionsinformationen</h2>
+        <p>Damit die Startseite die aktuelle Version, die Dateigröße und „Was ist neu“ anzeigen kann, fragt dein Browser beim Aufruf die Liste der neuesten Versionen direkt bei GitHub ab (<code>api.github.com</code>). Dabei erhält GitHub deine IP-Adresse, den Zeitpunkt und übliche technische Angaben deines Browsers. Es werden keine Cookies gesetzt.</p>
+        <p>Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO; das berechtigte Interesse liegt darin, dir die richtige Datei und aktuelle Hinweise anzuzeigen. Empfänger ist derselbe Anbieter, der die Website ohnehin ausliefert (siehe oben).</p>
+
+        <h2>Download der App</h2>
+        <p>Die App liegt bei GitHub („Releases“). Wenn du auf „Download“ klickst, lädt dein Browser die Datei von Servern von GitHub; es gilt dasselbe wie beim Hosting.</p>
+
+        <h2>Keine Cookies, kein Tracking</h2>
+        <p>Diese Website setzt keine Cookies, nutzt keine Statistik- oder Tracking-Dienste und bindet keine Inhalte anderer Anbieter ein (keine externen Schriften, keine Videos, keine Social-Media-Knöpfe).</p>
+        <p><b>Hell/Dunkel:</b> Nur wenn du oben den Umschalter für die Darstellung benutzt, speichert dein Browser deine Wahl („hell“ oder „dunkel“) im lokalen Speicher (<code>localStorage</code>, Eintrag <code>kladdy-darstellung</code>). Das ist kein Cookie, wird an niemanden übertragen und ist technisch nötig, damit sich die Seite deine Wahl merkt (§ 25 Abs. 2 Nr. 2 TDDDG). Du kannst den Eintrag jederzeit über die Einstellungen deines Browsers löschen.</p>
+
+        <h2>Die App Kladdy</h2>
+        <h3>Alles bleibt auf deinem Mac</h3>
+        <p>Kladdy speichert alles, was du eingibst – Ein- und Ausgänge, Belege, Rechnungen, Quittungen, Termine, Kunden und Einstellungen – ausschließlich lokal auf deinem Mac (Ordner <code>~/Library/Application Support/de.kladdy.desktop/</code>). Es gibt kein Benutzerkonto, keine Cloud und keine Analyse- oder Tracking-Funktionen. Geschäftsdaten werden nicht übertragen – weder an mich noch an andere.</p>
+        <p>Wenn du Daten deiner Kundinnen und Kunden in der App speicherst, bist du für diese Daten selbst verantwortlich.</p>
+
+        <h3>Update-Prüfung</h3>
+        <p>Beim Start (höchstens einmal am Tag) und wenn du „Nach Updates suchen …“ wählst, ruft die App die Datei <code>latest.json</code> von GitHub ab. Installierst du ein Update, lädt sie auch das Update-Paket von GitHub. Dabei erhält GitHub technisch bedingt deine IP-Adresse, den Zeitpunkt und übliche technische Angaben der Anfrage. Inhalte aus der App werden nicht übertragen. Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO; das berechtigte Interesse liegt darin, dir Fehlerbehebungen und Sicherheitsupdates anzubieten. Zur Übermittlung in die USA siehe „Hosting bei GitHub Pages“.</p>
+
+        <h3>Das erste PDF</h3>
+        <p>Beim ersten Erstellen eines PDFs lädt der eingebaute Textsatz (Tectonic) einmalig Schriften und Satzpakete von den Servern des Tectonic-Projekts herunter und speichert sie auf deinem Mac. Dabei wird deine IP-Adresse an den jeweiligen Server übermittelt; Inhalte deiner Belege werden nicht übertragen.</p>
+
+        <h3>Backups</h3>
+        <p>Backups legst du an einem Ort deiner Wahl ab, etwa auf einem USB-Stick oder in iCloud Drive. Für iCloud Drive gelten die Datenschutzbestimmungen von Apple.</p>
+
+        <h2>Deine Rechte</h2>
+        <p>Du hast das Recht auf Auskunft (Art. 15 DSGVO), Berichtigung (Art. 16), Löschung (Art. 17), Einschränkung der Verarbeitung (Art. 18), Datenübertragbarkeit (Art. 20) und Widerspruch gegen Verarbeitungen auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO (Art. 21). Schreib dafür einfach an die oben genannte E-Mail-Adresse. Da ich selbst über diese Website keine personenbezogenen Daten speichere, betrifft das vor allem die Verarbeitung durch GitHub; du kannst dich dafür auch direkt an GitHub wenden.</p>
+        <p>Außerdem kannst du dich bei einer Datenschutz-Aufsichtsbehörde beschweren (Art. 77 DSGVO), zum Beispiel in dem Bundesland, in dem du wohnst. <span class="platzhalter">[optional: Für mich zuständig ist … (Landesdatenschutzbehörde) – sonst Satz löschen]</span></p>
+
+        <p class="muster-hinweis">Stand: Oktober 2026 · Muster ohne Gewähr – keine Rechtsberatung.</p>
+      </div>
+    </article>
+  </main>
+
+  <footer class="fuss">
+    <div class="innen fuss-innen">
+      <div class="fuss-marke">
+        <a class="marke" href="index.html">
+          <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><use href="#i-logo"/></svg>
+          <b>Kladdy</b>
+        </a>
+        <span>© <span data-jahr>2026</span></span>
+      </div>
+      <nav aria-label="Rechtliches">
+        <ul>
+          <li><a href="impressum.html">Impressum</a></li>
+          <li><a href="datenschutz.html" aria-current="page">Datenschutz</a></li>
+        </ul>
+      </nav>
+      <p class="fuss-hinweis"><span>Keine Steuerberatung. Alle Angaben ohne Gewähr.</span></p>
+    </div>
+  </footer>
+</body>
+</html>
