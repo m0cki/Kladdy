@@ -1,0 +1,171 @@
+/* Kladdy – Prototyp · Steuer & Export (Reiter der Auswertung)
+ * Sub-Reiter unter dem großen Umschalter, EÜR-Tabelle, Wareneingangsbuch, Grenzwert-Balken, Checkliste,
+ * Export-Liste, Druckansichten (nur mit body.printing-euer).
+ */
+
+/* .row ist im Kern auch eine Flex-Hilfsklasse → klickbare Tabellenzeilen ausdrücklich als Zeile darstellen */
+.aw .fin-table tr.row { display: table-row; }
+
+/* ---------- Sub-Reiter ---------- */
+.aw-tabs { display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; margin-top: -4px; }
+.aw-tabs .seg.tabs button .ic { width: 15px; height: 15px; margin-right: 5px; vertical-align: -3px; }
+.aw-tabs-hint { font-size: .78rem; color: var(--muted); }
+.aw-grpnote { margin-left: 8px; font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--muted); }
+.aw-toexport { padding: 6px 11px; font-size: .8rem; }
+.aw-toexport .ic { width: 15px; height: 15px; }
+
+/* ---------- EÜR-Tabelle ---------- */
+.aw-table { font-size: .82rem; }
+.aw-table th, .aw-table td { padding: 8px 8px; }
+.aw-table th.sticky, .aw-table td.sticky { min-width: 250px; max-width: 290px; padding-left: 12px; }
+.aw-lbl { display: flex; align-items: baseline; gap: 8px; min-width: 0; overflow: hidden; }
+.aw-lbl > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: none; max-width: 100%; }
+.aw-lbl small { color: var(--muted); font-size: .72rem; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.aw-table tr.aw-bereich td.sticky { font-weight: 600; }
+.aw-table tr.r-i td.sticky { padding-left: 28px; }
+.aw-table td.zero { color: var(--muted); opacity: .6; }
+.aw-table th.fut { opacity: .45; }
+.aw-table th.sum, .aw-table td.sum { padding-left: 16px; padding-right: 12px; border-left: 1px solid var(--border); font-weight: 650; min-width: 104px; }
+.aw-table tr.aw-info td { color: var(--muted); font-style: italic; }
+.aw-table tr.aw-leer td { padding-left: 28px; text-align: left; }
+.aw-table tr.aw-info td.sum { font-weight: 500; }
+.aw-table tr.r-hl td { background: color-mix(in oklab, var(--accent) 7%, transparent); }
+.aw-table tr.r-hl td.sticky { background: color-mix(in srgb, var(--surface), var(--accent) 9%); }
+.aw-table tr.r-hl td.latest { background: color-mix(in oklab, var(--accent) 13%, transparent); }
+.aw-table tr.r-hl td.neg-v, .aw-table tr.r-sum td.neg-v { color: var(--neg); }
+.aw-table tbody tr:not(.grp):hover td { background: var(--hover); }
+.aw-table tbody tr:not(.grp):hover td.sticky { background: color-mix(in srgb, var(--surface), var(--text) 4%); }
+.aw-table tr.grp td { padding-top: 9px; padding-bottom: 7px; }
+.aw-foot { flex-direction: column; align-items: flex-start; gap: 4px; color: var(--text-2); }
+.aw-foot > span { display: inline-flex; align-items: flex-start; gap: 8px; }
+.aw-foot .ic { width: 15px; height: 15px; color: var(--accent); margin-top: 2px; }
+.aw-foot .muted { padding-left: 23px; }
+
+/* ---------- Wareneingangsbuch ---------- */
+.aw-web td { vertical-align: middle; }
+.aw-web td.aw-lief { min-width: 180px; }
+.aw-web td.aw-ware { min-width: 180px; color: var(--text-2); }
+.aw-bref { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.aw-bref b { font-size: .76rem; font-weight: 600; }
+.aw-bref small { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: .72rem; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aw-bref small .ic { width: 12px; height: 12px; flex: none; }
+.aw-bref small span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.aw-bref .badge { align-self: flex-start; }
+.aw-web tr.row:focus-visible td { background: var(--accent-soft); outline: none; }
+.aw-web tfoot td.l { text-align: left; }
+
+/* ---------- Export ---------- */
+.aw-exlist { list-style: none; margin: -4px 0 0; padding: 0; display: flex; flex-direction: column; }
+.aw-ex { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 13px 0; border-bottom: 1px solid var(--border); }
+.aw-ex:last-child { border-bottom: 0; padding-bottom: 0; }
+.aw-ex-ic { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent-line); }
+.aw-ex-ic .ic { width: 19px; height: 19px; }
+.aw-ex-t { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.aw-ex-t b { font-size: .92rem; font-weight: 650; }
+.aw-ex-t small { font-size: .78rem; color: var(--muted); line-height: 1.45; }
+.aw-ex-a { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.aw-ex-a .btn.ghost { padding: 0 12px; height: 36px; border-radius: 10px; font-size: .84rem; }
+.aw-ex-a .badge .ic { width: 11px; height: 11px; }
+.aw-ex:has(.aw-ex-a .badge) .aw-ex-ic { color: var(--muted); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--border); }
+.aw-steps { list-style: none; margin: 0; padding: 0; counter-reset: s; display: flex; flex-direction: column; gap: 14px; }
+.aw-steps li { counter-increment: s; display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 2px 10px; font-size: .84rem; line-height: 1.5; }
+.aw-steps li::before { content: counter(s); grid-row: span 2; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: .72rem; font-weight: 700; color: var(--accent); background: var(--accent-soft); }
+.aw-steps b { font-weight: 650; }
+.aw-steps span { color: var(--text-2); }
+.aw-steps .link { font-size: inherit; }
+@media (max-width: 700px) { .aw-ex { grid-template-columns: 38px minmax(0, 1fr); } .aw-ex-a { grid-column: 2; justify-content: flex-start; } }
+
+/* ---------- Grenzwerte ---------- */
+.aw-meters { display: flex; flex-direction: column; }
+.aw-meter { display: flex; flex-direction: column; gap: 8px; padding: 16px 0; border-top: 1px dashed var(--border); }
+.aw-meter:first-child { padding-top: 0; border-top: 0; }
+.aw-meter:last-child { padding-bottom: 0; }
+.aw-meter-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.aw-meter-head b { display: block; font-size: .92rem; font-weight: 650; }
+.aw-meter-head small { display: block; font-size: .76rem; color: var(--muted); }
+.aw-meter-val { display: flex; align-items: baseline; gap: 8px; }
+.aw-meter-val > b { font-size: 1.25rem; font-weight: 700; letter-spacing: -.02em; }
+.aw-meter-val .muted { font-size: .8rem; }
+.aw-meter-pct { margin-left: auto; font-size: .8rem; font-weight: 650; color: var(--text-2); }
+.aw-meter-scale { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: .7rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.aw-hoch { display: inline-flex; align-items: center; gap: 6px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.aw-hoch b { font-weight: 650; color: var(--text); }
+.aw-hoch i { width: 14px; height: 8px; border-radius: 3px; flex: none; background: repeating-linear-gradient(135deg, color-mix(in oklab, var(--accent) 55%, transparent) 0 3px, transparent 3px 6px); box-shadow: inset 0 0 0 1px var(--accent-line); }
+.aw-row3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 28px; }
+.aw-row3 .aw-meter { padding: 0 0 0 28px; border-top: 0; border-left: 1px dashed var(--border); }
+.aw-row3 .aw-meter:first-child { padding-left: 0; border-left: 0; }
+.aw-row3 .aw-meter-text { margin-top: 2px; }
+@media (max-width: 1100px) {
+  .aw-row3 { grid-template-columns: minmax(0, 1fr); }
+  .aw-row3 .aw-meter { padding: 16px 0 0; border-left: 0; border-top: 1px dashed var(--border); margin-top: 16px; }
+  .aw-row3 .aw-meter:first-child { padding-top: 0; border-top: 0; margin-top: 0; }
+}
+.aw-meter-text { font-size: .8rem; line-height: 1.5; color: var(--text-2); }
+
+/* ---------- Checkliste ---------- */
+.aw-ck-count { font-weight: 700; font-size: .9rem; color: var(--text-2); }
+.aw-ck-prog { height: 6px; margin: -4px 0 8px; }
+.aw-checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.aw-checks li { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: .86rem; }
+.aw-checks li:last-child { border-bottom: 0; }
+.aw-ck { width: 22px; height: 22px; flex: none; display: grid; place-items: center; border-radius: 7px; border: 1.5px solid var(--border-strong); color: transparent; transition: background .2s, border-color .2s, color .2s, transform .2s var(--spring); }
+.aw-ck .ic { width: 14px; height: 14px; stroke-width: 2.4; }
+button.aw-ck:hover { border-color: var(--accent); transform: scale(1.06); }
+li.ok .aw-ck { background: var(--pos); border-color: var(--pos); color: #fff; }
+li.auto:not(.ok) .aw-ck { border-color: color-mix(in oklab, var(--warn) 60%, transparent); background: color-mix(in oklab, var(--warn) 14%, transparent); color: var(--warn); }
+.aw-ck-t { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.aw-ck-t small { font-size: .74rem; color: var(--muted); }
+li.ok .aw-ck-t > span { color: var(--text-2); }
+li.auto:not(.ok) .aw-ck-t small { color: var(--warn); }
+.aw-checks .link { font-size: .78rem; white-space: nowrap; }
+.aw-checks .link .ic { width: 13px; height: 13px; }
+.aw-ku .card-foot { flex-wrap: wrap; }
+.aw-ku .card-foot .muted { display: inline-flex; align-items: center; gap: 6px; }
+.aw-ku .card-foot .ic { width: 14px; height: 14px; }
+
+@media (max-width: 700px) { .aw-tabs .seg { flex-wrap: wrap; } }
+
+/* ================= Druck (EÜR, Wareneingangsbuch) =================
+ * Inhalt wird nur zum Drucken in #printArea gesetzt; am Bildschirm nie sichtbar. */
+@media screen { #printArea > .aw-print { display: none; } }
+@media print {
+  body.printing-euer { background: #fff !important; color: #111 !important; }
+  body.printing-euer > :not(#printArea) { display: none !important; }
+  body.printing-euer #printArea { display: block !important; position: static !important; inset: auto !important; width: auto !important; height: auto !important; overflow: visible !important; visibility: visible !important; opacity: 1 !important; transform: none !important; }
+  body.printing-euer #printArea > :not(.aw-print) { display: none !important; }
+}
+.aw-print { color: #111; font: 8.5pt/1.35 "Segoe UI", "Helvetica Neue", Arial, system-ui, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.aw-print .pr-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; padding-bottom: 10px; border-bottom: 1.5pt solid #111; margin-bottom: 12px; }
+.aw-print .pr-title small { display: block; font-size: 8pt; color: #666; text-transform: uppercase; letter-spacing: .08em; font-weight: 600; }
+.aw-print h1 { font-size: 17pt; font-weight: 750; letter-spacing: -.02em; margin: 2px 0 3px; }
+.aw-print .pr-title p { color: #444; font-size: 9pt; }
+.aw-print .pr-firm { text-align: right; font-size: 8pt; color: #333; line-height: 1.45; }
+.aw-print .pr-firm b { display: block; font-size: 9pt; color: #111; }
+.aw-print .pr-kpis { display: flex; gap: 10px; margin-bottom: 12px; }
+.aw-print .pr-kpis div { flex: 1; padding: 7px 10px; border: .75pt solid #ccc; border-radius: 4pt; }
+.aw-print .pr-kpis div.hl { border-color: #111; background: #f3f3f6; }
+.aw-print .pr-kpis small { display: block; font-size: 7.5pt; color: #666; }
+.aw-print .pr-kpis b { font-size: 12pt; font-variant-numeric: tabular-nums; }
+.aw-print .pr-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.aw-print .pr-table th { font-size: 7.5pt; font-weight: 700; color: #444; text-align: right; padding: 4px 4px; border-bottom: 1pt solid #111; }
+.aw-print .pr-table th:first-child, .aw-print .pr-table td:first-child { text-align: left; }
+.aw-print .pr-table td { padding: 3.2px 4px; text-align: right; border-bottom: .5pt solid #ddd; white-space: nowrap; }
+.aw-print .pr-table td small { color: #777; font-size: 7pt; }
+.aw-print .pr-table .s { font-weight: 700; border-left: .75pt solid #bbb; padding-left: 8px; }
+.aw-print .pr-table tr.g td { padding-top: 8px; font-size: 7.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #333; border-bottom: .75pt solid #999; background: #f4f4f6; }
+.aw-print .pr-table tr.g td i { text-transform: none; letter-spacing: 0; font-weight: 500; color: #777; }
+.aw-print .pr-table tr.kat td:first-child { padding-left: 14px; color: #333; }
+.aw-print .pr-table tr.bereich td:first-child { font-weight: 600; }
+.aw-print .pr-table tr.sum td { font-weight: 700; border-top: .75pt solid #111; }
+.aw-print .pr-table tr.gewinn td { font-weight: 800; font-size: 9pt; border-top: 1pt solid #111; border-bottom: 1.5pt double #111; background: #eef0ff; }
+.aw-print .pr-table tr.info td { color: #666; font-style: italic; }
+.aw-print .pr-table tfoot td { font-weight: 700; border-top: 1pt solid #111; border-bottom: 0; }
+.aw-print .pr-note { margin-top: 10px; font-size: 7.5pt; color: #555; max-width: 190mm; }
+.aw-print .pr-foot { display: flex; justify-content: space-between; margin-top: 14px; padding-top: 6px; border-top: .5pt solid #bbb; font-size: 7pt; color: #777; }
+/* Wareneingangsbuch: hochkant, Adresse und Ware dürfen umbrechen */
+.pr-web .pr-table td { white-space: normal; vertical-align: top; text-align: left; }
+.pr-web .pr-table td.r, .pr-web .pr-table th.r { text-align: right; white-space: nowrap; }
+.pr-web .pr-table td.c, .pr-web .pr-table th.c { text-align: center; }
+.pr-web .pr-table th { text-align: left; }
+.pr-web .pr-table tbody tr { break-inside: avoid; }
+.pr-web .pr-table thead { display: table-header-group; }

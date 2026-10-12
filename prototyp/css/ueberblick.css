@@ -1,0 +1,27 @@
+/* Kladdy – Prototyp · Auswertung → Überblick */
+.ov-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px 20px; flex-wrap: wrap; margin-top: 6px; }
+.ov-bar .section-title { margin: 0; }
+.ov-bar .section-title .muted { font-weight: 500; }
+
+/* Status auf einen Blick: eine Zeile Pillen unter dem Umschalter */
+.ub-pills { flex-direction: row; flex-wrap: wrap; min-width: 0; }
+.ub-pills .status-pill { flex: 1 1 200px; flex-direction: column; align-items: flex-start; gap: 2px; padding: 10px 14px 10px 30px; position: relative; }
+.ub-pills .status-pill .status-dot { position: absolute; left: 13px; top: 15px; }
+.ub-pills .status-pill span { margin-left: 0; padding-left: 0; font-size: .76rem; white-space: normal; }
+.ub-pills a.status-pill:hover { transform: translateY(-2px); }
+
+/* Angeheftete Kennzahlen */
+.kz-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--gap); }
+.kz-tile {
+  display: flex; flex-direction: column; gap: 8px; padding: 16px 16px 12px; border-radius: var(--radius); min-width: 0;
+  background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow);
+  transition: transform .3s var(--spring), border-color .2s, box-shadow .3s;
+}
+:root[data-glass="on"] .kz-tile { background: color-mix(in srgb, var(--surface) 82%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+.kz-tile:hover { transform: translateY(-4px); border-color: var(--accent-line); box-shadow: 0 18px 40px -20px color-mix(in oklab, var(--accent) 60%, transparent); }
+.kz-tile .kz-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: .8rem; font-weight: 600; color: var(--muted); }
+.kz-tile .kz-head .ampel { width: 8px; height: 8px; border-radius: 50%; }
+.kz-tile .kz-val { font-size: 1.45rem; font-weight: 700; letter-spacing: -.025em; font-family: var(--num-font); font-variant-numeric: tabular-nums; }
+.kz-tile .kz-foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
+.kz-tile .kz-foot .kpi-sub { flex-direction: column; align-items: flex-start; gap: 1px; }
+.kz-tile .kz-formel { display: block; font-family: var(--mono); font-size: .68rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-top: 8px; border-top: 1px solid var(--border); }

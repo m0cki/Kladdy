@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="de" data-mode="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kladdy – Prototyp</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/buchungen.css">
+  <link rel="stylesheet" href="css/termine.css">
+  <link rel="stylesheet" href="css/belege.css">
+  <link rel="stylesheet" href="css/vorlagen.css">
+  <link rel="stylesheet" href="css/kunden.css">
+  <link rel="stylesheet" href="css/ueberblick.css">
+  <link rel="stylesheet" href="css/liquiditaet.css">
+  <link rel="stylesheet" href="css/kennzahlen.css">
+  <link rel="stylesheet" href="css/steuer.css">
+</head>
+<body>
+  <!-- dekorativer Farbverlauf im Hintergrund (in den Einstellungen abschaltbar) -->
+  <div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
+
+  <div class="app" id="app">
+    <aside class="sidebar" id="sidebar"></aside>
+    <div class="sb-scrim" data-action="toggle-sidebar"></div>
+    <div class="main">
+      <header class="topbar" id="topbar"></header>
+      <main class="content" id="content"></main>
+    </div>
+  </div>
+
+  <!-- Druckbereich: Belege werden hier hineingerendert und nur dieser Teil wird gedruckt -->
+  <div id="printArea" class="print-area" aria-hidden="true"></div>
+
+  <div id="overlays"></div>
+  <div class="drop-overlay" id="dropOverlay" aria-hidden="true">
+    <div class="drop-card">
+      <svg class="ic" viewBox="0 0 24 24"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5M4.5 15v3a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3"/></svg>
+      <b>Beleg hier ablegen</b>
+      <small>PDF oder Foto · Betrag, Datum und Geschäft werden automatisch erkannt</small>
+    </div>
+  </div>
+  <div class="gtip" id="gtip" role="tooltip"></div>
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <script src="js/data.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/qr.js"></script>
+  <script src="js/formula.js"></script>
+  <script src="js/beleg.js"></script>
+  <script src="js/core.js"></script>
+  <!-- Menü: Ein- & Ausgänge · Termine · Rechnungen & Quittungen (+ Maske, Vorlagen) · Kunden · Auswertung (Überblick, Liquidität, Kennzahlen, Steuer & Export) -->
+  <script src="js/pages/buchungen.js"></script>
+  <script src="js/pages/termine.js"></script>
+  <script src="js/pages/belege.js"></script>
+  <script src="js/pages/vorlagen.js"></script>
+  <script src="js/pages/kunden.js"></script>
+  <script src="js/pages/ueberblick.js"></script>
+  <script src="js/pages/liquiditaet.js"></script>
+  <script src="js/pages/kennzahlen.js"></script>
+  <script src="js/pages/steuer.js"></script>
+</body>
+</html>
