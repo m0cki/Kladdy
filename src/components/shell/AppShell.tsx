@@ -1,25 +1,41 @@
-/* App-Rahmen: Aurora, Seitenleiste, Kopfzeile, Inhalt, Schubladen, Toasts.
+/* App-Rahmen: Aurora, Seitenleiste, Kopfzeile, Inhalt, Schubladen, Toasts, Update-Prüfung beim Start.
  * Globale Kürzel: In der Mac-App gehören ⌘N, ⌘O, ⇧⌘L und ⌘\ dem nativen Menü (Events über lib/menu.ts);
  * im Browser (npm run dev) übernimmt sie der Tastatur-Handler hier. ⌘K (Suche) ist immer Sache der Oberfläche. */
 import { useEffect, useRef } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { runCommand } from '../../lib/commands';
 import { watchFenster } from '../../lib/fenster';
 import { inTauri, onMenu, type MenuId } from '../../lib/menu';
+import { isEinstellungen } from '../../lib/einstellungen-index';
+import { autoCheckOnStart } from '../../lib/updates';
 import { useUi } from '../../store/ui';
 import { Toasts } from '../ui/Toasts';
-import { SettingsDrawer } from './SettingsDrawer';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
+import { UpdateNotesDrawer } from './UpdateNotesDrawer';
 
 export function AppShell() {
   const collapsed = useUi((s) => s.sidebarCollapsed);
   const closeDrawer = useUi((s) => s.closeDrawer);
+  const setZurueck = useUi((s) => s.setZurueck);
   const searchRef = useRef<HTMLInputElement>(null);
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
+  const navigate = useNavigate();
+  // aktuelle navigate-Funktion für Menü-Events (Listener wird nur einmal angemeldet)
+  const navRef = useRef(navigate);
+  useEffect(() => {
+    navRef.current = navigate;
+  }, [navigate]);
 
-  useEffect(() => onMenu((id) => runCommand(id)), []);
+  useEffect(() => onMenu((id) => runCommand(id, { navigate: (to) => navRef.current(to) })), []);
   useEffect(() => watchFenster(), []);
+  // Update-Prüfung beim Start: höchstens einmal am Tag, nur wenn eingeschaltet (§3.2)
+  useEffect(() => autoCheckOnStart(), []);
+
+  // Rückweg aus den Einstellungen merken
+  useEffect(() => {
+    if (!isEinstellungen(pathname)) setZurueck(pathname + search);
+  }, [pathname, search, setZurueck]);
 
   useEffect(() => {
     const native = inTauri();
@@ -41,7 +57,7 @@ export function AppShell() {
       else if (k === 'o' && !e.shiftKey) id = 'importieren';
       if (id) {
         e.preventDefault();
-        runCommand(id);
+        runCommand(id, { navigate: (to) => navRef.current(to) });
       }
     };
     window.addEventListener('keydown', onKey);
@@ -70,7 +86,7 @@ export function AppShell() {
           </main>
         </div>
       </div>
-      <SettingsDrawer />
+      <UpdateNotesDrawer />
       <Toasts />
     </>
   );

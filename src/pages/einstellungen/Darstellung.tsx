@@ -1,37 +1,23 @@
-/* Einstellungs-Schublade (§6.10). Phase 0: nur „Darstellung“ – Modus, Themes, Akzent, Farbton, Radius,
- * Schriftgröße, Dichte, Plus/Minus, Monospace-Zahlen, Bewegung, Glas, Aurora. Gespeichert in localStorage. */
+/* Einstellungen › Darstellung (§6.10, §9.1): Modus, Themes, Akzent, Farbton, Radius, Schriftgröße, Dichte,
+ * Plus/Minus, Monospace-Zahlen, Bewegung, Glas, Aurora. Gespeichert in localStorage (lib/settings.ts). */
 import type { CSSProperties, ReactNode } from 'react';
-import { Moon, RotateCcw, Settings as SettingsIcon, Sun } from 'lucide-react';
+import { Moon, RotateCcw, Sun } from 'lucide-react';
 import { THEMES, type Settings } from '../../lib/settings';
 import { useUi } from '../../store/ui';
-import { Drawer } from '../ui/Drawer';
-import { Seg } from '../ui/Seg';
-import { Switch } from '../ui/Switch';
-
-function Row({ label, value, children }: { label: string; value?: string; children: ReactNode }) {
-  return (
-    <div className="set-row">
-      <div className="set-label">
-        <span>{label}</span>
-        {value ? <output>{value}</output> : null}
-      </div>
-      {children}
-    </div>
-  );
-}
+import { Seg } from '../../components/ui/Seg';
+import { Switch } from '../../components/ui/Switch';
+import { SetCard, SetRow } from './SetRow';
 
 type NumKey = 'tintH' | 'tintS' | 'radius' | 'fontScale';
 
-export function SettingsDrawer() {
-  const open = useUi((s) => s.drawer === 'settings');
-  const close = useUi((s) => s.closeDrawer);
+export default function Darstellung() {
   const s = useUi((st) => st.settings);
   const set = useUi((st) => st.setSetting);
   const setTheme = useUi((st) => st.setTheme);
   const reset = useUi((st) => st.resetSettings);
   const toast = useUi((st) => st.toast);
 
-  const range = (key: NumKey, min: number, max: number, step = 1) => (
+  const range = (key: NumKey, min: number, max: number, label: string, step = 1) => (
     <input
       type="range"
       className={key === 'tintH' ? 'hue' : undefined}
@@ -39,6 +25,7 @@ export function SettingsDrawer() {
       max={max}
       step={step}
       value={s[key]}
+      aria-label={label}
       onChange={(e) => set(key, Number(e.target.value))}
     />
   );
@@ -49,10 +36,9 @@ export function SettingsDrawer() {
   ) => <Seg options={options} value={s[key]} onChange={(v) => set(key, v)} ariaLabel={ariaLabel} />;
 
   return (
-    <Drawer open={open} onClose={close} title="Einstellungen" icon={SettingsIcon} width={440}>
-      <section>
-        <h3>Darstellung</h3>
-        <Row label="Modus">
+    <>
+      <SetCard title="Darstellung" i={1}>
+        <SetRow id="modus" label="Modus">
           {seg(
             'mode',
             [
@@ -62,53 +48,54 @@ export function SettingsDrawer() {
             ],
             'Modus',
           )}
-        </Row>
-        <div className="set-label">
-          <span>Farbthema</span>
-          {s.theme === 'custom' ? <span className="badge accent">Eigenes Theme</span> : null}
+        </SetRow>
+        <div className="set-row" data-setting="farbthema">
+          <div className="set-label">
+            <span>Farbthema</span>
+            {s.theme === 'custom' ? <span className="badge accent">Eigenes Theme</span> : null}
+          </div>
+          <div className="themes">
+            {THEMES.map((th) => (
+              <button
+                key={th.id}
+                type="button"
+                className={`theme-sw ${s.theme === th.id ? 'active' : ''}`}
+                aria-pressed={s.theme === th.id}
+                onClick={() => setTheme(th.id)}
+                style={{ '--sw-a': th.accent, '--sw-h': th.tintH, '--sw-s': `${th.tintS}%` } as CSSProperties}
+              >
+                <span className="sw-prev">
+                  <i />
+                  <i />
+                  <i />
+                </span>
+                <span className="sw-name">{th.name}</span>
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="themes">
-          {THEMES.map((th) => (
-            <button
-              key={th.id}
-              type="button"
-              className={`theme-sw ${s.theme === th.id ? 'active' : ''}`}
-              aria-pressed={s.theme === th.id}
-              onClick={() => setTheme(th.id)}
-              style={{ '--sw-a': th.accent, '--sw-h': th.tintH, '--sw-s': `${th.tintS}%` } as CSSProperties}
-            >
-              <span className="sw-prev">
-                <i />
-                <i />
-                <i />
-              </span>
-              <span className="sw-name">{th.name}</span>
-            </button>
-          ))}
-        </div>
-      </section>
+      </SetCard>
 
-      <section>
-        <h3>Feinabstimmung</h3>
-        <Row label="Akzentfarbe">
+      <SetCard title="Feinabstimmung" i={2}>
+        <SetRow id="akzentfarbe" label="Akzentfarbe">
           <div className="color-row">
             <input type="color" value={s.accent} aria-label="Akzentfarbe" onChange={(e) => set('accent', e.target.value.toLowerCase())} />
             <code>{s.accent.toUpperCase()}</code>
           </div>
-        </Row>
-        <Row label="Farbton Hintergrund" value={`${s.tintH}°`}>
-          {range('tintH', 0, 360)}
-        </Row>
-        <Row label="Sättigung Hintergrund" value={`${s.tintS}%`}>
-          {range('tintS', 0, 40)}
-        </Row>
-        <Row label="Eckenrundung" value={`${s.radius}px`}>
-          {range('radius', 0, 24)}
-        </Row>
-        <Row label="Schriftgröße" value={`${s.fontScale}%`}>
-          {range('fontScale', 85, 120, 5)}
-        </Row>
-        <Row label="Dichte">
+        </SetRow>
+        <SetRow id="farbton" label="Farbton Hintergrund" value={`${s.tintH}°`}>
+          {range('tintH', 0, 360, 'Farbton Hintergrund')}
+        </SetRow>
+        <SetRow id="saettigung" label="Sättigung Hintergrund" value={`${s.tintS}%`}>
+          {range('tintS', 0, 40, 'Sättigung Hintergrund')}
+        </SetRow>
+        <SetRow id="radius" label="Eckenrundung" value={`${s.radius}px`}>
+          {range('radius', 0, 24, 'Eckenrundung')}
+        </SetRow>
+        <SetRow id="schriftgroesse" label="Schriftgröße" value={`${s.fontScale}%`}>
+          {range('fontScale', 85, 120, 'Schriftgröße', 5)}
+        </SetRow>
+        <SetRow id="dichte" label="Dichte">
           {seg(
             'density',
             [
@@ -118,8 +105,8 @@ export function SettingsDrawer() {
             ],
             'Dichte',
           )}
-        </Row>
-        <Row label="Plus/Minus-Farben">
+        </SetRow>
+        <SetRow id="plusminus" label="Plus/Minus-Farben">
           {seg(
             'posneg',
             [
@@ -129,8 +116,8 @@ export function SettingsDrawer() {
             ],
             'Plus/Minus-Farben',
           )}
-        </Row>
-        <Row label="Zahlen">
+        </SetRow>
+        <SetRow id="zahlen" label="Zahlen">
           {seg(
             'numFont',
             [
@@ -139,12 +126,11 @@ export function SettingsDrawer() {
             ],
             'Zahlen',
           )}
-        </Row>
-      </section>
+        </SetRow>
+      </SetCard>
 
-      <section>
-        <h3>Bewegung &amp; Effekte</h3>
-        <Row label="Animationen">
+      <SetCard title="Bewegung & Effekte" i={3}>
+        <SetRow id="animationen" label="Animationen">
           {seg(
             'motion',
             [
@@ -154,16 +140,16 @@ export function SettingsDrawer() {
             ],
             'Animationen',
           )}
-        </Row>
-        <div className="toggle-row">
+        </SetRow>
+        <div className="toggle-row" data-setting="glas">
           <span>Glas-Effekt</span>
           <Switch checked={s.glass} onChange={(v) => set('glass', v)} label="Glas-Effekt" />
         </div>
-        <div className="toggle-row">
+        <div className="toggle-row" data-setting="aurora">
           <span>Farbverlauf im Hintergrund</span>
           <Switch checked={s.aurora} onChange={(v) => set('aurora', v)} label="Farbverlauf im Hintergrund" />
         </div>
-        <div className="row wrap">
+        <div className="row wrap" data-setting="darstellung-zuruecksetzen">
           <button
             type="button"
             className="btn ghost"
@@ -176,7 +162,7 @@ export function SettingsDrawer() {
             Darstellung zurücksetzen
           </button>
         </div>
-      </section>
-    </Drawer>
+      </SetCard>
+    </>
   );
 }

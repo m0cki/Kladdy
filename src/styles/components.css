@@ -46,6 +46,16 @@
 .sb-nav .sb-label { flex: 1; font-size: .9rem; font-weight: 550; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sb-nav .sb-badge { font-size: .68rem; font-weight: 700; padding: 1px 7px; border-radius: 99px; background: var(--surface-3); color: var(--text-2); }
 .sb-nav .sb-badge.alarm { background: color-mix(in oklab, var(--neg) 18%, transparent); color: var(--neg); }
+.sb-nav .sb-badge.phase { font-weight: 600; color: var(--muted); background: transparent; box-shadow: inset 0 0 0 1px var(--border-strong); }
+.sb-title { padding: 0 10px 6px; font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 650; white-space: nowrap; overflow: hidden; transition: opacity .25s; }
+.sb-back .sb-label { color: var(--text-2); }
+/* Wechsel Hauptmenü ⇄ Einstellungen: kurz einblenden und leicht seitlich hereingleiten */
+.sb-swap { animation: sbSwapIn .38s var(--ease) both; }
+.sb-swap[data-modus="haupt"] { animation-name: sbSwapBack; }
+@keyframes sbSwapIn { from { opacity: 0; transform: translateX(14px); } }
+@keyframes sbSwapBack { from { opacity: 0; transform: translateX(-14px); } }
+:root[data-motion="reduced"] .sb-swap { animation-name: fade; animation-duration: .25s; }
+:root:not(.ready) .sb-swap { animation: none; }
 @media (min-width: 901px) {
   .sb-collapsed .brand-text, .sb-collapsed .sb-label, .sb-collapsed .sb-badge { opacity: 0; pointer-events: none; width: 0; }
   /* eingeklappt: nur das Logo, mittig (die Ampel hat im Fenster ihre eigene Zeile darüber) */
@@ -59,6 +69,8 @@
     display: grid; place-items: center; font-size: .6rem; line-height: 1; opacity: 1; box-shadow: 0 0 0 2px var(--bg); }
   .sb-collapsed .sb-section { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
   .sb-collapsed .sb-section:first-child { border-top: 0; }
+  .sb-collapsed .sb-title { opacity: 0; height: 0; padding: 0; }
+  .sb-collapsed .sb-nav .sb-badge.phase { display: none; }
   .sb-collapsed .sb-toggle .pnl-chev { rotate: 180deg; }
   .sb-collapsed .sb-toggle:hover .pnl-chev { translate: 1.5px 0; }
 }
@@ -433,7 +445,7 @@ input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 7px; }
 .set-row { display: flex; flex-direction: column; gap: 8px; }
 .set-label { display: flex; justify-content: space-between; align-items: center; font-size: .85rem; font-weight: 600; }
 .set-label output { font-family: var(--mono); font-size: .75rem; color: var(--muted); font-weight: 500; }
-.drawer .seg { align-self: flex-start; flex-wrap: wrap; }
+.drawer .seg, .set-card .seg { align-self: flex-start; flex-wrap: wrap; }
 /* Hinweis-Kasten in den Einstellungen (Datensicherung, Über) */
 .set-note { display: flex; align-items: flex-start; gap: 10px; padding: 11px 13px; border-radius: var(--radius-sm); font-size: .8rem; line-height: 1.5;
   color: var(--text-2); background: var(--surface-2); border: 1px solid var(--border); }
@@ -448,6 +460,7 @@ input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 7px; }
 .set-version small { color: var(--muted); font-size: .74rem; }
 /* ⚙ mit Hinweis-Punkt (Datensicherung prüfen) */
 .tb-gear { position: relative; }
+.tb-gear.active { background: var(--accent-soft); color: var(--accent); }
 .tb-dot { position: absolute; top: 8px; right: 8px; width: 8px; height: 8px; border-radius: 50%; background: var(--warn); box-shadow: 0 0 0 2px var(--bg); }
 .tb-dot[hidden] { display: none; }
 .themes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
@@ -482,7 +495,44 @@ input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 7px; }
 .toast button { padding: 4px 10px; border-radius: 8px; font-weight: 700; color: var(--bg); background: color-mix(in srgb, var(--bg) 18%, transparent); }
 .toast button:hover { background: color-mix(in srgb, var(--bg) 28%, transparent); }
 .toast.out { opacity: 0; transform: translateY(8px); transition: opacity .3s, transform .3s; }
+.toast[data-icon="info"] .ic, .toast[data-icon="download"] .ic { color: var(--bg); }
+.toast[data-icon="warn"] .ic { color: var(--warn); }
+.toast > span:not(.toast-prog) { max-width: 52ch; }
+.toast .toast-x { display: inline-grid; place-items: center; padding: 4px; background: transparent; opacity: .7; }
+.toast .toast-x:hover { opacity: 1; }
+.toast .toast-x .ic { width: 14px; height: 14px; color: var(--bg); }
+/* Fortschritt (Update-Download) als dünner Balken unten im Toast */
+.toast.has-prog { position: relative; overflow: hidden; padding-bottom: 13px; }
+.toast-prog { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: color-mix(in srgb, var(--bg) 22%, transparent); }
+.toast-prog i { position: absolute; inset: 0; background: var(--accent); transform-origin: left; transform: scaleX(var(--p, 0)); transition: transform .25s var(--ease); }
+.toast-prog.indet i { transform: none; width: 35%; animation: progIndet 1.2s var(--ease) infinite; }
+@keyframes progIndet { from { translate: -100% 0; } to { translate: 300% 0; } }
 @keyframes toastIn { from { opacity: 0; transform: translateY(16px) scale(.95); } }
+
+/* Such-Dropdown: bei schmaler Kopfzeile nach beiden Seiten breiter als das Feld (mind. 440 px) */
+.sd { left: min(0px, calc((100% - 440px) / 2)); right: min(0px, calc((100% - 440px) / 2)); }
+.sd-foot { flex-wrap: wrap; }
+.sd-foot > span { white-space: nowrap; }
+
+/* ============ Einstellungsseite ============ */
+.set-content { display: flex; flex-direction: column; gap: var(--gap); max-width: 820px; min-width: 0; }
+.set-card { display: flex; flex-direction: column; gap: 16px; }
+.set-card h3 { font-size: .72rem; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); font-weight: 650; }
+.set-card .themes { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+.update-notes { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .86rem; line-height: 1.55; color: var(--text-2); }
+/* Sprung aus der Suche: Einstellung kurz hervorheben */
+[data-setting] { border-radius: var(--radius-sm); scroll-margin: calc(var(--topbar-h) + 24px) 0 24px; }
+.set-flash { box-shadow: 0 0 0 6px var(--accent-soft), 0 0 0 7px var(--accent-line); background: var(--accent-soft); animation: setFlash 1.8s var(--ease) forwards; }
+@keyframes setFlash {
+  0% { box-shadow: 0 0 0 0 var(--accent-line); background: transparent; }
+  15% { box-shadow: 0 0 0 6px var(--accent-soft), 0 0 0 7px var(--accent-line); background: var(--accent-soft); }
+  70% { box-shadow: 0 0 0 6px var(--accent-soft), 0 0 0 7px var(--accent-line); background: var(--accent-soft); }
+  100% { box-shadow: 0 0 0 6px transparent, 0 0 0 7px transparent; background: transparent; }
+}
+:root[data-motion="reduced"] .set-flash { animation-name: setFlashRuhig; animation-timing-function: linear; }
+@keyframes setFlashRuhig { to { box-shadow: 0 0 0 6px transparent, 0 0 0 7px transparent; background: transparent; } }
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { rotate: 360deg; } }
 
 /* ============ Skeleton ============ */
 .sk { border-radius: var(--radius); background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface-3) 50%, var(--surface-2) 75%); background-size: 300% 100%; animation: shimmer 1.2s linear infinite; }

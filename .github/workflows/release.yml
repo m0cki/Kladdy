@@ -1,0 +1,169 @@
+# Manuelles Release (Ablauf in RELEASE.md). Läuft NUR per Hand über „Run workflow“ und nur von main.
+# 1. Vorprüfung (Branch, Signatur-Secret, pubkey)  2. CI (ci.yml)  3. Version erhöhen, Commit + Tag pushen
+# 4. Bauen, signieren und als GitHub-Release veröffentlichen (.dmg, .app.tar.gz, .sig, latest.json).
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Versionssprung (SemVer)'
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+      prerelease:
+        description: 'Als Vorabversion (Beta) markieren – bekommt kein automatisches Update'
+        type: boolean
+        default: false
+      notes:
+        description: 'Was ist neu? (leer = automatisch aus den Änderungen seit dem letzten Tag)'
+        type: string
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  vorpruefung:
+    name: Vorprüfung
+    runs-on: ubuntu-latest
+    steps:
+      - name: Nur von main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Releases werden nur von main erstellt (gestartet auf ${GITHUB_REF})."
+          exit 1
+
+      - name: Signatur-Secret vorhanden?
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "::error::Das Secret TAURI_SIGNING_PRIVATE_KEY fehlt (Settings → Secrets and variables → Actions). Siehe RELEASE.md."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+
+      - name: Öffentlicher Update-Schlüssel eingetragen?
+        run: |
+          if grep -q 'KLADDY_UPDATER_PUBKEY_PLATZHALTER' src-tauri/tauri.conf.json; then
+            echo "::error::plugins.updater.pubkey in src-tauri/tauri.conf.json ist noch der Platzhalter. Erst den öffentlichen Schlüssel eintragen (RELEASE.md)."
+            exit 1
+          fi
+
+  ci:
+    name: CI
+    needs: vorpruefung
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    name: Version, Tag & Veröffentlichen
+    needs: ci
+    runs-on: macos-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      # Genau der Commit, den die CI geprüft hat (nicht ein inzwischen neuerer Stand von main)
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Abhängigkeiten installieren
+        run: npm ci
+
+      - name: Version erhöhen
+        id: version
+        env:
+          BUMP: ${{ inputs.bump }}
+        run: |
+          npm run --silent version:check
+          VERSION="$(node scripts/version.mjs bump "$BUMP")"
+          TAG="v${VERSION}"
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null || git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null; then
+            echo "::error::Der Tag ${TAG} existiert schon. Nichts veröffentlicht (RELEASE.md → „Wenn etwas schiefgeht“)."
+            exit 1
+          fi
+          npm run --silent version:check
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "Neue Version: ${VERSION}"
+
+      - name: Release-Notizen
+        id: notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NOTES: ${{ inputs.notes }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if [ -n "$(printf '%s' "$NOTES" | tr -d '[:space:]')" ]; then
+            printf '%s\n' "$NOTES" > "$RUNNER_TEMP/notes.md"
+          else
+            PREV="$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || true)"
+            ARGS=(-f "tag_name=${TAG}" -f "target_commitish=${GITHUB_SHA}")
+            [ -n "$PREV" ] && ARGS+=(-f "previous_tag_name=${PREV}")
+            if ! gh api "repos/${GITHUB_REPOSITORY}/releases/generate-notes" "${ARGS[@]}" --jq .body > "$RUNNER_TEMP/notes.md"; then
+              # Rückfall: Commits seit dem letzten Tag
+              RANGE="${PREV:+${PREV}..}HEAD"
+              { echo "## Änderungen"; git log --no-merges --pretty='- %s' $RANGE; } > "$RUNNER_TEMP/notes.md"
+            fi
+          fi
+          {
+            echo "body<<KLADDY_NOTES_EOF"
+            cat "$RUNNER_TEMP/notes.md"
+            echo "KLADDY_NOTES_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Release-Commit und Tag pushen
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock
+          git commit -m "Release ${TAG}"
+          git tag -a "${TAG}" -m "Kladdy ${VERSION}"
+          # Kein Force-Push: Ist main inzwischen weiter, schlägt das fehl und es wird nichts veröffentlicht.
+          if ! git push origin HEAD:main; then
+            echo "::error::main hat sich seit dem Start des Workflows geändert (oder ist gegen Pushes geschützt). Nichts veröffentlicht – den Release-Workflow einfach neu starten (RELEASE.md)."
+            exit 1
+          fi
+          git push origin "${TAG}"
+
+      - name: Bauen, signieren & veröffentlichen
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ steps.version.outputs.tag }}
+          releaseName: Kladdy ${{ steps.version.outputs.version }}
+          releaseBody: ${{ steps.notes.outputs.body }}
+          releaseDraft: false
+          prerelease: ${{ inputs.prerelease }}
+          uploadUpdaterJson: true
+          args: --target aarch64-apple-darwin

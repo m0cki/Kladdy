@@ -12,6 +12,7 @@ import Ueberblick from './pages/auswertung/Ueberblick';
 import Liquiditaet from './pages/auswertung/Liquiditaet';
 import Kennzahlen from './pages/auswertung/Kennzahlen';
 import Steuer from './pages/auswertung/Steuer';
+import Einstellungen from './pages/Einstellungen';
 
 export default function App() {
   return (
@@ -32,6 +33,8 @@ export default function App() {
             <Route path="auswertung/liquiditaet" element={<Liquiditaet />} />
             <Route path="auswertung/kennzahlen" element={<Kennzahlen />} />
             <Route path="auswertung/steuer" element={<Steuer />} />
+            <Route path="einstellungen" element={<Einstellungen />} />
+            <Route path="einstellungen/:bereich" element={<Einstellungen />} />
             <Route path="*" element={<Navigate to={START} replace />} />
           </Route>
         </Routes>
