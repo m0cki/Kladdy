@@ -1,0 +1,72 @@
+# Prüfungen für Pull Requests und main. Erstellt keine Tags, Releases oder Artefakte.
+# Wird von release.yml über `workflow_call` wiederverwendet: schlägt hier etwas fehl, wird nichts veröffentlicht.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Bei Aufruf aus release.yml ist github.workflow „Release“ – eigene Gruppe, kein Konflikt.
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  checks:
+    name: Prüfen & bauen (macOS)
+    runs-on: macos-latest
+    timeout-minutes: 45
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Abhängigkeiten installieren
+        run: npm ci
+
+      - name: Versionen gleich?
+        run: npm run version:check
+
+      - name: Typen prüfen
+        run: npm run typecheck
+
+      - name: Tests (Vitest)
+        run: npm test
+
+      - name: Frontend bauen
+        run: npm run build
+
+      - name: cargo fmt --check
+        working-directory: src-tauri
+        run: cargo fmt --check
+
+      - name: cargo clippy
+        working-directory: src-tauri
+        run: cargo clippy -- -D warnings
+
+      - name: cargo test
+        working-directory: src-tauri
+        run: cargo test
+
+      # Nur Kompilier-Probe: Debug, ohne Bundle, ohne Update-Signatur.
+      - name: tauri build (Kompilier-Probe)
+        run: npm run tauri -- build --debug --no-bundle --ci
