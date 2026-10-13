@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { datenbank, sqlWert, sqlWerte, zeitstempel } from './db';
+import { datenbank, datenbankVerfuegbar, nacheinander, sqlWert, sqlWerte, zeitstempel } from './db';
 
 describe('sqlWert', () => {
   it('wandelt Wahrheitswerte und undefined', () => {
@@ -37,5 +37,31 @@ describe('zeitstempel', () => {
 describe('datenbank', () => {
   it('außerhalb der App mit klarer Meldung abgelehnt', async () => {
     await expect(datenbank()).rejects.toThrow(/nur in der App/);
+    expect(datenbankVerfuegbar()).toBe(false);
+  });
+});
+
+describe('nacheinander', () => {
+  it('führt Aufträge strikt nacheinander aus, auch nach einem Fehler', async () => {
+    const log: string[] = [];
+    const warte = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const a = nacheinander(async () => {
+      log.push('a+');
+      await warte(10);
+      log.push('a-');
+      return 1;
+    });
+    const b = nacheinander(async () => {
+      log.push('b');
+      throw new Error('kaputt');
+    });
+    const c = nacheinander(async () => {
+      log.push('c');
+      return 3;
+    });
+    await expect(a).resolves.toBe(1);
+    await expect(b).rejects.toThrow('kaputt');
+    await expect(c).resolves.toBe(3);
+    expect(log).toEqual(['a+', 'a-', 'b', 'c']);
   });
 });

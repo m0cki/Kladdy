@@ -32,6 +32,21 @@ export function zeitstempel(d: Date = new Date()): string {
   return d.toISOString().replace(/\.\d{3}Z$/, 'Z');
 }
 
+/** Gibt es hier eine Datenbank? Nein im Browser (npm run dev): Seiten zeigen dann einen Hinweis statt Daten. */
+export const datenbankVerfuegbar = (): boolean => isTauri();
+
+/**
+ * Schreibvorgänge nacheinander ausführen (eine gemeinsame Warteschlange). Ersetzt keine Transaktion, verhindert aber,
+ * dass zwei schnelle Änderungen (z. B. zwei Felder kurz nacheinander verlassen) ihren alten Stand gleichzeitig lesen.
+ * Ein Fehler bricht nur den eigenen Auftrag ab, nicht die folgenden.
+ */
+let kette: Promise<unknown> = Promise.resolve();
+export function nacheinander<T>(auftrag: () => Promise<T>): Promise<T> {
+  const ergebnis = kette.then(auftrag, auftrag);
+  kette = ergebnis.catch(() => undefined);
+  return ergebnis;
+}
+
 let verbindung: Promise<Database> | null = null;
 
 /** Die eine Datenbank-Verbindung der App (wird beim ersten Aufruf geöffnet und migriert). */
