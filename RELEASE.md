@@ -59,8 +59,10 @@ Repository → **Settings → Secrets and variables → Actions → New reposito
   (der Code enthält keine Nutzerdaten – die bleiben auf dem Mac).
 - Settings → Actions → General → Workflow permissions: „Read and write permissions“ ist **nicht** nötig; der
   Release-Job fordert `contents: write` selbst an.
-- Ist `main` per Branch-Schutz gegen direkte Pushes gesperrt, kann der Workflow den Release-Commit nicht pushen.
-  Dann für `github-actions[bot]` eine Ausnahme erlauben.
+- Ruleset für `main` (Settings → Rules → Rulesets): Änderungen nur per Pull Request (0 Freigaben, eigene PRs
+  dürfen gemergt werden), Pflicht-Checks `Detect changes`, `Frontend (Linux)` und `Rust (macOS)`, kein Force-Push,
+  kein Löschen. Die Checks laufen deshalb bei **jedem** PR, auch bei reinen Doku-Änderungen. Der Release-Workflow
+  pusht nichts nach `main`, nur den Tag; eine Ausnahme im Ruleset ist nicht nötig.
 
 ## Ein Release erstellen
 
@@ -78,16 +80,19 @@ Was der Workflow (`.github/workflows/release.yml`) tut:
    **die CI für diesen `main`-Commit ist grün**. Die Prüfungen (`ci.yml`) laufen bei jedem Push auf `main` ohnehin:
    Versionen gleich, Typecheck, Vitest und Frontend-Build auf Linux; `cargo fmt`, `clippy` und `cargo test` auf macOS,
    aber nur wenn sich `src-tauri/` geändert hat (Mac-Runner warten oft lange; ein übersprungener Job zählt als grün);
-   der Release-Workflow wiederholt sie nicht, sondern fragt ihr Ergebnis ab. Läuft die CI noch oder ist sie rot, bricht er
-   ab, ohne etwas zu veröffentlichen. Reine Release-Commits (nur Versionsdateien) und reine Doku-Änderungen
-   (`*.md`, `referenz/`, `docs/`, `LICENSE`) lösen keine CI aus, für sie zählt der Vorgänger-Commit. Der Build in Schritt 4 kompiliert die App ohnehin noch einmal.
-2. **Version erhöhen:** `node scripts/version.mjs bump <bump>` schreibt dieselbe Version in `package.json`,
-   `package-lock.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` und `src-tauri/Cargo.lock`.
-   Existiert der Tag `vX.Y.Z` schon, bricht der Workflow ab.
-3. **Commit „Release vX.Y.Z“** auf `main`, Tag `vX.Y.Z`, beides pushen. Veröffentlicht wird genau der Commit, den die
-   CI geprüft hat (`github.sha`). Ist `main` in der Zwischenzeit weitergelaufen, schlägt der Push fehl (kein
-   Force-Push) und der Workflow bricht mit einer klaren Meldung ab, ohne etwas zu veröffentlichen – dann einfach neu
-   starten.
+   der Release-Workflow wiederholt sie nicht, sondern fragt ihr Ergebnis ab. Laufen die Checks noch oder sind sie rot,
+   bricht er ab, ohne etwas zu veröffentlichen. Reine Doku-Änderungen auf `main` (`*.md`, `referenz/`, `docs/`,
+   `LICENSE`) lösen keinen Lauf aus, für sie zählt der Vorgänger-Commit. Der Build in Schritt 4 kompiliert die App
+   ohnehin noch einmal.
+2. **Version erhöhen:** Ausgangspunkt ist die höhere von zwei Versionen: die in den Versionsdateien auf `main` und die
+   des höchsten Tags `vX.Y.Z`. `node scripts/version.mjs bump <bump>` schreibt dann dieselbe neue Version in
+   `package.json`, `package-lock.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` und `src-tauri/Cargo.lock`.
+   Existiert der Tag schon, bricht der Workflow ab.
+3. **Commit „Release vX.Y.Z“** direkt auf dem geprüften `main`-Commit (`github.sha`) und Tag `vX.Y.Z`; gepusht wird
+   **nur der Tag**. `main` ist per Ruleset geschützt, deshalb landet der Release-Commit nicht dort, und die
+   Versionsdateien auf `main` bleiben auf dem alten Stand (in Entwicklungs-Builds zeigt die App diese Version). Die
+   veröffentlichte Version steht im Tag. Für einen Sprung, den `bump` nicht abbildet, per PR auf `main`
+   `node scripts/version.mjs set X.Y.Z` setzen; ist sie höher als der letzte Tag, zählt sie als Ausgangspunkt.
 4. **Bauen & veröffentlichen** mit `tauri-apps/tauri-action@v1` für `aarch64-apple-darwin` (Apple Silicon), signiert mit
    dem Update-Schlüssel. Das Release enthält:
    - `Kladdy_X.Y.Z_aarch64.dmg` – zum Herunterladen und Installieren,
@@ -99,12 +104,12 @@ Versionen lokal prüfen: `npm run version:check`. Von Hand setzen (nur im Notfal
 
 ### Wenn etwas schiefgeht
 
-- **Abbruch vor Schritt 4:** nichts ist passiert, Fehler beheben und neu starten.
-- **Abbruch in Schritt 5** (Commit und Tag sind schon gepusht, das Release fehlt oder ist unvollständig): Den Fehler
+- **Abbruch vor Schritt 3:** nichts ist passiert, Fehler beheben und neu starten.
+- **Abbruch in Schritt 4** (der Tag ist schon gepusht, das Release fehlt oder ist unvollständig): Den Fehler
   beheben und ein neues Release starten (empfohlen; es bekommt die nächste Nummer, Versionsnummern werden nie
   wiederverwendet). „Re-run failed jobs“ hilft nicht: Er baut wieder vom alten Commit, kommt auf dieselbe Nummer und
   bricht ab, weil der Tag schon existiert. Nur wenn noch niemand die Version bekommen hat, darf man stattdessen das
-  unvollständige Release und den Tag auf GitHub löschen, den Release-Commit zurücknehmen und neu starten.
+  unvollständige Release und den Tag auf GitHub löschen und neu starten.
 
 ## In der App
 

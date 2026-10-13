@@ -1,6 +1,7 @@
 # Manuelles Release (Ablauf in RELEASE.md). Läuft NUR per Hand über „Run workflow“ und nur von main.
-# 1. Vorprüfung (Branch, Signatur-Secret, pubkey, CI auf main grün)  2. Version erhöhen, Commit + Tag pushen
-# 3. Bauen, signieren und als GitHub-Release veröffentlichen (.dmg, .app.tar.gz, .sig, latest.json).
+# 1. Vorprüfung (Branch, Signatur-Secret, pubkey, Checks auf main grün)  2. Version erhöhen, Release-Commit + Tag
+# pushen (nur den Tag, main ist geschützt)  3. Bauen, signieren und als GitHub-Release veröffentlichen
+# (.dmg, .app.tar.gz, .sig, latest.json).
 name: Release
 
 on:
@@ -62,16 +63,13 @@ jobs:
             exit 1
           fi
 
-      # Die CI läuft bei jedem Push auf main (ci.yml). Statt sie hier zu wiederholen, wird ihr Ergebnis für
-      # genau diesen Commit abgefragt. Ohne eigenen CI-Lauf sind nur Commits erlaubt, die nichts Prüfbares
-      # ändern – für sie zählt der Vorgänger (erster Elternteil):
-      #  - Release-Commits dieser Action (nur Versionsdateien; GITHUB_TOKEN-Pushes lösen keine CI aus)
-      #  - reine Doku-Änderungen (paths-ignore in ci.yml, Liste in DOKU_PFADE gleich halten)
+      # Die Checks laufen bei jedem Push auf main (ci.yml). Statt sie hier zu wiederholen, wird ihr Ergebnis für
+      # genau diesen Commit abgefragt. Ohne eigenen Lauf sind nur reine Doku-Änderungen erlaubt (paths-ignore in
+      # ci.yml, Liste in DOKU_PFADE gleich halten); für sie zählt der Vorgänger (erster Elternteil).
       - name: Checks green on main?
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          VERSIONSDATEIEN='^(package\.json|package-lock\.json|src-tauri/tauri\.conf\.json|src-tauri/Cargo\.toml|src-tauri/Cargo\.lock)$'
           DOKU_PFADE='(\.md$|^referenz/|^docs/|^LICENSE$)'
           SHA="${GITHUB_SHA}"
           while :; do
@@ -90,13 +88,11 @@ jobs:
               echo "CI grün für ${SHA:0:7}: ${URL}"
               break
             fi
-            # kein CI-Lauf: nur erlaubt, wenn der Commit nichts Prüfbares ändert (Vergleich mit dem ersten Elternteil)
-            SUBJECT="$(git log -1 --format=%s "$SHA")"
+            # kein Lauf: nur erlaubt, wenn der Commit nur Doku ändert (Vergleich mit dem ersten Elternteil)
             DATEIEN="$(git diff --name-only "${SHA}^1" "$SHA")"
-            NICHT_VERSION="$(printf '%s\n' "$DATEIEN" | grep -Ev "$VERSIONSDATEIEN" | grep -v '^$' || true)"
             NICHT_DOKU="$(printf '%s\n' "$DATEIEN" | grep -Ev "$DOKU_PFADE" | grep -v '^$' || true)"
-            if { [[ "$SUBJECT" =~ ^Release\ v[0-9] ]] && [ -z "$NICHT_VERSION" ]; } || [ -z "$NICHT_DOKU" ]; then
-              echo "${SHA:0:7} ändert nichts Prüfbares – prüfe den Vorgänger."
+            if [ -z "$NICHT_DOKU" ]; then
+              echo "${SHA:0:7} ändert nur Doku – prüfe den Vorgänger."
               SHA="$(git rev-parse "${SHA}^1")"
               continue
             fi
@@ -136,12 +132,20 @@ jobs:
       - name: Abhängigkeiten installieren
         run: npm ci
 
+      # Die Release-Commits liegen nicht auf main (geschützt, die Action pusht nur den Tag). Die zuletzt
+      # veröffentlichte Version steht deshalb im höchsten Tag, nicht in den Versionsdateien auf main.
+      # Ausgangspunkt ist die höhere von beiden; so lässt sich per „set“ auf main auch ein Sprung vorgeben.
       - name: Version erhöhen
         id: version
         env:
           BUMP: ${{ inputs.bump }}
         run: |
           npm run --silent version:check
+          DATEI="$(node scripts/version.mjs get)"
+          LETZTER_TAG="$(git tag -l 'v[0-9]*' --sort=-v:refname | head -n 1)"
+          BASIS="$(printf '%s\n%s\n' "$DATEI" "${LETZTER_TAG#v}" | grep -v '^$' | sort -V | tail -n 1)"
+          echo "Versionsdateien: ${DATEI}, letzter Tag: ${LETZTER_TAG:-keiner}, Basis: ${BASIS}"
+          if [ "$BASIS" != "$DATEI" ]; then node scripts/version.mjs set "$BASIS" >/dev/null; fi
           VERSION="$(node scripts/version.mjs bump "$BUMP")"
           TAG="v${VERSION}"
           if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null || git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null; then
@@ -163,7 +167,8 @@ jobs:
           if [ -n "$(printf '%s' "$NOTES" | tr -d '[:space:]')" ]; then
             printf '%s\n' "$NOTES" > "$RUNNER_TEMP/notes.md"
           else
-            PREV="$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || true)"
+            # höchster bisheriger Tag (git describe findet ihn nicht: Release-Commits liegen neben main)
+            PREV="$(git tag -l 'v[0-9]*' --sort=-v:refname | head -n 1)"
             ARGS=(-f "tag_name=${TAG}" -f "target_commitish=${GITHUB_SHA}")
             [ -n "$PREV" ] && ARGS+=(-f "previous_tag_name=${PREV}")
             if ! gh api "repos/${GITHUB_REPOSITORY}/releases/generate-notes" "${ARGS[@]}" --jq .body > "$RUNNER_TEMP/notes.md"; then
@@ -183,18 +188,15 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
           TAG: ${{ steps.version.outputs.tag }}
         run: |
-          # Release-Commit unter dem Konto des Repository-Inhabers (nur m0cki erscheint als Contributor)
+          # Release-Commit unter dem Konto des Repository-Inhabers (nur m0cki erscheint als Contributor).
+          # Er hängt direkt am geprüften main-Commit, wird aber nicht nach main gepusht (Ruleset: nur per PR);
+          # der Tag hält ihn fest. main behält die alten Versionsdateien, maßgeblich ist der Tag.
           git config user.name "m0cki"
           git config user.email "148272869+m0cki@users.noreply.github.com"
           git add package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock
           git commit -m "Release ${TAG}"
           git tag -a "${TAG}" -m "Kladdy ${VERSION}"
-          # Kein Force-Push: Ist main inzwischen weiter, schlägt das fehl und es wird nichts veröffentlicht.
-          if ! git push origin HEAD:main; then
-            echo "::error::main hat sich seit dem Start des Workflows geändert (oder ist gegen Pushes geschützt). Nichts veröffentlicht – den Release-Workflow einfach neu starten (RELEASE.md)."
-            exit 1
-          fi
-          git push origin "${TAG}"
+          git push origin "refs/tags/${TAG}"
 
       - name: Bauen, signieren & veröffentlichen
         uses: tauri-apps/tauri-action@v1
