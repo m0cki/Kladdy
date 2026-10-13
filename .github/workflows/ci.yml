@@ -1,6 +1,6 @@
 # Prüfungen für Pull Requests und main. Erstellt keine Tags, Releases oder Artefakte.
 # release.yml fragt das Ergebnis dieses Laufs für den main-Commit ab: ist es nicht grün, wird nichts veröffentlicht.
-name: CI
+name: Checks
 
 # Reine Doku-Änderungen lösen keine CI aus. release.yml akzeptiert solche Commits ohne eigenen Lauf
 # (gleiche Liste dort in DOKU_PFADE pflegen).
@@ -23,8 +23,8 @@ jobs:
   # Rust nur prüfen, wenn sich src-tauri/ (oder diese Datei) geändert hat. Mac-Runner sind knapp und
   # warten oft minutenlang auf Zuteilung; Linux-Runner starten sofort. Ein übersprungener Job zählt als grün,
   # release.yml muss dafür nichts wissen.
-  aenderungen:
-    name: Änderungen erkennen
+  changes:
+    name: Detect changes
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -34,7 +34,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Geänderte Pfade
+      - name: Changed paths
         id: pfade
         env:
           BASIS: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
@@ -53,7 +53,7 @@ jobs:
           fi
 
   frontend:
-    name: Frontend prüfen (Linux)
+    name: Frontend (Linux)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -64,25 +64,25 @@ jobs:
           node-version: lts/*
           cache: npm
 
-      - name: Abhängigkeiten installieren
+      - name: Install dependencies
         run: npm ci
 
-      - name: Versionen gleich?
+      - name: Versions in sync
         run: npm run version:check
 
-      - name: Typen prüfen
+      - name: Typecheck
         run: npm run typecheck
 
       - name: Tests (Vitest)
         run: npm test
 
-      - name: Frontend bauen
+      - name: Build frontend
         run: npm run build
 
   rust:
-    name: Rust prüfen (macOS)
-    needs: aenderungen
-    if: needs.aenderungen.outputs.rust == 'true'
+    name: Rust (macOS)
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
     runs-on: macos-latest
     timeout-minutes: 45
     env:
@@ -100,7 +100,7 @@ jobs:
 
       # generate_context! verlangt, dass frontendDist existiert; der Inhalt ist für die Prüfung egal
       # (das echte Frontend baut der Linux-Job, der Release-Build baut alles vollständig).
-      - name: Platzhalter für dist/
+      - name: Placeholder dist/
         run: mkdir -p dist
 
       - name: cargo fmt --check

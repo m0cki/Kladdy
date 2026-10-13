@@ -67,7 +67,7 @@ jobs:
       # ändern – für sie zählt der Vorgänger (erster Elternteil):
       #  - Release-Commits dieser Action (nur Versionsdateien; GITHUB_TOKEN-Pushes lösen keine CI aus)
       #  - reine Doku-Änderungen (paths-ignore in ci.yml, Liste in DOKU_PFADE gleich halten)
-      - name: CI auf main grün?
+      - name: Checks green on main?
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
