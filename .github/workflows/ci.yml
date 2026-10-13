@@ -1,5 +1,5 @@
 # Prüfungen für Pull Requests und main. Erstellt keine Tags, Releases oder Artefakte.
-# Wird von release.yml über `workflow_call` wiederverwendet: schlägt hier etwas fehl, wird nichts veröffentlicht.
+# release.yml fragt das Ergebnis dieses Laufs für den main-Commit ab: ist es nicht grün, wird nichts veröffentlicht.
 name: CI
 
 on:

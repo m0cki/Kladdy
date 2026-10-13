@@ -74,17 +74,20 @@ GitHub → **Actions → Release → Run workflow** (Branch: `main`). Eingaben:
 
 Was der Workflow (`.github/workflows/release.yml`) tut:
 
-1. **Vorprüfung:** läuft nur von `main`, Secret `TAURI_SIGNING_PRIVATE_KEY` vorhanden, `pubkey` kein Platzhalter.
-2. **CI:** alle Prüfungen aus `ci.yml` (Versionen gleich, Typecheck, Vitest, Frontend-Build, `cargo fmt`, `clippy`,
-   `cargo test`, Tauri-Kompilier-Probe). Schlägt etwas fehl, wird **nichts** veröffentlicht.
-3. **Version erhöhen:** `node scripts/version.mjs bump <bump>` schreibt dieselbe Version in `package.json`,
+1. **Vorprüfung:** läuft nur von `main`, Secret `TAURI_SIGNING_PRIVATE_KEY` vorhanden, `pubkey` kein Platzhalter, und
+   **die CI für diesen `main`-Commit ist grün**. Die Prüfungen (`ci.yml`: Versionen gleich, Typecheck, Vitest,
+   Frontend-Build, `cargo fmt`, `clippy`, `cargo test`, Tauri-Kompilier-Probe) laufen bei jedem Push auf `main` ohnehin;
+   der Release-Workflow wiederholt sie nicht, sondern fragt ihr Ergebnis ab. Läuft die CI noch oder ist sie rot, bricht er
+   ab, ohne etwas zu veröffentlichen. Reine Release-Commits (nur Versionsdateien) lösen keine CI aus, für sie zählt der
+   Vorgänger-Commit. Der Build in Schritt 4 kompiliert die App ohnehin noch einmal.
+2. **Version erhöhen:** `node scripts/version.mjs bump <bump>` schreibt dieselbe Version in `package.json`,
    `package-lock.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` und `src-tauri/Cargo.lock`.
    Existiert der Tag `vX.Y.Z` schon, bricht der Workflow ab.
-4. **Commit „Release vX.Y.Z“** auf `main`, Tag `vX.Y.Z`, beides pushen. Veröffentlicht wird genau der Commit, den die
+3. **Commit „Release vX.Y.Z“** auf `main`, Tag `vX.Y.Z`, beides pushen. Veröffentlicht wird genau der Commit, den die
    CI geprüft hat (`github.sha`). Ist `main` in der Zwischenzeit weitergelaufen, schlägt der Push fehl (kein
    Force-Push) und der Workflow bricht mit einer klaren Meldung ab, ohne etwas zu veröffentlichen – dann einfach neu
    starten.
-5. **Bauen & veröffentlichen** mit `tauri-apps/tauri-action@v1` für `aarch64-apple-darwin` (Apple Silicon), signiert mit
+4. **Bauen & veröffentlichen** mit `tauri-apps/tauri-action@v1` für `aarch64-apple-darwin` (Apple Silicon), signiert mit
    dem Update-Schlüssel. Das Release enthält:
    - `Kladdy_X.Y.Z_aarch64.dmg` – zum Herunterladen und Installieren,
    - `Kladdy_X.Y.Z_aarch64.app.tar.gz` + `.sig` – das Update-Paket mit Signatur
