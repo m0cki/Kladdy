@@ -26,3 +26,5 @@
   Kunden mit Buchungen/Belegen erst nach Fristablauf anonymisieren (§2.10), nie vorher löschen.
 - Tests: Vitest für lib/*, cargo test für Rust. Vor jedem Commit: npm run typecheck && npm test.
 - Nach jeder Phase: App mit `npm run tauri dev` starten und Prüfpunkte nennen.
+- Git: keine Claude-Hinweise in Commits oder PRs (kein „Co-Authored-By: Claude …“, kein „Generated with Claude Code“).
+  Als Contributor erscheint nur m0cki.
