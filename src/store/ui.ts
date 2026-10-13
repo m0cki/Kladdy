@@ -1,4 +1,4 @@
-/* UI-Zustand (zustand): Darstellung, Seitenleiste, Schubladen, Toasts. Daten kommen ab Phase 1 aus SQLite. */
+/* UI-Zustand (zustand): Darstellung, Seitenleiste, Schubladen, Toasts, Rückweg aus den Einstellungen. Daten kommen ab Phase 1 aus SQLite. */
 import { flushSync } from 'react-dom';
 import { create } from 'zustand';
 import {
@@ -36,11 +36,23 @@ function loadSidebar(): boolean {
   }
 }
 
-export type DrawerId = 'settings' | null;
+export type DrawerId = 'update-notes' | null;
+export type ToastIcon = 'check' | 'info' | 'warn' | 'download';
+export interface ToastAction {
+  label: string;
+  run: () => void;
+}
 export interface Toast {
   id: number;
   text: string;
-  icon?: 'check' | 'info';
+  icon?: ToastIcon;
+  /** gleicher Schlüssel ersetzt den bestehenden Toast an Ort und Stelle (z. B. Update-Fortschritt) */
+  key?: string;
+  actions?: ToastAction[];
+  /** bleibt stehen, bis er geschlossen oder ersetzt wird */
+  sticky?: boolean;
+  /** Fortschrittsbalken: 0–1, null = unbestimmt, undefined = keiner */
+  progress?: number | null;
 }
 
 interface UiState {
@@ -56,8 +68,12 @@ interface UiState {
   toggleSidebar: () => void;
   openDrawer: (id: Exclude<DrawerId, null>) => void;
   closeDrawer: () => void;
-  toast: (text: string, icon?: Toast['icon']) => void;
+  toast: (text: string, icon?: ToastIcon) => void;
+  showToast: (t: Omit<Toast, 'id'>) => number;
   dismissToast: (id: number) => void;
+  /** Letzte Seite außerhalb der Einstellungen (⚙ oder Esc führt dorthin zurück) */
+  zurueck: string;
+  setZurueck: (path: string) => void;
 }
 
 let toastId = 0;
@@ -92,7 +108,19 @@ export const useUi = create<UiState>((set, get) => {
       const id = ++toastId;
       set({ toasts: [...get().toasts, { id, text, icon }] });
     },
+    showToast: (t) => {
+      const existing = t.key ? get().toasts.find((x) => x.key === t.key) : undefined;
+      if (existing) {
+        set({ toasts: get().toasts.map((x) => (x.id === existing.id ? { ...t, id: existing.id } : x)) });
+        return existing.id;
+      }
+      const id = ++toastId;
+      set({ toasts: [...get().toasts, { icon: 'check', ...t, id }] });
+      return id;
+    },
     dismissToast: (id) => set({ toasts: get().toasts.filter((t) => t.id !== id) }),
+    zurueck: '',
+    setZurueck: (zurueck) => set({ zurueck }),
   };
 });
 
