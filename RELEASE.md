@@ -75,8 +75,9 @@ GitHub → **Actions → Release → Run workflow** (Branch: `main`). Eingaben:
 Was der Workflow (`.github/workflows/release.yml`) tut:
 
 1. **Vorprüfung:** läuft nur von `main`, Secret `TAURI_SIGNING_PRIVATE_KEY` vorhanden, `pubkey` kein Platzhalter, und
-   **die CI für diesen `main`-Commit ist grün**. Die Prüfungen (`ci.yml`: Versionen gleich, Typecheck, Vitest,
-   Frontend-Build, `cargo fmt`, `clippy`, `cargo test`) laufen bei jedem Push auf `main` ohnehin;
+   **die CI für diesen `main`-Commit ist grün**. Die Prüfungen (`ci.yml`) laufen bei jedem Push auf `main` ohnehin:
+   Versionen gleich, Typecheck, Vitest und Frontend-Build auf Linux; `cargo fmt`, `clippy` und `cargo test` auf macOS,
+   aber nur wenn sich `src-tauri/` geändert hat (Mac-Runner warten oft lange; ein übersprungener Job zählt als grün);
    der Release-Workflow wiederholt sie nicht, sondern fragt ihr Ergebnis ab. Läuft die CI noch oder ist sie rot, bricht er
    ab, ohne etwas zu veröffentlichen. Reine Release-Commits (nur Versionsdateien) und reine Doku-Änderungen
    (`*.md`, `referenz/`, `docs/`, `LICENSE`) lösen keine CI aus, für sie zählt der Vorgänger-Commit. Der Build in Schritt 4 kompiliert die App ohnehin noch einmal.

@@ -20,12 +20,42 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  checks:
-    name: Prüfen & bauen (macOS)
-    runs-on: macos-latest
-    timeout-minutes: 45
-    env:
-      CARGO_TERM_COLOR: always
+  # Rust nur prüfen, wenn sich src-tauri/ (oder diese Datei) geändert hat. Mac-Runner sind knapp und
+  # warten oft minutenlang auf Zuteilung; Linux-Runner starten sofort. Ein übersprungener Job zählt als grün,
+  # release.yml muss dafür nichts wissen.
+  aenderungen:
+    name: Änderungen erkennen
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      rust: ${{ steps.pfade.outputs.rust }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Geänderte Pfade
+        id: pfade
+        env:
+          BASIS: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          # Basis unbekannt (erster Push, Force-Push) -> sicherheitshalber alles prüfen
+          if [ -z "$BASIS" ] || ! git cat-file -e "${BASIS}^{commit}" 2>/dev/null; then
+            echo "Basis ${BASIS:-leer} nicht gefunden, Rust wird geprüft."
+            echo "rust=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          DATEIEN="$(git diff --name-only "${BASIS}...${GITHUB_SHA}")"
+          echo "$DATEIEN"
+          if grep -Eq '^(src-tauri/|\.github/workflows/ci\.yml$)' <<< "$DATEIEN"; then
+            echo "rust=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "rust=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  frontend:
+    name: Frontend prüfen (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
 
@@ -33,14 +63,6 @@ jobs:
         with:
           node-version: lts/*
           cache: npm
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri -> target
 
       - name: Abhängigkeiten installieren
         run: npm ci
@@ -57,12 +79,35 @@ jobs:
       - name: Frontend bauen
         run: npm run build
 
+  rust:
+    name: Rust prüfen (macOS)
+    needs: aenderungen
+    if: needs.aenderungen.outputs.rust == 'true'
+    runs-on: macos-latest
+    timeout-minutes: 45
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      # generate_context! verlangt, dass frontendDist existiert; der Inhalt ist für die Prüfung egal
+      # (das echte Frontend baut der Linux-Job, der Release-Build baut alles vollständig).
+      - name: Platzhalter für dist/
+        run: mkdir -p dist
+
       - name: cargo fmt --check
         working-directory: src-tauri
         run: cargo fmt --check
 
-      # clippy kompiliert die komplette App (inkl. Tauri) – eine eigene tauri-build-Probe ist nicht nötig,
-      # der Release-Build in release.yml baut ohnehin vollständig.
+      # clippy kompiliert die komplette App (inkl. Tauri) – eine eigene tauri-build-Probe ist nicht nötig.
       - name: cargo clippy
         working-directory: src-tauri
         run: cargo clippy -- -D warnings
