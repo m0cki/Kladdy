@@ -2,11 +2,17 @@ import { describe, expect, it } from 'vitest';
 import {
   KREIS_NAMEN,
   STANDARD_MUSTER,
+  ZAEHLER_MAX,
   formatNummer,
+  hoechsteLaufende,
   istJahresabhaengig,
   musterFehler,
+  musterKollidieren,
+  musterRegex,
+  musterWechselFehler,
   naechsteNummer,
   vorschau,
+  zaehlerErhoehen,
   type NummernkreisId,
 } from './numbering';
 import standarddaten from '../../src-tauri/migrations/0002_standarddaten.sql?raw';
@@ -145,5 +151,94 @@ describe('naechsteNummer', () => {
   it('wirft bei kaputtem Stand', () => {
     expect(() => naechsteNummer({ ...quittung, naechste: 0 }, 2026)).toThrow(RangeError);
     expect(() => naechsteNummer({ ...quittung, naechste: 2.5 }, 2026)).toThrow(RangeError);
+  });
+});
+
+describe('musterRegex / hoechsteLaufende', () => {
+  it('erkennt Nummern des Musters im Jahr', () => {
+    const re = musterRegex('RE-{JJJJ}-{NNN}', 2026);
+    expect(re.exec('RE-2026-014')?.[1]).toBe('014');
+    expect(re.test('RE-2026-1000')).toBe(true);
+    expect(re.test('RE-2025-014')).toBe(false);
+    expect(re.test('RE-2026-14')).toBe(false);
+    expect(re.test('XRE-2026-014')).toBe(false);
+  });
+
+  it('maskiert Sonderzeichen im Muster', () => {
+    expect(musterRegex('R.{JJ}/{NN}', 2026).test('R.26/07')).toBe(true);
+    expect(musterRegex('R.{JJ}/{NN}', 2026).test('RX26/07')).toBe(false);
+  });
+
+  it('höchste vergebene Nummer', () => {
+    const nummern = ['QU-2026-001', 'QU-2026-105', 'QU-2025-300', 'RE-2026-200', 'QU-2026-009'];
+    expect(hoechsteLaufende('QU-{JJJJ}-{NNN}', 2026, nummern)).toBe(105);
+    expect(hoechsteLaufende('QU-{JJJJ}-{NNN}', 2027, nummern)).toBe(0);
+    expect(hoechsteLaufende('K-{NNNN}', 2026, ['K-0001', 'K-0220'])).toBe(220);
+  });
+});
+
+describe('musterKollidieren', () => {
+  it('gleiche Form = Gefahr doppelter Nummern', () => {
+    expect(musterKollidieren('RE-{JJJJ}-{NNN}', 'RE-{JJJJ}-{NNNN}')).toBe(true);
+    expect(musterKollidieren('RE-{JJ}-{NNN}', 'RE-{JJJJ}-{NNN}')).toBe(true);
+    expect(musterKollidieren('RE-{JJJJ}-{NNN}', 'QU-{JJJJ}-{NNN}')).toBe(false);
+  });
+});
+
+describe('musterWechselFehler', () => {
+  const kreis = { muster: 'RE-{JJJJ}-{NNN}', jahr: 2026, naechste: 15 };
+
+  it('neues Muster ohne Überschneidung ist in Ordnung', () => {
+    expect(musterWechselFehler(kreis, 'R{JJ}-{NNNN}', 2026, ['RE-2026-001', 'RE-2026-014'])).toBeNull();
+  });
+
+  it('ungültiges Muster', () => {
+    expect(musterWechselFehler(kreis, 'RE-{JJJJ}', 2026, [])).toMatch(/laufende Nummer/);
+  });
+
+  it('zurück zu einem alten Muster, mit dem schon höhere Nummern vergeben sind', () => {
+    const nummern = ['R26-0001', 'R26-0030', 'RE-2026-014'];
+    expect(musterWechselFehler(kreis, 'R{JJ}-{NNNN}', 2026, nummern)).toBe(
+      'Mit diesem Muster wäre R26-0015 schon vergeben (bis R26-0030). Nummern werden nie wiederverwendet.',
+    );
+  });
+
+  it('gleiches Schema wie ein anderer Kreis derselben Tabelle', () => {
+    expect(musterWechselFehler(kreis, 'QU-{JJJJ}-{NNNN}', 2026, [], [{ name: 'Quittung', muster: 'QU-{JJJJ}-{NNN}' }])).toMatch(
+      /Quittung/,
+    );
+  });
+
+  it('Kreis steht schon in einem späteren Jahr', () => {
+    expect(musterWechselFehler({ ...kreis, jahr: 2027 }, 'R{JJ}-{NNNN}', 2026, [])).toMatch(/2027/);
+  });
+});
+
+describe('zaehlerErhoehen', () => {
+  const kreis = { muster: 'RE-{JJJJ}-{NNN}', jahr: 2026, naechste: 15 };
+
+  it('nur nach oben', () => {
+    expect(zaehlerErhoehen(kreis, 40, 2026)).toEqual({ stand: { jahr: 2026, naechste: 40 } });
+    expect(zaehlerErhoehen(kreis, 14, 2026)).toEqual({ fehler: 'Kleiner als 15 geht nicht: Nummern werden nie wiederverwendet.' });
+    expect(zaehlerErhoehen(kreis, 15, 2026)).toEqual({ fehler: 'RE-2026-015 ist schon die nächste Nummer.' });
+  });
+
+  it('neues Jahr: Kreis begänne bei 1, Erhöhen setzt das Jahr mit', () => {
+    expect(zaehlerErhoehen(kreis, 5, 2027)).toEqual({ stand: { jahr: 2027, naechste: 5 } });
+    expect(zaehlerErhoehen({ muster: 'QU-{JJJJ}-{NNN}', jahr: 0, naechste: 1 }, 105, 2026)).toEqual({ stand: { jahr: 2026, naechste: 105 } });
+  });
+
+  it('Kreis ohne Jahr behält jahr = 0', () => {
+    expect(zaehlerErhoehen({ muster: 'K-{NNNN}', jahr: 0, naechste: 221 }, 300, 2026)).toEqual({ stand: { jahr: 0, naechste: 300 } });
+  });
+
+  it('nie unter eine schon vergebene Nummer', () => {
+    expect(zaehlerErhoehen(kreis, 20, 2026, ['RE-2026-025'])).toEqual({ fehler: 'RE-2026-025 ist schon vergeben.' });
+  });
+
+  it('ungültige Eingaben', () => {
+    expect(zaehlerErhoehen(kreis, 20.5, 2026)).toHaveProperty('fehler');
+    expect(zaehlerErhoehen(kreis, ZAEHLER_MAX + 1, 2026)).toEqual({ fehler: 'Bitte eine ganze Zahl von 1 bis 99.999.999 eintragen.' });
+    expect(zaehlerErhoehen({ ...kreis, jahr: 2027 }, 20, 2026)).toHaveProperty('fehler');
   });
 });

@@ -117,3 +117,97 @@ export function naechsteNummer(kreis: Pick<Nummernkreis, 'muster' | 'jahr' | 'na
     stand: { jahr: jahrJetzt, naechste: laufend + 1 },
   };
 }
+
+/* ---------- Einstellungen › Nummernkreise: Muster wechseln, Zähler erhöhen (GoBD: nie eine Nummer doppelt) ---------- */
+
+const regexText = (s: string) => s.replace(/[.*+?^${}()|[\]\\/-]/g, '\\$&');
+
+/** Regex für genau die Nummern dieses Musters im Jahr `jahr`; Gruppe 1 = laufende Nummer (auch länger als die Nullen). */
+export function musterRegex(muster: string, jahr: number): RegExp {
+  let quelle = '';
+  let pos = 0;
+  for (const m of muster.matchAll(PLATZHALTER)) {
+    quelle += regexText(muster.slice(pos, m.index));
+    const name = m[1];
+    if (name === 'JJJJ') quelle += String(jahr);
+    else if (name === 'JJ') quelle += String(jahr % 100).padStart(2, '0');
+    else quelle += `(\\d{${name.length},})`;
+    pos = m.index + m[0].length;
+  }
+  quelle += regexText(muster.slice(pos));
+  return new RegExp(`^${quelle}$`);
+}
+
+/** Höchste laufende Nummer unter `nummern`, die zum Muster im Jahr `jahr` passt (0 = keine). */
+export function hoechsteLaufende(muster: string, jahr: number, nummern: readonly string[]): number {
+  const re = musterRegex(muster, jahr);
+  let max = 0;
+  for (const n of nummern) {
+    const m = re.exec(n);
+    if (m) max = Math.max(max, Number(m[1]));
+  }
+  return max;
+}
+
+/** Könnten zwei Muster dieselbe Nummer erzeugen? Vorsichtig: gleiche Form ohne Rücksicht auf Stellenzahl und Jahresformat. */
+export function musterKollidieren(a: string, b: string): boolean {
+  const form = (m: string) => m.replace(/\{JJ(JJ)?\}/g, '{J}').replace(/\{N+\}/g, '{N}');
+  return form(a) === form(b);
+}
+
+/**
+ * Prüft ein neues Muster für einen Kreis, bevor es gespeichert wird. null = in Ordnung.
+ * - `vergebene`: alle Nummern, die es in der Zieltabelle schon gibt (buchungen, rechnungen bzw. kunden)
+ * - `andere`: die übrigen Kreise, die in dieselbe Tabelle schreiben (rechnungen.nummer ist über alle Belegarten eindeutig)
+ */
+export function musterWechselFehler(
+  kreis: Pick<Nummernkreis, 'muster' | 'jahr' | 'naechste'>,
+  neu: string,
+  jahrJetzt: number,
+  vergebene: readonly string[],
+  andere: readonly { name: string; muster: string }[] = [],
+): string | null {
+  const fehler = musterFehler(neu);
+  if (fehler) return fehler;
+  const gleich = andere.find((k) => musterKollidieren(k.muster, neu));
+  if (gleich) return `Zu ähnlich wie das Muster für ${gleich.name} (${gleich.muster}) – Nummern könnten doppelt vorkommen.`;
+  let v: Vergabe;
+  try {
+    v = naechsteNummer({ ...kreis, muster: neu }, jahrJetzt);
+  } catch (e) {
+    return e instanceof Error ? e.message : String(e);
+  }
+  const hoechste = hoechsteLaufende(neu, jahrJetzt, vergebene);
+  if (hoechste >= v.laufend) {
+    return `Mit diesem Muster wäre ${v.nummer} schon vergeben (bis ${formatNummer(neu, jahrJetzt, hoechste)}). Nummern werden nie wiederverwendet.`;
+  }
+  return null;
+}
+
+/** Größte erlaubte laufende Nummer beim Erhöhen (Schutz vor Tippfehlern wie 1000000). */
+export const ZAEHLER_MAX = 99_999_999;
+
+/**
+ * Nächste laufende Nummer erhöhen, z. B. beim Umstieg aus einem anderen Programm (RE-2026-015 statt -001).
+ * Nur nach oben: Übersprungene Nummern werden nie vergeben, kleinere sind ausgeschlossen (GoBD, nie wiederverwenden).
+ * Liefert den neuen Stand (jahr, naechste) für ein UPDATE oder eine Fehlermeldung.
+ */
+export function zaehlerErhoehen(
+  kreis: Pick<Nummernkreis, 'muster' | 'jahr' | 'naechste'>,
+  neu: number,
+  jahrJetzt: number,
+  vergebene: readonly string[] = [],
+): { stand: Pick<Nummernkreis, 'jahr' | 'naechste'> } | { fehler: string } {
+  let v: Vergabe;
+  try {
+    v = naechsteNummer(kreis, jahrJetzt);
+  } catch (e) {
+    return { fehler: e instanceof Error ? e.message : String(e) };
+  }
+  if (!Number.isSafeInteger(neu) || neu < 1 || neu > ZAEHLER_MAX) return { fehler: `Bitte eine ganze Zahl von 1 bis ${ZAEHLER_MAX.toLocaleString('de-DE')} eintragen.` };
+  if (neu === v.laufend) return { fehler: `${v.nummer} ist schon die nächste Nummer.` };
+  if (neu < v.laufend) return { fehler: `Kleiner als ${v.laufend} geht nicht: Nummern werden nie wiederverwendet.` };
+  const hoechste = hoechsteLaufende(kreis.muster, jahrJetzt, vergebene);
+  if (hoechste >= neu) return { fehler: `${formatNummer(kreis.muster, jahrJetzt, hoechste)} ist schon vergeben.` };
+  return { stand: { jahr: istJahresabhaengig(kreis.muster) ? jahrJetzt : 0, naechste: neu } };
+}
