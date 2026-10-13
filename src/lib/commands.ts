@@ -1,7 +1,9 @@
-/* Globale Befehle – aus dem nativen Menü, aus Tastenkürzeln (Browser) und später aus der Befehlspalette.
- * Phase 0: nur Hell/Dunkel und Seitenleiste sind echt, der Rest meldet, in welcher Phase er kommt. */
+/* Globale Befehle – aus dem nativen Menü, aus Tastenkürzeln (Browser) und aus der Suche (später Befehlspalette, §6.2).
+ * Echt: Hell/Dunkel, Seitenleiste, Nach Updates suchen, Über Kladdy. Der Rest meldet, in welcher Phase er kommt. */
 import { toggleMode, useUi } from '../store/ui';
+import { bereichPfad } from './einstellungen-index';
 import type { MenuId } from './menu';
+import { checkForUpdate } from './updates';
 
 const SPAETER: Partial<Record<MenuId, string>> = {
   erfassen: 'Die Erfassen-Schublade kommt in Phase 1',
@@ -9,13 +11,20 @@ const SPAETER: Partial<Record<MenuId, string>> = {
   rechnung: 'Rechnung schreiben (über die Erfassen-Schublade) kommt in Phase 3',
   importieren: 'Beleg importieren kommt in Phase 1',
   export: 'Export kommt in Phase 5',
-  updates: 'Die Update-Prüfung kommt in Phase 6',
-  ueber: '„Über Kladdy“ kommt in Phase 6',
 };
 
-export function runCommand(id: MenuId, origin?: { x: number; y: number }): void {
+export interface CommandContext {
+  /** Klickpunkt (für die Enthüllung beim Hell/Dunkel-Wechsel) */
+  origin?: { x: number; y: number };
+  /** Router-Navigation (aus AppShell) */
+  navigate?: (to: string) => void;
+}
+
+export function runCommand(id: MenuId, ctx: CommandContext = {}): void {
   const ui = useUi.getState();
-  if (id === 'hell-dunkel') toggleMode(origin);
+  if (id === 'hell-dunkel') toggleMode(ctx.origin);
   else if (id === 'seitenleiste') ui.toggleSidebar();
+  else if (id === 'updates') void checkForUpdate({ manual: true });
+  else if (id === 'ueber') ctx.navigate?.(bereichPfad('updates'));
   else ui.toast(SPAETER[id] ?? 'Kommt später', 'info');
 }
