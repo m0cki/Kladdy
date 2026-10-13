@@ -1,6 +1,6 @@
 # Manuelles Release (Ablauf in RELEASE.md). Läuft NUR per Hand über „Run workflow“ und nur von main.
-# 1. Vorprüfung (Branch, Signatur-Secret, pubkey)  2. CI (ci.yml)  3. Version erhöhen, Commit + Tag pushen
-# 4. Bauen, signieren und als GitHub-Release veröffentlichen (.dmg, .app.tar.gz, .sig, latest.json).
+# 1. Vorprüfung (Branch, Signatur-Secret, pubkey, CI auf main grün)  2. Version erhöhen, Commit + Tag pushen
+# 3. Bauen, signieren und als GitHub-Release veröffentlichen (.dmg, .app.tar.gz, .sig, latest.json).
 name: Release
 
 on:
@@ -32,6 +32,9 @@ jobs:
   vorpruefung:
     name: Vorprüfung
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
     steps:
       - name: Nur von main
         if: github.ref != 'refs/heads/main'
@@ -49,6 +52,8 @@ jobs:
           fi
 
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 50
 
       - name: Öffentlicher Update-Schlüssel eingetragen?
         run: |
@@ -57,14 +62,51 @@ jobs:
             exit 1
           fi
 
-  ci:
-    name: CI
-    needs: vorpruefung
-    uses: ./.github/workflows/ci.yml
+      # Die CI läuft bei jedem Push auf main (ci.yml). Statt sie hier zu wiederholen, wird ihr Ergebnis für
+      # genau diesen Commit abgefragt. Ohne eigenen CI-Lauf sind nur Commits erlaubt, die nichts Prüfbares
+      # ändern – für sie zählt der Vorgänger (erster Elternteil):
+      #  - Release-Commits dieser Action (nur Versionsdateien; GITHUB_TOKEN-Pushes lösen keine CI aus)
+      #  - reine Doku-Änderungen (paths-ignore in ci.yml, Liste in DOKU_PFADE gleich halten)
+      - name: Checks green on main?
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSIONSDATEIEN='^(package\.json|package-lock\.json|src-tauri/tauri\.conf\.json|src-tauri/Cargo\.toml|src-tauri/Cargo\.lock)$'
+          DOKU_PFADE='(\.md$|^referenz/|^docs/|^LICENSE$)'
+          SHA="${GITHUB_SHA}"
+          while :; do
+            RUN="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${SHA}&event=push&per_page=1" \
+              --jq '.workflow_runs[0] | if . == null then "" else .status + "|" + (.conclusion // "") + "|" + .html_url end')"
+            if [ -n "$RUN" ]; then
+              IFS='|' read -r STATUS CONCLUSION URL <<< "$RUN"
+              if [ "$STATUS" != "completed" ]; then
+                echo "::error::Die CI für ${SHA:0:7} läuft noch (${URL}). Warten, bis sie grün ist, dann Release neu starten."
+                exit 1
+              fi
+              if [ "$CONCLUSION" != "success" ]; then
+                echo "::error::Die CI für ${SHA:0:7} ist nicht grün (${CONCLUSION}: ${URL}). Nichts veröffentlicht."
+                exit 1
+              fi
+              echo "CI grün für ${SHA:0:7}: ${URL}"
+              break
+            fi
+            # kein CI-Lauf: nur erlaubt, wenn der Commit nichts Prüfbares ändert (Vergleich mit dem ersten Elternteil)
+            SUBJECT="$(git log -1 --format=%s "$SHA")"
+            DATEIEN="$(git diff --name-only "${SHA}^1" "$SHA")"
+            NICHT_VERSION="$(printf '%s\n' "$DATEIEN" | grep -Ev "$VERSIONSDATEIEN" | grep -v '^$' || true)"
+            NICHT_DOKU="$(printf '%s\n' "$DATEIEN" | grep -Ev "$DOKU_PFADE" | grep -v '^$' || true)"
+            if { [[ "$SUBJECT" =~ ^Release\ v[0-9] ]] && [ -z "$NICHT_VERSION" ]; } || [ -z "$NICHT_DOKU" ]; then
+              echo "${SHA:0:7} ändert nichts Prüfbares – prüfe den Vorgänger."
+              SHA="$(git rev-parse "${SHA}^1")"
+              continue
+            fi
+            echo "::error::Für ${SHA:0:7} gibt es keinen CI-Lauf auf main. Nichts veröffentlicht."
+            exit 1
+          done
 
   release:
     name: Version, Tag & Veröffentlichen
-    needs: ci
+    needs: vorpruefung
     runs-on: macos-latest
     timeout-minutes: 60
     permissions:

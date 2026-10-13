@@ -1,29 +1,61 @@
 # Prüfungen für Pull Requests und main. Erstellt keine Tags, Releases oder Artefakte.
-# Wird von release.yml über `workflow_call` wiederverwendet: schlägt hier etwas fehl, wird nichts veröffentlicht.
-name: CI
+# release.yml fragt das Ergebnis dieses Laufs für den main-Commit ab: ist es nicht grün, wird nichts veröffentlicht.
+name: Checks
 
+# Reine Doku-Änderungen lösen keine CI aus. release.yml akzeptiert solche Commits ohne eigenen Lauf
+# (gleiche Liste dort in DOKU_PFADE pflegen).
 on:
   pull_request:
     branches: [main]
+    paths-ignore: ['**.md', 'referenz/**', 'docs/**', 'LICENSE']
   push:
     branches: [main]
-  workflow_call:
+    paths-ignore: ['**.md', 'referenz/**', 'docs/**', 'LICENSE']
 
 permissions:
   contents: read
 
 concurrency:
-  # Bei Aufruf aus release.yml ist github.workflow „Release“ – eigene Gruppe, kein Konflikt.
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  checks:
-    name: Prüfen & bauen (macOS)
-    runs-on: macos-latest
-    timeout-minutes: 45
-    env:
-      CARGO_TERM_COLOR: always
+  # Rust nur prüfen, wenn sich src-tauri/ (oder diese Datei) geändert hat. Mac-Runner sind knapp und
+  # warten oft minutenlang auf Zuteilung; Linux-Runner starten sofort. Ein übersprungener Job zählt als grün,
+  # release.yml muss dafür nichts wissen.
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      rust: ${{ steps.pfade.outputs.rust }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Changed paths
+        id: pfade
+        env:
+          BASIS: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          # Basis unbekannt (erster Push, Force-Push) -> sicherheitshalber alles prüfen
+          if [ -z "$BASIS" ] || ! git cat-file -e "${BASIS}^{commit}" 2>/dev/null; then
+            echo "Basis ${BASIS:-leer} nicht gefunden, Rust wird geprüft."
+            echo "rust=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          DATEIEN="$(git diff --name-only "${BASIS}...${GITHUB_SHA}")"
+          echo "$DATEIEN"
+          if grep -Eq '^(src-tauri/|\.github/workflows/ci\.yml$)' <<< "$DATEIEN"; then
+            echo "rust=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "rust=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  frontend:
+    name: Frontend (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
 
@@ -31,6 +63,32 @@ jobs:
         with:
           node-version: lts/*
           cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Versions in sync
+        run: npm run version:check
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Tests (Vitest)
+        run: npm test
+
+      - name: Build frontend
+        run: npm run build
+
+  rust:
+    name: Rust (macOS)
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: macos-latest
+    timeout-minutes: 45
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v7
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -40,25 +98,16 @@ jobs:
         with:
           workspaces: src-tauri -> target
 
-      - name: Abhängigkeiten installieren
-        run: npm ci
-
-      - name: Versionen gleich?
-        run: npm run version:check
-
-      - name: Typen prüfen
-        run: npm run typecheck
-
-      - name: Tests (Vitest)
-        run: npm test
-
-      - name: Frontend bauen
-        run: npm run build
+      # generate_context! verlangt, dass frontendDist existiert; der Inhalt ist für die Prüfung egal
+      # (das echte Frontend baut der Linux-Job, der Release-Build baut alles vollständig).
+      - name: Placeholder dist/
+        run: mkdir -p dist
 
       - name: cargo fmt --check
         working-directory: src-tauri
         run: cargo fmt --check
 
+      # clippy kompiliert die komplette App (inkl. Tauri) – eine eigene tauri-build-Probe ist nicht nötig.
       - name: cargo clippy
         working-directory: src-tauri
         run: cargo clippy -- -D warnings
@@ -66,7 +115,3 @@ jobs:
       - name: cargo test
         working-directory: src-tauri
         run: cargo test
-
-      # Nur Kompilier-Probe: Debug, ohne Bundle, ohne Update-Signatur.
-      - name: tauri build (Kompilier-Probe)
-        run: npm run tauri -- build --debug --no-bundle --ci
