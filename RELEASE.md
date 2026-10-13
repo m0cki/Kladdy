@@ -80,7 +80,10 @@ Was der Workflow (`.github/workflows/release.yml`) tut:
 3. **Version erhöhen:** `node scripts/version.mjs bump <bump>` schreibt dieselbe Version in `package.json`,
    `package-lock.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` und `src-tauri/Cargo.lock`.
    Existiert der Tag `vX.Y.Z` schon, bricht der Workflow ab.
-4. **Commit „Release vX.Y.Z“** auf `main`, Tag `vX.Y.Z`, beides pushen.
+4. **Commit „Release vX.Y.Z“** auf `main`, Tag `vX.Y.Z`, beides pushen. Veröffentlicht wird genau der Commit, den die
+   CI geprüft hat (`github.sha`). Ist `main` in der Zwischenzeit weitergelaufen, schlägt der Push fehl (kein
+   Force-Push) und der Workflow bricht mit einer klaren Meldung ab, ohne etwas zu veröffentlichen – dann einfach neu
+   starten.
 5. **Bauen & veröffentlichen** mit `tauri-apps/tauri-action@v1` für `aarch64-apple-darwin` (Apple Silicon), signiert mit
    dem Update-Schlüssel. Das Release enthält:
    - `Kladdy_X.Y.Z_aarch64.dmg` – zum Herunterladen und Installieren,
@@ -95,9 +98,9 @@ Versionen lokal prüfen: `npm run version:check`. Von Hand setzen (nur im Notfal
 - **Abbruch vor Schritt 4:** nichts ist passiert, Fehler beheben und neu starten.
 - **Abbruch in Schritt 5** (Commit und Tag sind schon gepusht, das Release fehlt oder ist unvollständig): Den Fehler
   beheben und ein neues Release starten (empfohlen; es bekommt die nächste Nummer, Versionsnummern werden nie
-  wiederverwendet). Achtung: Auch „Re-run failed jobs“ erhöht die Version erneut, weil `main` schon den
-  Release-Commit enthält. Nur wenn noch niemand die Version bekommen hat, darf man stattdessen das unvollständige
-  Release und den Tag auf GitHub löschen, den Release-Commit zurücknehmen und neu starten.
+  wiederverwendet). „Re-run failed jobs“ hilft nicht: Er baut wieder vom alten Commit, kommt auf dieselbe Nummer und
+  bricht ab, weil der Tag schon existiert. Nur wenn noch niemand die Version bekommen hat, darf man stattdessen das
+  unvollständige Release und den Tag auf GitHub löschen, den Release-Commit zurücknehmen und neu starten.
 
 ## In der App
 

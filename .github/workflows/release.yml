@@ -72,9 +72,10 @@ jobs:
     env:
       CARGO_TERM_COLOR: always
     steps:
+      # Genau der Commit, den die CI geprüft hat (nicht ein inzwischen neuerer Stand von main)
       - uses: actions/checkout@v7
         with:
-          ref: main
+          ref: ${{ github.sha }}
           fetch-depth: 0
 
       - uses: actions/setup-node@v7
@@ -121,7 +122,7 @@ jobs:
             printf '%s\n' "$NOTES" > "$RUNNER_TEMP/notes.md"
           else
             PREV="$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || true)"
-            ARGS=(-f "tag_name=${TAG}" -f "target_commitish=main")
+            ARGS=(-f "tag_name=${TAG}" -f "target_commitish=${GITHUB_SHA}")
             [ -n "$PREV" ] && ARGS+=(-f "previous_tag_name=${PREV}")
             if ! gh api "repos/${GITHUB_REPOSITORY}/releases/generate-notes" "${ARGS[@]}" --jq .body > "$RUNNER_TEMP/notes.md"; then
               # Rückfall: Commits seit dem letzten Tag
@@ -145,7 +146,11 @@ jobs:
           git add package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock
           git commit -m "Release ${TAG}"
           git tag -a "${TAG}" -m "Kladdy ${VERSION}"
-          git push origin HEAD:main
+          # Kein Force-Push: Ist main inzwischen weiter, schlägt das fehl und es wird nichts veröffentlicht.
+          if ! git push origin HEAD:main; then
+            echo "::error::main hat sich seit dem Start des Workflows geändert (oder ist gegen Pushes geschützt). Nichts veröffentlicht – den Release-Workflow einfach neu starten (RELEASE.md)."
+            exit 1
+          fi
           git push origin "${TAG}"
 
       - name: Bauen, signieren & veröffentlichen
