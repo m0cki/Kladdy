@@ -2,12 +2,12 @@
 # release.yml fragt das Ergebnis dieses Laufs für den main-Commit ab: ist es nicht grün, wird nichts veröffentlicht.
 name: Checks
 
-# Reine Doku-Änderungen lösen keine CI aus. release.yml akzeptiert solche Commits ohne eigenen Lauf
-# (gleiche Liste dort in DOKU_PFADE pflegen).
+# Pull Requests laufen immer durch (die Checks sind für main Pflicht; ein PR ohne Lauf bliebe auf „Pending“
+# hängen). Auf main lösen reine Doku-Änderungen keinen Lauf aus; release.yml akzeptiert solche Commits ohne
+# eigenen Lauf (gleiche Liste dort in DOKU_PFADE pflegen).
 on:
   pull_request:
     branches: [main]
-    paths-ignore: ['**.md', 'referenz/**', 'docs/**', 'LICENSE']
   push:
     branches: [main]
     paths-ignore: ['**.md', 'referenz/**', 'docs/**', 'LICENSE']
