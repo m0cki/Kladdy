@@ -46,6 +46,16 @@
 .sb-nav .sb-label { flex: 1; font-size: .9rem; font-weight: 550; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sb-nav .sb-badge { font-size: .68rem; font-weight: 700; padding: 1px 7px; border-radius: 99px; background: var(--surface-3); color: var(--text-2); }
 .sb-nav .sb-badge.alarm { background: color-mix(in oklab, var(--neg) 18%, transparent); color: var(--neg); }
+.sb-nav .sb-badge.phase { font-weight: 600; color: var(--muted); background: transparent; box-shadow: inset 0 0 0 1px var(--border-strong); }
+.sb-title { padding: 0 10px 6px; font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 650; white-space: nowrap; overflow: hidden; transition: opacity .25s; }
+.sb-back .sb-label { color: var(--text-2); }
+/* Wechsel Hauptmenü ⇄ Einstellungen: kurz einblenden und leicht seitlich hereingleiten */
+.sb-swap { animation: sbSwapIn .38s var(--ease) both; }
+.sb-swap[data-modus="haupt"] { animation-name: sbSwapBack; }
+@keyframes sbSwapIn { from { opacity: 0; transform: translateX(14px); } }
+@keyframes sbSwapBack { from { opacity: 0; transform: translateX(-14px); } }
+:root[data-motion="reduced"] .sb-swap { animation-name: fade; animation-duration: .25s; }
+:root:not(.ready) .sb-swap { animation: none; }
 @media (min-width: 901px) {
   .sb-collapsed .brand-text, .sb-collapsed .sb-label, .sb-collapsed .sb-badge { opacity: 0; pointer-events: none; width: 0; }
   /* eingeklappt: nur das Logo, mittig (die Ampel hat im Fenster ihre eigene Zeile darüber) */
@@ -59,6 +69,8 @@
     display: grid; place-items: center; font-size: .6rem; line-height: 1; opacity: 1; box-shadow: 0 0 0 2px var(--bg); }
   .sb-collapsed .sb-section { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
   .sb-collapsed .sb-section:first-child { border-top: 0; }
+  .sb-collapsed .sb-title { opacity: 0; height: 0; padding: 0; }
+  .sb-collapsed .sb-nav .sb-badge.phase { display: none; }
   .sb-collapsed .sb-toggle .pnl-chev { rotate: 180deg; }
   .sb-collapsed .sb-toggle:hover .pnl-chev { translate: 1.5px 0; }
 }
@@ -503,18 +515,7 @@ input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 7px; }
 .sd-foot > span { white-space: nowrap; }
 
 /* ============ Einstellungsseite ============ */
-.set-shell { container-type: inline-size; }
-.set-page { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: var(--gap); align-items: start; }
-.set-nav { position: sticky; top: calc(var(--topbar-h) + 16px); display: flex; flex-direction: column; gap: 2px; padding: 6px; border-radius: calc(var(--radius) + 6px);
-  background: var(--surface-2); border: 1px solid var(--border); }
-.set-nav a { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: var(--radius-sm); color: var(--text-2); font-size: .88rem; font-weight: 550; min-width: 0; transition: background .2s, color .2s; }
-.set-nav a span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.set-nav a small { font-size: .68rem; color: var(--muted); font-weight: 500; white-space: nowrap; }
-.set-nav a .ic { width: 17px; height: 17px; color: var(--muted); flex: none; }
-.set-nav a:hover { background: var(--hover); color: var(--text); }
-.set-nav a.active { background: var(--surface); color: var(--text); box-shadow: 0 0 0 1px var(--border-strong), inset 2px 0 0 var(--accent); }
-.set-nav a.active .ic { color: var(--accent); }
-.set-content { display: flex; flex-direction: column; gap: var(--gap); max-width: 760px; min-width: 0; }
+.set-content { display: flex; flex-direction: column; gap: var(--gap); max-width: 820px; min-width: 0; }
 .set-card { display: flex; flex-direction: column; gap: 16px; }
 .set-card h3 { font-size: .72rem; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); font-weight: 650; }
 .set-card .themes { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
@@ -530,11 +531,6 @@ input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 7px; }
 }
 :root[data-motion="reduced"] .set-flash { animation-name: setFlashRuhig; animation-timing-function: linear; }
 @keyframes setFlashRuhig { to { box-shadow: 0 0 0 6px transparent, 0 0 0 7px transparent; background: transparent; } }
-@container (max-width: 640px) {
-  .set-page { grid-template-columns: minmax(0, 1fr); }
-  .set-nav { position: static; flex-direction: row; flex-wrap: wrap; }
-  .set-nav a small { display: none; }
-}
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { rotate: 360deg; } }
 

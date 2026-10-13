@@ -1,10 +1,10 @@
 /* Einstellungen als eigene Seite (Wunsch des Nutzers, abweichend von §6.10 „Schublade“).
- * Links die Bereichs-Navigation, rechts der Inhalt. ⚙ oder Esc führen zur vorherigen Seite zurück.
+ * Die Bereichs-Navigation steht dann in der Seitenleiste (Sidebar.tsx). ⚙ oder Esc führen zur vorherigen Seite zurück.
  * `?feld=<id>` (aus der Suche) scrollt zur Einstellung und hebt sie kurz hervor. */
 import { useEffect, useRef } from 'react';
-import { Navigate, NavLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Settings } from 'lucide-react';
-import { BEREICHE, bereich, bereichPfad, isBereichId, type Bereich } from '../lib/einstellungen-index';
+import { bereich, bereichPfad, isBereichId, type Bereich } from '../lib/einstellungen-index';
 import { START } from '../lib/navigation';
 import { useUi } from '../store/ui';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -82,22 +82,9 @@ export default function Einstellungen() {
 
   return (
     <div className="page">
-      <PageHead icon={Settings} title="Einstellungen" sub="Gilt nur für diesen Mac" />
-      <div className="set-shell">
-        <div className="set-page">
-          <nav className="set-nav reveal" style={reveal(1)} aria-label="Bereiche der Einstellungen">
-            {BEREICHE.map(({ id, label, icon: Icon, phase }) => (
-              <NavLink key={id} to={bereichPfad(id)} className={({ isActive }) => (isActive ? 'active' : '')}>
-                <Icon />
-                <span>{label}</span>
-                {phase ? <small>Phase {phase}</small> : null}
-              </NavLink>
-            ))}
-          </nav>
-          <div className="set-content" ref={inhalt} key={b.id}>
-            {b.id === 'darstellung' ? <Darstellung /> : b.id === 'updates' ? <UpdatesUeber /> : <Platzhalter b={b} />}
-          </div>
-        </div>
+      <PageHead icon={Settings} title="Einstellungen" sub={`${b.label} · gilt nur für diesen Mac`} />
+      <div className="set-content" ref={inhalt} key={b.id}>
+        {b.id === 'darstellung' ? <Darstellung /> : b.id === 'updates' ? <UpdatesUeber /> : <Platzhalter b={b} />}
       </div>
     </div>
   );
