@@ -63,13 +63,16 @@ jobs:
           fi
 
       # Die CI läuft bei jedem Push auf main (ci.yml). Statt sie hier zu wiederholen, wird ihr Ergebnis für
-      # genau diesen Commit abgefragt. Release-Commits dieser Action ändern nur Versionsnummern und lösen
-      # selbst keine CI aus (GITHUB_TOKEN) – für sie zählt das Ergebnis des Vorgänger-Commits.
+      # genau diesen Commit abgefragt. Ohne eigenen CI-Lauf sind nur Commits erlaubt, die nichts Prüfbares
+      # ändern – für sie zählt der Vorgänger (erster Elternteil):
+      #  - Release-Commits dieser Action (nur Versionsdateien; GITHUB_TOKEN-Pushes lösen keine CI aus)
+      #  - reine Doku-Änderungen (paths-ignore in ci.yml, Liste in DOKU_PFADE gleich halten)
       - name: CI auf main grün?
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSIONSDATEIEN='^(package\.json|package-lock\.json|src-tauri/tauri\.conf\.json|src-tauri/Cargo\.toml|src-tauri/Cargo\.lock)$'
+          DOKU_PFADE='(\.md$|^referenz/|^docs/|^LICENSE$)'
           SHA="${GITHUB_SHA}"
           while :; do
             RUN="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${SHA}&event=push&per_page=1" \
@@ -87,12 +90,14 @@ jobs:
               echo "CI grün für ${SHA:0:7}: ${URL}"
               break
             fi
-            # kein CI-Lauf: nur erlaubt für Release-Commits, die ausschließlich Versionsdateien ändern
+            # kein CI-Lauf: nur erlaubt, wenn der Commit nichts Prüfbares ändert (Vergleich mit dem ersten Elternteil)
             SUBJECT="$(git log -1 --format=%s "$SHA")"
-            ANDERE="$(git diff-tree --no-commit-id --name-only -r "$SHA" | grep -Ev "$VERSIONSDATEIEN" || true)"
-            if [[ "$SUBJECT" =~ ^Release\ v[0-9] ]] && [ -z "$ANDERE" ]; then
-              echo "${SHA:0:7} ist ein reiner Release-Commit – prüfe den Vorgänger."
-              SHA="$(git rev-parse "${SHA}^")"
+            DATEIEN="$(git diff --name-only "${SHA}^1" "$SHA")"
+            NICHT_VERSION="$(printf '%s\n' "$DATEIEN" | grep -Ev "$VERSIONSDATEIEN" | grep -v '^$' || true)"
+            NICHT_DOKU="$(printf '%s\n' "$DATEIEN" | grep -Ev "$DOKU_PFADE" | grep -v '^$' || true)"
+            if { [[ "$SUBJECT" =~ ^Release\ v[0-9] ]] && [ -z "$NICHT_VERSION" ]; } || [ -z "$NICHT_DOKU" ]; then
+              echo "${SHA:0:7} ändert nichts Prüfbares – prüfe den Vorgänger."
+              SHA="$(git rev-parse "${SHA}^1")"
               continue
             fi
             echo "::error::Für ${SHA:0:7} gibt es keinen CI-Lauf auf main. Nichts veröffentlicht."
