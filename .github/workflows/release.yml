@@ -141,8 +141,9 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
           TAG: ${{ steps.version.outputs.tag }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Release-Commit unter dem Konto des Repository-Inhabers (nur m0cki erscheint als Contributor)
+          git config user.name "m0cki"
+          git config user.email "148272869+m0cki@users.noreply.github.com"
           git add package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock
           git commit -m "Release ${TAG}"
           git tag -a "${TAG}" -m "Kladdy ${VERSION}"
