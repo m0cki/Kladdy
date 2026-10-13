@@ -50,6 +50,11 @@ pub const MIGRATIONEN: &[MigrationsDatei] = &[
         beschreibung: "standarddaten",
         sql: include_str!("../migrations/0002_standarddaten.sql"),
     },
+    MigrationsDatei {
+        version: 3,
+        beschreibung: "protokoll_schluessel",
+        sql: include_str!("../migrations/0003_protokoll_schluessel.sql"),
+    },
 ];
 
 /// Verbindungs-URL, wie sie das Plugin und `Database.load` erwarten.
@@ -399,6 +404,21 @@ mod tests {
                 falsch.is_err(),
                 "unbekannte Kategorie muss abgelehnt werden"
             );
+            // 0003: Protokoll für Stammdaten ohne INTEGER-ID (datensatz_id = 0, Textschlüssel)
+            sqlx::query(
+                "INSERT INTO protokoll (zeitpunkt, tabelle, datensatz_id, aktion, alt_json, neu_json, schluessel)
+                 VALUES ('2026-10-13T20:15:00Z', 'nummernkreise', 0, 'geaendert', '{\"muster\":\"RE-{JJJJ}-{NNN}\"}', '{\"muster\":\"R{JJ}-{NNNN}\"}', 'rechnung')",
+            )
+            .execute(&mut c)
+            .await
+            .unwrap();
+            let schluessel: Option<String> = sqlx::query_scalar(
+                "SELECT schluessel FROM protokoll WHERE tabelle = 'nummernkreise'",
+            )
+            .fetch_one(&mut c)
+            .await
+            .unwrap();
+            assert_eq!(schluessel.as_deref(), Some("rechnung"));
             c.close().await.unwrap();
         });
         let _ = std::fs::remove_dir_all(&ordner);

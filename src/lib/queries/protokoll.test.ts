@@ -12,9 +12,9 @@ describe('protokollSql', () => {
       neu: { betrag_cent: 1999, beschreibung: 'Rasen mähen' },
       zeitpunkt: ZEIT,
     });
-    expect(sql).toMatch(/^INSERT INTO protokoll \(zeitpunkt, tabelle, datensatz_id, aktion, alt_json, neu_json\)/);
-    expect(sql).toContain('$6');
-    expect(werte).toEqual([ZEIT, 'buchungen', 7, 'neu', null, '{"betrag_cent":1999,"beschreibung":"Rasen mähen"}']);
+    expect(sql).toMatch(/^INSERT INTO protokoll \(zeitpunkt, tabelle, datensatz_id, aktion, alt_json, neu_json, schluessel\)/);
+    expect(sql).toContain('$7');
+    expect(werte).toEqual([ZEIT, 'buchungen', 7, 'neu', null, '{"betrag_cent":1999,"beschreibung":"Rasen mähen"}', null]);
   });
 
   it('Änderung: alt und neu', () => {
@@ -26,7 +26,7 @@ describe('protokollSql', () => {
       neu: { status: 'bezahlt' },
       zeitpunkt: ZEIT,
     });
-    expect(werte.slice(3)).toEqual(['geaendert', '{"status":"offen"}', '{"status":"bezahlt"}']);
+    expect(werte.slice(3)).toEqual(['geaendert', '{"status":"offen"}', '{"status":"bezahlt"}', null]);
   });
 
   it('verworfener Entwurf: nur alt', () => {
@@ -52,6 +52,20 @@ describe('protokollSql', () => {
     );
     expect(() => protokollSql({ tabelle: 'buchungen', datensatzId: 0, aktion: 'neu', neu: {} })).toThrow(RangeError);
     expect(() => protokollSql({ tabelle: 'buchungen', datensatzId: 1.5, aktion: 'neu', neu: {} })).toThrow(RangeError);
+  });
+
+  it('Stammdaten mit Textschlüssel: datensatz_id 0, Schlüssel in eigener Spalte', () => {
+    const { werte } = protokollSql({
+      tabelle: 'nummernkreise',
+      schluessel: 'rechnung',
+      aktion: 'geaendert',
+      alt: { muster: 'RE-{JJJJ}-{NNN}' },
+      neu: { muster: 'R{JJ}-{NNNN}' },
+      zeitpunkt: ZEIT,
+    });
+    expect(werte).toEqual([ZEIT, 'nummernkreise', 0, 'geaendert', '{"muster":"RE-{JJJJ}-{NNN}"}', '{"muster":"R{JJ}-{NNNN}"}', 'rechnung']);
+    expect(protokollSql({ tabelle: 'steuer_parameter', schluessel: '2027', aktion: 'neu', neu: { km_pauschale_cent: 30 } }).werte[6]).toBe('2027');
+    expect(() => protokollSql({ tabelle: 'einstellungen', schluessel: ' ', aktion: 'neu', neu: {} })).toThrow(/Schlüssel/);
   });
 });
 
