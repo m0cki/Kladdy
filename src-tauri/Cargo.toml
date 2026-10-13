@@ -1,6 +1,6 @@
 [package]
 name = "kladdy"
-version = "0.1.0"
+version = "1.0.0"
 description = "Kladdy – Buchhaltung für das Kleingewerbe"
 authors = ["Kladdy"]
 edition = "2024"
