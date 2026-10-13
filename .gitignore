@@ -1,0 +1,26 @@
+# Abhängigkeiten & Build
+node_modules
+dist
+dist-ssr
+*.local
+
+# Tauri / Rust
+src-tauri/target/
+src-tauri/gen/schemas
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Editor & System
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.sw?
+
+# Geheimnisse (Update-Schlüssel nie ins Repository, §3.2)
+*.key
+.env
+.env.*

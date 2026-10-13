@@ -1,0 +1,75 @@
+/* Kladdy · Design-Tokens (ANLEITUNG §9.1, 1:1 aus referenz/prototyp/css/styles.css)
+ * Schalter am <html>: data-mode, data-density, data-motion, data-glass, data-aurora, data-numfont, data-posneg.
+ * Akzent, Farbton, Radius und Schriftgröße setzt src/lib/settings.ts als Inline-Variablen am <html>. */
+
+:root {
+  --accent: #6366f1;
+  --on-accent: #fff;
+  --accent-2: color-mix(in oklab, var(--accent), #ec4899 40%);
+  --accent-2: oklch(from var(--accent) l c calc(h + 50));
+  --accent-soft: color-mix(in oklab, var(--accent) 14%, transparent);
+  --accent-line: color-mix(in oklab, var(--accent) 45%, transparent);
+  --tint-h: 240;
+  --tint-s: 14%;
+  --radius: 14px;
+  --radius-sm: calc(var(--radius) * 0.6);
+  --font-scale: 1;
+  --gap: 18px;
+  --pad: 20px;
+  --sb-w: 272px;
+  --topbar-h: 68px;
+  --tb-pad: clamp(16px, 3vw, 40px);
+  --font: "Inter Variable", "Inter", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, "SF Mono", monospace;
+  --num-font: var(--font);
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  --spring: cubic-bezier(.34, 1.5, .64, 1);
+}
+:root[data-numfont="mono"] { --num-font: var(--mono); }
+:root[data-density="compact"] { --gap: 12px; --pad: 14px; }
+:root[data-density="cozy"] { --gap: 24px; --pad: 26px; }
+
+:root[data-mode="dark"] {
+  --bg: hsl(var(--tint-h) var(--tint-s) 5.5%);
+  --surface: hsl(var(--tint-h) var(--tint-s) 8.5%);
+  --surface-2: hsl(var(--tint-h) var(--tint-s) 11.5%);
+  --surface-3: hsl(var(--tint-h) var(--tint-s) 15%);
+  --border: hsl(var(--tint-h) var(--tint-s) 15.5%);
+  --border-strong: hsl(var(--tint-h) var(--tint-s) 22%);
+  --text: hsl(var(--tint-h) 20% 96%);
+  --text-2: hsl(var(--tint-h) 10% 74%);
+  --muted: hsl(var(--tint-h) 7% 55%);
+  --grid: hsl(var(--tint-h) var(--tint-s) 14%);
+  --axis: hsl(var(--tint-h) var(--tint-s) 24%);
+  --hover: hsl(0 0% 100% / .045);
+  --shadow: 0 1px 0 hsl(0 0% 100% / .035) inset, 0 12px 32px -14px rgb(0 0 0 / .65);
+  --shadow-lg: 0 24px 60px -18px rgb(0 0 0 / .7), 0 0 0 1px hsl(0 0% 100% / .04);
+  --glass: hsl(var(--tint-h) var(--tint-s) 7% / .7);
+  --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70;
+  --pos: #22c55e; --neg: #f87171; --warn: #fbbf24;     /* --warn neu für Kladdy */
+  --aurora-opacity: .22;
+}
+:root[data-mode="light"] {
+  --bg: hsl(var(--tint-h) calc(var(--tint-s) + 8%) 96.5%);
+  --surface: hsl(var(--tint-h) 40% 99.6%);
+  --surface-2: hsl(var(--tint-h) calc(var(--tint-s) + 6%) 96%);
+  --surface-3: hsl(var(--tint-h) calc(var(--tint-s) + 4%) 92.5%);
+  --border: hsl(var(--tint-h) calc(var(--tint-s) + 4%) 90%);
+  --border-strong: hsl(var(--tint-h) var(--tint-s) 83%);
+  --text: hsl(var(--tint-h) 25% 10%);
+  --text-2: hsl(var(--tint-h) 10% 32%);
+  --muted: hsl(var(--tint-h) 7% 47%);
+  --grid: hsl(var(--tint-h) calc(var(--tint-s) + 4%) 92%);
+  --axis: hsl(var(--tint-h) var(--tint-s) 78%);
+  --hover: hsl(var(--tint-h) 30% 30% / .05);
+  --shadow: 0 1px 2px rgb(15 20 40 / .04), 0 10px 28px -16px rgb(15 20 40 / .18);
+  --shadow-lg: 0 24px 60px -20px rgb(15 20 40 / .3), 0 0 0 1px rgb(15 20 40 / .05);
+  --glass: hsl(var(--tint-h) 40% 99% / .72);
+  --series-1: #2a78d6; --series-2: #eb6834; --series-3: #1baf7a;
+  --pos: #15803d; --neg: #dc2626; --warn: #b45309;
+  --aurora-opacity: .16;
+}
+:root[data-posneg="blueorange"][data-mode="dark"] { --pos: #60a5fa; --neg: #fb923c; }
+:root[data-posneg="blueorange"][data-mode="light"] { --pos: #1d4ed8; --neg: #c2410c; }
+:root[data-posneg="tealpink"][data-mode="dark"] { --pos: #2dd4bf; --neg: #f472b6; }
+:root[data-posneg="tealpink"][data-mode="light"] { --pos: #0f766e; --neg: #be185d; }
