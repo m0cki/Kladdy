@@ -73,8 +73,16 @@ fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .select_all_with_text("Alles auswählen")
         .build()?;
 
-    let hell_dunkel = item("hell-dunkel", "Hell/Dunkel umschalten", Some("CmdOrCtrl+Shift+L"))?;
-    let seitenleiste = item("seitenleiste", "Seitenleiste ein-/ausblenden", Some("CmdOrCtrl+Backslash"))?;
+    let hell_dunkel = item(
+        "hell-dunkel",
+        "Hell/Dunkel umschalten",
+        Some("CmdOrCtrl+Shift+L"),
+    )?;
+    let seitenleiste = item(
+        "seitenleiste",
+        "Seitenleiste ein-/ausblenden",
+        Some("CmdOrCtrl+Backslash"),
+    )?;
     let darstellung = SubmenuBuilder::new(app, "Darstellung")
         .item(&hell_dunkel)
         .item(&seitenleiste)
@@ -97,6 +105,9 @@ fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // Updates aus der App heraus (§3.2): Prüfen/Laden/Installieren und danach Neustart.
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .menu(build_menu)
         .on_menu_event(|app, event| {
             let id = event.id().as_ref();
