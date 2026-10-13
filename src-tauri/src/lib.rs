@@ -1,5 +1,7 @@
 //! Kladdy – Tauri-Hülle.
-//! Hier werden Plugins, die native Menüleiste und (später) Commands registriert.
+//! Hier werden Plugins, die native Menüleiste und Commands registriert.
+
+mod datenbank;
 
 use tauri::menu::{Menu, MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{AppHandle, Emitter, Runtime};
@@ -105,6 +107,10 @@ fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // Datenbank (§5): erst sichern, dann darf das SQL-Plugin migrieren – Reihenfolge nicht vertauschen.
+        .plugin(datenbank::sicherungs_plugin())
+        .plugin(datenbank::sql_plugin())
+        .invoke_handler(tauri::generate_handler![datenbank::datenbank_url])
         // Updates aus der App heraus (§3.2): Prüfen/Laden/Installieren und danach Neustart.
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
