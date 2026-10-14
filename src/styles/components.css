@@ -550,3 +550,9 @@ input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 7px; }
 /* Einstellungen › Firma, Steuern, Nummernkreise */
 .set-sk { height: 180px; }
 .set-erneut { justify-content: center; margin-top: -18px; }
+.set-jahr { width: 96px; flex: none; }
+.kw-table td { vertical-align: middle; }
+.kw-label { display: flex; flex-direction: column; gap: 2px; font-weight: 550; }
+.kw-label small { color: var(--muted); font-size: .74rem; font-weight: 400; }
+.kw-table .hint { margin: 4px 0 0; }
+.kw-wert { width: 170px; margin-left: auto; }

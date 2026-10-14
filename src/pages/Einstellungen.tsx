@@ -11,6 +11,7 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { PageHead, reveal } from '../components/ui/PageHead';
 import Darstellung from './einstellungen/Darstellung';
 import Firma from './einstellungen/Firma';
+import Steuern from './einstellungen/Steuern';
 import UpdatesUeber from './einstellungen/UpdatesUeber';
 
 const FLASH_MS = 1800;
@@ -19,6 +20,7 @@ const FLASH_MS = 1800;
 const INHALT: Partial<Record<BereichId, ComponentType>> = {
   darstellung: Darstellung,
   firma: Firma,
+  steuern: Steuern,
   updates: UpdatesUeber,
 };
 
