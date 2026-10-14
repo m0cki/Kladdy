@@ -11,6 +11,7 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { PageHead, reveal } from '../components/ui/PageHead';
 import Darstellung from './einstellungen/Darstellung';
 import Firma from './einstellungen/Firma';
+import Nummernkreise from './einstellungen/Nummernkreise';
 import Steuern from './einstellungen/Steuern';
 import UpdatesUeber from './einstellungen/UpdatesUeber';
 
@@ -21,6 +22,7 @@ const INHALT: Partial<Record<BereichId, ComponentType>> = {
   darstellung: Darstellung,
   firma: Firma,
   steuern: Steuern,
+  nummernkreise: Nummernkreise,
   updates: UpdatesUeber,
 };
 

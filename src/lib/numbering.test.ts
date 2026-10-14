@@ -6,6 +6,8 @@ import {
   formatNummer,
   hoechsteLaufende,
   istJahresabhaengig,
+  kreisVorschau,
+  laufendeLesen,
   musterFehler,
   musterKollidieren,
   musterRegex,
@@ -240,5 +242,35 @@ describe('zaehlerErhoehen', () => {
     expect(zaehlerErhoehen(kreis, 20.5, 2026)).toHaveProperty('fehler');
     expect(zaehlerErhoehen(kreis, ZAEHLER_MAX + 1, 2026)).toEqual({ fehler: 'Bitte eine ganze Zahl von 1 bis 99.999.999 eintragen.' });
     expect(zaehlerErhoehen({ ...kreis, jahr: 2027 }, 20, 2026)).toHaveProperty('fehler');
+  });
+});
+
+describe('kreisVorschau', () => {
+  const kreis = { jahr: 2026, naechste: 15 };
+  it('zeigt die nächste Nummer mit dem gerade getippten Muster', () => {
+    expect(kreisVorschau(kreis, 'QU-{JJJJ}-{NNN}', 2026)).toEqual({ nummer: 'QU-2026-015', laufend: 15 });
+    expect(kreisVorschau(kreis, 'Q{JJ}/{NNNN}', 2026)).toEqual({ nummer: 'Q26/0015', laufend: 15 });
+  });
+  it('beginnt im neuen Jahr bei 1, ohne Jahr im Muster wird weitergezählt', () => {
+    expect(kreisVorschau(kreis, 'QU-{JJJJ}-{NNN}', 2027)).toEqual({ nummer: 'QU-2027-001', laufend: 1 });
+    expect(kreisVorschau({ jahr: 0, naechste: 12 }, 'K-{NNNN}', 2027)).toEqual({ nummer: 'K-0012', laufend: 12 });
+  });
+  it('meldet ungültige Muster und ein Jahr vor dem Stand des Kreises', () => {
+    expect(kreisVorschau(kreis, 'QU-{JJJJ}', 2026)).toEqual({ fehler: expect.stringContaining('laufende Nummer') });
+    expect(kreisVorschau(kreis, 'QU-{JJJJ}-{NNN}', 2025)).toEqual({ fehler: expect.stringContaining('2026') });
+  });
+});
+
+describe('laufendeLesen', () => {
+  it('liest ganze Zahlen, auch mit Tausenderpunkt oder Leerzeichen', () => {
+    expect(laufendeLesen('15')).toBe(15);
+    expect(laufendeLesen(' 1.000 ')).toBe(1000);
+    expect(laufendeLesen('1 000')).toBe(1000);
+  });
+  it('lehnt Leeres, Vorzeichen und Kommazahlen ab', () => {
+    expect(laufendeLesen('')).toBeNull();
+    expect(laufendeLesen('-3')).toBeNull();
+    expect(laufendeLesen('12,5')).toBeNull();
+    expect(laufendeLesen('abc')).toBeNull();
   });
 });

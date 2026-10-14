@@ -224,3 +224,29 @@ export function zaehlerErhoehen(
   if (hoechste >= neu) return { fehler: `${formatNummer(kreis.muster, jahrJetzt, hoechste)} ist schon vergeben.` };
   return { stand: { jahr: istJahresabhaengig(kreis.muster) ? jahrJetzt : 0, naechste: neu } };
 }
+
+/* ---------- Anzeige in Einstellungen › Nummernkreise ---------- */
+
+/** Live-Vorschau: nächste Nummer des Kreises mit (ggf. gerade getipptem) Muster, oder eine Fehlermeldung. */
+export function kreisVorschau(
+  kreis: Pick<Nummernkreis, 'jahr' | 'naechste'>,
+  muster: string,
+  jahrJetzt: number,
+): { nummer: string; laufend: number } | { fehler: string } {
+  const fehler = musterFehler(muster);
+  if (fehler) return { fehler };
+  try {
+    const v = naechsteNummer({ ...kreis, muster }, jahrJetzt);
+    return { nummer: v.nummer, laufend: v.laufend };
+  } catch (e) {
+    return { fehler: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** Eingabe „Nächste laufende Nummer“ lesen (Leerzeichen und Tausenderpunkte erlaubt); null = keine ganze Zahl. */
+export function laufendeLesen(eingabe: string): number | null {
+  const t = eingabe.replace(/[\s. ]/g, '');
+  if (!/^\d+$/.test(t)) return null;
+  const n = Number(t);
+  return Number.isSafeInteger(n) ? n : null;
+}

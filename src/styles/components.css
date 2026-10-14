@@ -556,3 +556,9 @@ input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 7px; }
 .kw-label small { color: var(--muted); font-size: .74rem; font-weight: 400; }
 .kw-table .hint { margin: 4px 0 0; }
 .kw-wert { width: 170px; margin-left: auto; }
+.nk-row + .nk-row { border-top: 1px solid var(--border); padding-top: 16px; }
+.nk-next { display: inline-flex; align-items: center; gap: 8px; font-size: .74rem; font-weight: 500; color: var(--muted); }
+.nk-row .row .input { flex: 1; min-width: 0; }
+.nk-std { display: inline-flex; align-items: center; gap: 4px; padding: 0; color: var(--text-2); font: inherit; text-decoration: underline dotted; text-underline-offset: 3px; }
+.nk-std:hover { color: var(--text); }
+.nk-std .ic { width: 12px; height: 12px; }
