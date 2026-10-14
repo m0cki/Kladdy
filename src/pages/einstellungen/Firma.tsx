@@ -170,7 +170,7 @@ function FirmaFormular({ gespeichert, neuLaden }: { gespeichert: FirmaDaten; neu
           <div className="set-note ok" data-setting="firma-pflichtangaben">
             <CircleCheck />
             <span>
-              <b>Alles da.</b> Name, Anschrift und Steuernummer stehen auf jeder Rechnung und Quittung (§ 34a UStDV).
+              <b>Alles da.</b> Die Pflichtangaben für Rechnungen und Quittungen sind eingetragen (§ 34a UStDV).
             </span>
           </div>
         )}
