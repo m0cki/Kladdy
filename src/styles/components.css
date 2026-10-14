@@ -546,3 +546,7 @@ input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 7px; }
 .bl-back { display: inline-flex; align-items: center; gap: 2px; margin: 0 0 6px -4px; font-size: .8rem; font-weight: 600; color: var(--muted); border-radius: 8px; padding: 2px 6px 2px 2px; transition: color .15s, background .15s; }
 .bl-back .ic { width: 16px; height: 16px; }
 .bl-back:hover { color: var(--accent); background: var(--hover); }
+
+/* Einstellungen › Firma, Steuern, Nummernkreise */
+.set-sk { height: 180px; }
+.set-erneut { justify-content: center; margin-top: -18px; }

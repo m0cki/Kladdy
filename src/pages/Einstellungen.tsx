@@ -1,18 +1,26 @@
 /* Einstellungen als eigene Seite (Wunsch des Nutzers, abweichend von §6.10 „Schublade“).
  * Die Bereichs-Navigation steht dann in der Seitenleiste (Sidebar.tsx). ⚙ oder Esc führen zur vorherigen Seite zurück.
  * `?feld=<id>` (aus der Suche) scrollt zur Einstellung und hebt sie kurz hervor. */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ComponentType } from 'react';
 import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Settings } from 'lucide-react';
-import { bereich, bereichPfad, isBereichId, type Bereich } from '../lib/einstellungen-index';
+import { bereich, bereichPfad, isBereichId, type Bereich, type BereichId } from '../lib/einstellungen-index';
 import { START } from '../lib/navigation';
 import { useUi } from '../store/ui';
 import { EmptyState } from '../components/ui/EmptyState';
 import { PageHead, reveal } from '../components/ui/PageHead';
 import Darstellung from './einstellungen/Darstellung';
+import Firma from './einstellungen/Firma';
 import UpdatesUeber from './einstellungen/UpdatesUeber';
 
 const FLASH_MS = 1800;
+
+/** Gebaute Bereiche; alle anderen zeigen den Platzhalter. */
+const INHALT: Partial<Record<BereichId, ComponentType>> = {
+  darstellung: Darstellung,
+  firma: Firma,
+  updates: UpdatesUeber,
+};
 
 function Platzhalter({ b }: { b: Bereich }) {
   return (
@@ -79,12 +87,13 @@ export default function Einstellungen() {
 
   if (!isBereichId(param)) return <Navigate to={bereichPfad('darstellung')} replace />;
   const b = bereich(param);
+  const Inhalt = INHALT[b.id];
 
   return (
     <div className="page">
       <PageHead icon={Settings} title="Einstellungen" sub={`${b.label} · gilt nur für diesen Mac`} />
       <div className="set-content" ref={inhalt} key={b.id}>
-        {b.id === 'darstellung' ? <Darstellung /> : b.id === 'updates' ? <UpdatesUeber /> : <Platzhalter b={b} />}
+        {Inhalt ? <Inhalt /> : <Platzhalter b={b} />}
       </div>
     </div>
   );

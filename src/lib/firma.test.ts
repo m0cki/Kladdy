@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  feldAnzeige,
   feldFehler,
+  feldUebernehmen,
   fehlendePflichtangaben,
   firmaAusJson,
   firmaFehler,
@@ -116,5 +118,27 @@ describe('fehlendePflichtangaben (§2.3)', () => {
     expect(fehlendePflichtangaben({ ...basis, ust_idnr: 'DE123456789' })).toEqual([]);
     expect(fehlendePflichtangaben({ ...basis, ku_id: 'x' })).toEqual([]);
     expect(fehlendePflichtangaben({ ...basis, ort: '' })).toEqual(['Anschrift (Straße, PLZ, Ort)', 'Steuernummer, USt-IdNr. oder KU-ID']);
+  });
+});
+
+describe('feldUebernehmen / feldAnzeige', () => {
+  it('normalisiert gültige Eingaben zum Speichern', () => {
+    expect(feldUebernehmen('iban', 'de89 3704 0044 0532 0130 00')).toEqual({ wert: 'DE89370400440532013000' });
+    expect(feldUebernehmen('name', '  Mustermann   Service ')).toEqual({ wert: 'Mustermann Service' });
+    expect(feldUebernehmen('email', '')).toEqual({ wert: '' });
+  });
+  it('meldet Fehler verständlich, z. B. eine falsche IBAN-Prüfziffer', () => {
+    const r = feldUebernehmen('iban', 'DE88 3704 0044 0532 0130 00');
+    expect(r).toEqual({ fehler: expect.stringContaining('Prüfziffer') });
+    expect(feldUebernehmen('plz', '1234')).toEqual({ fehler: expect.stringContaining('fünf Ziffern') });
+  });
+  it('zeigt die IBAN in Vierergruppen, andere Felder unverändert', () => {
+    expect(feldAnzeige('iban', 'DE89370400440532013000')).toBe('DE89 3704 0044 0532 0130 00');
+    expect(feldAnzeige('iban', '')).toBe('');
+    expect(feldAnzeige('bic', 'COBADEFFXXX')).toBe('COBADEFFXXX');
+  });
+  it('Anzeige und Übernahme passen zusammen (kein Speichern ohne Änderung)', () => {
+    const gespeichert = 'DE89370400440532013000';
+    expect(feldUebernehmen('iban', feldAnzeige('iban', gespeichert))).toEqual({ wert: gespeichert });
   });
 });

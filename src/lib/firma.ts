@@ -153,3 +153,15 @@ export function fehlendePflichtangaben(f: Firma): string[] {
   if (!f.steuernummer.trim() && !f.ust_idnr.trim() && !f.ku_id.trim()) fehlt.push('Steuernummer, USt-IdNr. oder KU-ID');
   return fehlt;
 }
+
+/* ---------- Einstellungen › Firma: ein Feld übernehmen ---------- */
+
+/** Eingabe beim Verlassen eines Felds: normalisiert und geprüft. { wert } zum Speichern oder { fehler } (deutsch). */
+export function feldUebernehmen(feld: FirmaFeld, eingabe: string): { wert: string } | { fehler: string } {
+  const wert = normalisiere(feld, eingabe);
+  const fehler = feldFehler(feld, wert);
+  return fehler ? { fehler } : { wert };
+}
+
+/** Gespeicherten Wert so zeigen, wie man ihn liest (IBAN in Vierergruppen); Speichern normalisiert wieder. */
+export const feldAnzeige = (feld: FirmaFeld, wert: string): string => (feld === 'iban' && wert ? ibanFormat(wert) : wert);
