@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Nummernkreis } from '../numbering';
-import { KREIS_REIHENFOLGE, nachbarn, nummernTabelle } from './nummernkreise';
+import { KREIS_REIHENFOLGE, type Nummernkreis } from '../numbering';
+import { nachbarn, nummernTabelle } from './nummernkreise';
 
 describe('nummernTabelle', () => {
   it('ordnet jeden Kreis seiner Tabelle zu', () => {

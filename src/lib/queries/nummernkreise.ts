@@ -4,11 +4,8 @@
  * wird nichts geschrieben). Logik und Prüfungen in lib/numbering.ts.
  * Protokoll: tabelle 'nummernkreise', schluessel = Kreis-ID ('rechnung'). */
 import { abfrage, ausfuehren, nacheinander } from '../db';
-import { KREIS_NAMEN, type Nummernkreis, type NummernkreisId } from '../numbering';
+import { KREIS_NAMEN, KREIS_REIHENFOLGE, type Nummernkreis, type NummernkreisId } from '../numbering';
 import { protokollieren } from './protokoll';
-
-/** Anzeige-Reihenfolge: Buchungen, dann Belege (Quittung zuerst, sie ist der Standard), zuletzt Kunden. */
-export const KREIS_REIHENFOLGE: readonly NummernkreisId[] = ['buchung', 'quittung', 'rechnung', 'angebot', 'eigenbeleg', 'kunde'];
 
 export type NummernTabelle = 'buchungen' | 'rechnungen' | 'kunden';
 

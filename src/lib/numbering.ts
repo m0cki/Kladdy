@@ -35,6 +35,19 @@ export const KREIS_NAMEN: Readonly<Record<NummernkreisId, string>> = {
   kunde: 'Kunde',
 };
 
+/** Bezeichnung der Nummer selbst (Einstellungen, Suche). */
+export const NUMMER_NAMEN: Readonly<Record<NummernkreisId, string>> = {
+  buchung: 'Buchungsnummer',
+  rechnung: 'Rechnungsnummer',
+  quittung: 'Quittungsnummer',
+  angebot: 'Angebotsnummer',
+  eigenbeleg: 'Eigenbelegnummer',
+  kunde: 'Kundennummer',
+};
+
+/** Anzeige-Reihenfolge: Buchungen, dann Belege (Quittung zuerst, sie ist der Standard), zuletzt Kunden. */
+export const KREIS_REIHENFOLGE: readonly NummernkreisId[] = ['buchung', 'quittung', 'rechnung', 'angebot', 'eigenbeleg', 'kunde'];
+
 const PLATZHALTER = /\{([^{}]*)\}/g;
 /** Zeichen außerhalb der Platzhalter: Buchstaben (auch Umlaute), Ziffern und - _ / . (keine Leerzeichen, nichts für LaTeX/Dateinamen Heikles). */
 const ERLAUBT = /^[\p{L}\d\-_/.]*$/u;

@@ -17,7 +17,7 @@ const FLASH_MS = 1800;
 function Platzhalter({ b }: { b: Bereich }) {
   return (
     <section className="card reveal" style={reveal(1)} data-setting={b.id}>
-      <EmptyState icon={b.icon} title={`Kommt mit Phase ${b.phase}`}>
+      <EmptyState icon={b.icon} title={b.phase ? `Kommt mit Phase ${b.phase}` : 'Kommt bald'}>
         {b.inhalt}
       </EmptyState>
     </section>
