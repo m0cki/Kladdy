@@ -117,7 +117,10 @@ pub fn run() {
         // Datenbank (§5): erst sichern, dann darf das SQL-Plugin migrieren – Reihenfolge nicht vertauschen.
         .plugin(datenbank::sicherungs_plugin())
         .plugin(datenbank::sql_plugin())
-        .invoke_handler(tauri::generate_handler![datenbank::datenbank_url, ist_entwicklerversion])
+        .invoke_handler(tauri::generate_handler![
+            datenbank::datenbank_url,
+            ist_entwicklerversion
+        ])
         // Updates aus der App heraus (§3.2): Prüfen/Laden/Installieren und danach Neustart.
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
