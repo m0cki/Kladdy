@@ -116,13 +116,14 @@ Versionen lokal prüfen: `npm run version:check`. Von Hand setzen (nur im Notfal
 - Beim Start sucht Kladdy höchstens **einmal täglich** nach Updates (abschaltbar unter ⚙ → Updates & Über Kladdy →
   „Automatisch nach Updates suchen“), von Hand über das Menü „Ablage → Nach Updates suchen …“ oder den Knopf in den
   Einstellungen.
-- Gibt es eine neue Version: Hinweis „Version X ist da“ mit „Was ist neu?“ und „Jetzt aktualisieren“ → Download mit
-  Fortschritt → Neustart. Ab Phase 5 legt die App vorher automatisch eine Datensicherung an.
-  Geplant (ANLEITUNG §3.2 Punkt 5): Laden und Neustart trennen („Jetzt neu starten“ / „Später“ ⇒ beim nächsten
-  Start aktiv).
-- **Nie in der Dev-App (`npm run tauri dev`) auf „Jetzt aktualisieren“ klicken**, solange das noch nicht gesperrt ist:
-  Der Updater ersetzt dann `src-tauri/target/debug` durch die Release-App und die Dev-App startet nicht mehr neu.
-  Behebung: `rm -rf src-tauri/target/debug` und `npm run tauri dev` neu starten (baut alles neu, Daten bleiben).
+- Gibt es eine neue Version: Hinweis „Version X ist da“ mit „Was ist neu?“ und „Jetzt aktualisieren“ → Download und
+  Installation mit Fortschritt (man arbeitet weiter) → „Update bereit · Jetzt neu starten · Später“. Neu gestartet wird
+  nur auf Klick; bei „Später“ ist die neue Version beim nächsten Start da. Ab Phase 5 legt die App vorher automatisch
+  eine Datensicherung an. (Die 1.0.0 hat noch den alten Ablauf: laden und sofort neu starten.)
+- **Die Dev-App (`npm run tauri dev`) installiert nie**, sie meldet nur „Version X ist da (in der Entwicklerversion wird
+  nicht installiert)“. Wer mit einer älteren Dev-App doch installiert hat, startet nicht mehr: Der Updater hat dann
+  `src-tauri/target/debug` durch die Release-App ersetzt. Behebung: `rm -rf src-tauri/target/debug` und
+  `npm run tauri dev` neu starten (baut alles neu, Daten bleiben).
 - Ins Internet geht die App dafür nur mit einer Anfrage an `latest.json` bei GitHub.
 
 ## Erster Start auf einem anderen Mac („Dennoch öffnen“)

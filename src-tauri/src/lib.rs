@@ -104,13 +104,23 @@ fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .build()
 }
 
+/// Für den Updater (src/lib/updates.ts): Debug-Build (`npm run tauri dev`)? Dort wird nie installiert, weil die App
+/// keine `.app` ist und der Updater sonst `src-tauri/target/debug` durch das Release-Bundle ersetzt (§3.2 Punkt 5).
+#[tauri::command]
+fn ist_entwicklerversion() -> bool {
+    cfg!(debug_assertions)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         // Datenbank (§5): erst sichern, dann darf das SQL-Plugin migrieren – Reihenfolge nicht vertauschen.
         .plugin(datenbank::sicherungs_plugin())
         .plugin(datenbank::sql_plugin())
-        .invoke_handler(tauri::generate_handler![datenbank::datenbank_url])
+        .invoke_handler(tauri::generate_handler![
+            datenbank::datenbank_url,
+            ist_entwicklerversion
+        ])
         // Updates aus der App heraus (§3.2): Prüfen/Laden/Installieren und danach Neustart.
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())

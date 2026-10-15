@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TAG_MS, defaultPrefs, fortschritt, loadPrefs, savePrefs, shouldAutoCheck, UPDATES_KEY } from './updates';
+import { TAG_MS, defaultPrefs, fortschritt, kannInstallieren, loadPrefs, savePrefs, shouldAutoCheck, UPDATES_KEY } from './updates';
 
 const mem = (init: Record<string, string> = {}) => {
   const data = { ...init };
@@ -43,5 +43,17 @@ describe('fortschritt', () => {
     expect(fortschritt(300, 200)).toBe(1);
     expect(fortschritt(10, undefined)).toBeNull();
     expect(fortschritt(10, 0)).toBeNull();
+  });
+});
+
+describe('kannInstallieren', () => {
+  it('nur bei gefundener Version', () => {
+    expect(kannInstallieren('available', false)).toBe(true);
+    for (const s of ['idle', 'checking', 'downloading', 'ready', 'restarting', 'error'] as const) {
+      expect(kannInstallieren(s, false)).toBe(false);
+    }
+  });
+  it('nie in der Entwicklerversion', () => {
+    expect(kannInstallieren('available', true)).toBe(false);
   });
 });

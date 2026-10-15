@@ -409,16 +409,16 @@ für die eigene App.
    neue Version, ein Toast „Version 1.2.0 ist da · Was ist neu? · Jetzt aktualisieren“ → `downloadAndInstall()` mit
    Fortschritt → `relaunch()`. **Vorher automatisch ein Backup** der Datenbank anlegen. Berechtigungen in
    `capabilities/default.json`: `"updater:default"`, `"process:allow-restart"`.
-   **Geplante Änderung (nach Test am 15.10.2026):** Laden und Neustart trennen, wie bei Mac-Apps üblich.
-   „Jetzt aktualisieren“ lädt und installiert nur (Fortschritt im Toast, man kann weiterarbeiten). Danach Toast
-   „Update bereit · Jetzt neu starten · Später“. „Später“ (oder Toast wegklicken) ⇒ die neue Version ist beim nächsten
-   Start einfach da, ohne weitere Frage. Neustart nie automatisch; ist eine Schublade mit ungespeicherten Eingaben
-   offen, vor dem Neustart nachfragen. Technik: statt `downloadAndInstall()` getrennt `download()` und `install()`
-   des Update-Objekts verwenden (gegen die aktuelle Doku von `@tauri-apps/plugin-updater` prüfen); `relaunch()` nur
-   auf Klick. **In Debug-Builds (`npm run tauri dev`) nie installieren:** Dort ist die App keine `.app`, der Updater
-   hält `src-tauri/target/debug` für das Bundle, ersetzt den Ordner durch die Release-App und der Neustart findet
-   nichts mehr (genau so passiert). Im Dev nur „Version X ist da (in der Entwicklerversion wird nicht installiert)“
-   anzeigen. Die Dev-App meldet immer ein Update, weil `main` die Version 0.1.0 behält (§10 Stand).
+   **Laden und Neustart getrennt (umgesetzt 15.10.2026, `src/lib/updates.ts`):** wie bei Mac-Apps üblich.
+   „Jetzt aktualisieren“ lädt und installiert nur (`update.download()` + `update.install()`, Fortschritt im Toast, man
+   kann weiterarbeiten). Danach Toast „Update bereit · Jetzt neu starten · Später“. „Später“ (oder Toast wegklicken)
+   ⇒ die neue Version ist beim nächsten Start einfach da, ohne weitere Frage. Neustart (`relaunch()`) nie
+   automatisch, nur auf Klick; hat die offene Schublade ungespeicherte Eingaben (`useUi.ungespeichert`, setzt die
+   Schublade selbst), wird vorher nachgefragt. **In Debug-Builds (`npm run tauri dev`) wird nie installiert**
+   (Rust-Command `ist_entwicklerversion`): Dort ist die App keine `.app`, der Updater hielte `src-tauri/target/debug`
+   für das Bundle und ersetzte den Ordner durch die Release-App. Im Dev nur „Version X ist da (in der
+   Entwicklerversion wird nicht installiert)“. Die Dev-App meldet immer ein Update, weil `main` die Version 0.1.0
+   behält (§10 Stand).
 6. Versionsnummer nach SemVer in `tauri.conf.json` und `package.json` gleich halten; „Was ist neu“ in `notes`.
    Nach dem ersten Update einmal prüfen, dass die App ohne erneute Freigabe startet.
 
@@ -1645,10 +1645,10 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet, startet
   Bewirtung, Geschenke, Homeoffice), Kategorien bearbeiten und EÜR-Zuordnung pro Jahr (braucht eigene Tabelle),
   Firmenlogo (nach der Dateiablage), sichtbare Fehlermeldung statt stillem Abbruch, wenn die Sicherung vor einer
   Migration fehlschlägt, Regelbesteuerung wirkt noch nicht auf Buchungen/Belege.
-- **Updater überarbeiten (eigener kleiner PR, vor dem nächsten Release):** Laden und Neustart trennen,
-  „Später“ ⇒ beim nächsten Start aktiv, im Dev nie installieren (Details §3.2 Punkt 5). Danach 1.0.1
-  veröffentlichen und das Update von der installierten 1.0.0 aus testen. Hinweis: Die 1.0.0 hat noch den alten
-  Ablauf (laden + sofort neu starten); erst Updates *ab* der Version mit dem neuen Ablauf verhalten sich neu.
+- **Updater überarbeitet** (eigener kleiner PR): Laden und Neustart getrennt, „Später“ ⇒ beim nächsten Start aktiv,
+  im Dev nie installieren (Details §3.2 Punkt 5). **Als Nächstes:** 1.0.1 veröffentlichen und das Update von der
+  installierten 1.0.0 aus testen. Hinweis: Die 1.0.0 hat noch den alten Ablauf (laden + sofort neu starten); erst
+  Updates *ab* 1.0.1 verhalten sich neu.
 
 ### Phase 0 – Grundgerüst & Design
 > Setze Phase 0 aus `ANLEITUNG.md` um: `git init`; Tauri-2-Projekt mit React + TypeScript + Vite (`npm create tauri-app@latest`);
