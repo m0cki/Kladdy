@@ -60,6 +60,11 @@ pub const MIGRATIONEN: &[MigrationsDatei] = &[
         beschreibung: "buchungen",
         sql: include_str!("../migrations/0004_buchungen.sql"),
     },
+    MigrationsDatei {
+        version: 5,
+        beschreibung: "belege",
+        sql: include_str!("../migrations/0005_belege.sql"),
+    },
 ];
 
 /// Verbindungs-URL, wie sie das Plugin und `Database.load` erwarten.
@@ -590,6 +595,81 @@ mod tests {
                 .await
                 .unwrap();
             assert_eq!(alle, 4);
+        });
+    }
+
+    #[test]
+    fn trigger_schuetzen_belege() {
+        tauri::async_runtime::block_on(async {
+            let mut c = testhilfe::test_db().await;
+            sqlx::query(
+                "INSERT INTO buchungen (id, nummer, typ, zahlungsdatum, betrag_cent, kategorie_id, zahlungsart, beschreibung, erstellt_am, geaendert_am)
+                 VALUES (1, '2026-0001', 'ausgabe', '2026-10-14', 100, 2, 'bar', 'x', 'jetzt', 'jetzt')",
+            )
+            .execute(&mut c)
+            .await
+            .unwrap();
+            sqlx::query(
+                "INSERT INTO belege (id, buchung_id, pfad, originalname, mime, sha256, groesse, art, aufbewahren_bis, erstellt_am)
+                 VALUES (1, 1, '2026/ab.pdf', 'a.pdf', 'application/pdf', 'ab', 3, 'beleg', '2034-12-31', 'jetzt')",
+            )
+            .execute(&mut c)
+            .await
+            .unwrap();
+            // Indizes aus 0005
+            let indizes: Vec<String> = sqlx::query_scalar(
+                "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'belege' ORDER BY name",
+            )
+            .fetch_all(&mut c)
+            .await
+            .unwrap();
+            assert_eq!(indizes, vec!["belege_buchung_id", "belege_sha256"]);
+
+            let meldung = |e: sqlx::Error| db_fehler(e);
+            let f = sqlx::query("DELETE FROM belege WHERE id = 1")
+                .execute(&mut c)
+                .await
+                .map_err(meldung)
+                .unwrap_err();
+            assert_eq!(f, "Belege werden nie gelöscht (GoBD).");
+            let gesperrt = "Belege werden nie geändert (GoBD). Nur die Aufbewahrungsfrist kann verlängert werden.";
+            for sql in [
+                "UPDATE belege SET pfad = '2026/cd.pdf'",
+                "UPDATE belege SET sha256 = 'cd'",
+                "UPDATE belege SET originalname = NULL",
+                "UPDATE belege SET groesse = 4",
+                "UPDATE belege SET buchung_id = NULL",
+                "UPDATE belege SET rechnung_id = 1",
+                "UPDATE belege SET art = 'erechnung_xml'",
+                "UPDATE belege SET mime = 'image/png'",
+                "UPDATE belege SET erstellt_am = 'spaeter'",
+                "UPDATE belege SET id = 2",
+                "UPDATE belege SET aufbewahren_bis = '2034-12-30'",
+                "UPDATE belege SET aufbewahren_bis = NULL",
+                "UPDATE belege SET aufbewahren_bis = '2040-12-31', groesse = 4",
+            ] {
+                let f = sqlx::query(sql)
+                    .execute(&mut c)
+                    .await
+                    .map_err(meldung)
+                    .unwrap_err();
+                assert_eq!(f, gesperrt, "{sql}");
+            }
+            // verlängern (und gleich lassen) geht
+            sqlx::query("UPDATE belege SET aufbewahren_bis = '2034-12-31'")
+                .execute(&mut c)
+                .await
+                .unwrap();
+            sqlx::query("UPDATE belege SET aufbewahren_bis = '2035-12-31'")
+                .execute(&mut c)
+                .await
+                .unwrap();
+            let (pfad, bis): (String, String) =
+                sqlx::query_as("SELECT pfad, aufbewahren_bis FROM belege")
+                    .fetch_one(&mut c)
+                    .await
+                    .unwrap();
+            assert_eq!((pfad.as_str(), bis.as_str()), ("2026/ab.pdf", "2035-12-31"));
         });
     }
 

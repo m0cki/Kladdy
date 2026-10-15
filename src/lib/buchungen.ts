@@ -52,6 +52,8 @@ export interface BuchungZeile {
   beschreibung: string;
   rechnung_id: number | null;
   rechnung_nummer: string | null;
+  /** gesetzt bei einer Storno-Gegenbuchung (ID des Originals); an die lassen sich keine Belege hängen */
+  storno_von_id?: number | null;
   /** Anzahl Dateien in `belege` zu dieser Buchung */
   belege_anzahl: number;
   /** 1 = es gibt eine Storno-Gegenbuchung */
@@ -356,6 +358,8 @@ export interface BuchungDaten {
   belegnummer: string | null;
   beschreibung: string;
   heute: string;
+  /** Quellpfade von Belegdateien: Rust kopiert und verknüpft sie in derselben Transaktion (nur wenn welche vorgemerkt sind) */
+  belege?: string[];
 }
 
 export type FormFeld = 'betrag' | 'kategorie' | 'zahlungsdatum' | 'beschreibung' | 'wer' | 'privat';

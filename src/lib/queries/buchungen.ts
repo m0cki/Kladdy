@@ -16,7 +16,7 @@ const ZEILE_SQL = `
   SELECT b.id, b.nummer, b.typ, b.zahlungsdatum, b.belegdatum, b.betrag_cent, b.privatanteil_prozent, b.kategorie_id,
          k.name AS kategorie_name, k.icon AS kategorie_icon, k.farbe AS kategorie_farbe,
          b.kunde_id, ku.name AS kunde_name, ku.nummer AS kunde_nummer, b.lieferant, b.art, b.zahlungsart,
-         b.belegnummer, b.beschreibung, b.rechnung_id, r.nummer AS rechnung_nummer,
+         b.belegnummer, b.beschreibung, b.rechnung_id, r.nummer AS rechnung_nummer, b.storno_von_id,
          ${BELEGE} AS belege_anzahl,
          CASE WHEN ${STORNIERT} THEN 1 ELSE 0 END AS storniert,
          CASE WHEN ${FEST} THEN 1 ELSE 0 END AS festgeschrieben
@@ -86,6 +86,8 @@ export interface BuchungErgebnis {
   kunde_nummer: string | null;
   /** Kunde wurde in diesem Vorgang neu angelegt (neuer_kunde) */
   kunde_neu: boolean;
+  /** Anzahl der in diesem Vorgang abgelegten Belegdateien (daten.belege) */
+  belege_neu?: number;
 }
 
 export const buchungAnlegen = (daten: BuchungDaten): Promise<BuchungErgebnis> => invoke<BuchungErgebnis>('buchung_anlegen', { daten });

@@ -4,6 +4,7 @@
  * (Toast „Verwerfen“ / „Weiter bearbeiten“), ebenso beim Schließen. */
 import { create } from 'zustand';
 import { useUi } from '../store/ui';
+import { belegeZusammenfuehren, type VorgemerkterBeleg } from './belege';
 import type { BuchungTyp, Zahlungsart } from './buchungen';
 
 export interface Vorbelegung {
@@ -20,16 +21,35 @@ export interface Vorbelegung {
   lieferant?: string;
   zahlungsart?: Zahlungsart;
   belegnummer?: string;
+  /** schon geprüfte Belegdateien (Datei-Drop, ⌘O) */
+  belege?: VorgemerkterBeleg[];
 }
 
 export type Auftrag = { art: 'neu'; vorbelegung: Vorbelegung; n: number } | { art: 'bearbeiten'; id: number; n: number };
 
 interface ErfassenState {
   auftrag: Auftrag | null;
+  /** Vorgemerkte Belegdateien der offenen Schublade (werden beim Speichern bzw. „Beleg anhängen“ abgelegt). Hier statt im
+   *  Formular, damit ein Drop auch während des Ladens ankommt. Jeder neue Auftrag beginnt mit seiner Vorbelegung. */
+  belege: VorgemerkterBeleg[];
+  /** Kann die offene Schublade Dateien annehmen? (false z. B. bei einer Gegenbuchung oder ohne Datenbank) */
+  nimmtBelege: boolean;
 }
 
 /** Was die Schublade gerade zeigen soll. `n` wechselt bei jedem Öffnen ⇒ Formular neu aufbauen. */
-export const useErfassen = create<ErfassenState>(() => ({ auftrag: null }));
+export const useErfassen = create<ErfassenState>(() => ({ auftrag: null, belege: [], nimmtBelege: true }));
+
+/** Dateien zur offenen Schublade hinzufügen (gleiche Datei nur einmal). */
+export function belegeVormerken(neu: VorgemerkterBeleg[]): void {
+  useErfassen.setState((s) => ({ belege: belegeZusammenfuehren(s.belege, neu) }));
+}
+
+/** Eine vorgemerkte Datei wieder herausnehmen (abgelegte Belege bleiben, die werden nie gelöscht). */
+export function belegEntfernen(pfad: string): void {
+  useErfassen.setState((s) => ({ belege: s.belege.filter((b) => b.pfad !== pfad) }));
+}
+
+export const belegeLeeren = (): void => useErfassen.setState({ belege: [] });
 
 let zaehler = 0;
 const FRAGE = 'erfassen-frage';
@@ -68,7 +88,7 @@ function nachVerwerfen(text: string, weiter: () => void): void {
 }
 
 function oeffne(auftrag: Auftrag): void {
-  useErfassen.setState({ auftrag });
+  useErfassen.setState({ auftrag, belege: auftrag.art === 'neu' ? belegeZusammenfuehren([], auftrag.vorbelegung.belege ?? []) : [], nimmtBelege: true });
   const ui = useUi.getState();
   if (ui.drawer === 'erfassen') ui.setUngespeichert(false);
   else ui.openDrawer('erfassen');
@@ -91,6 +111,7 @@ export function erfassenSchliessen(): void {
   nachVerwerfen('Ungespeicherte Eingaben verwerfen?', () => {
     const ui = useUi.getState();
     if (ui.drawer === 'erfassen') ui.closeDrawer();
+    belegeLeeren();
   });
 }
 
@@ -99,4 +120,5 @@ export function erfassenFertig(): void {
   frageToastWeg();
   const ui = useUi.getState();
   if (ui.drawer === 'erfassen') ui.closeDrawer();
+  belegeLeeren();
 }

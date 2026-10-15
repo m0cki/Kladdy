@@ -3,7 +3,9 @@
  * Reihenfolge wie im Prototyp (referenz/prototyp/js/pages/buchungen.js): Typ · Betrag groß · Kategorie-Kacheln (Vorschlag
  * über Stichworte) · Zahlungsdatum, Beleg-Nr., Beschreibung, Kunde bzw. Geschäft · Mehr Optionen (Privatanteil) ·
  * Bezahlt per · Beleg. Speichern ⌘↩, „Speichern & neu“ ⇧⌘↩. Geschrieben wird nur über Rust (buchung_anlegen/_aendern).
- * Ungespeicherte Eingaben setzen useUi.ungespeichert (Neustart nach Update fragt dann nach; Schließen auch). */
+ * Ungespeicherte Eingaben setzen useUi.ungespeichert (Neustart nach Update fragt dann nach; Schließen auch).
+ * Belege: vorgemerkte Dateien (Drop aufs Fenster, ⌘O, Klick auf die Dropzone) stehen in useErfassen.belege und gehen
+ * beim Speichern als `belege` mit; bei gesperrten Einträgen (festgeschrieben) nur über „Beleg anhängen“ (beleg_anhaengen). */
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
@@ -17,6 +19,7 @@ import {
   Info,
   Lock,
   Minus,
+  Paperclip,
   Pencil,
   Plus,
   Receipt,
@@ -52,8 +55,10 @@ import {
   type KundeKurz,
   type Sperre,
 } from '../../lib/buchungen';
+import { vorgemerkteAnhaengen } from '../../lib/belegablage';
+import { belegZusatz, belegeAnzahl, type VorgemerkterBeleg } from '../../lib/belege';
 import { datenbankVerfuegbar } from '../../lib/db';
-import { erfassenFertig, erfassenSchliessen, useErfassen, type Vorbelegung } from '../../lib/erfassen';
+import { belegeLeeren, erfassenFertig, erfassenSchliessen, useErfassen, type Vorbelegung } from '../../lib/erfassen';
 import { fehlerText } from '../../lib/fehler';
 import { betragAlsEingabe, formatBetrag, parseBetrag } from '../../lib/money';
 import {
@@ -72,6 +77,7 @@ import { Drawer } from '../ui/Drawer';
 import { EmptyState } from '../ui/EmptyState';
 import { Seg } from '../ui/Seg';
 import { KategorieIcon, ZAHLUNGSWEG_ICON } from '../buchungen/Symbole';
+import { BelegDropzone, VorgemerkteBelege, VorhandeneBelege, useBelegeZuBuchung } from '../belege/BelegDateien';
 
 interface Stamm {
   kategorien: KategorieWahl[];
@@ -124,6 +130,7 @@ type Ladezustand = { status: 'laden' } | { status: 'ohne-db' } | { status: 'fehl
 export function ErfassenSchublade() {
   const open = useUi((s) => s.drawer === 'erfassen');
   const auftrag = useErfassen((s) => s.auftrag);
+  const belege = useErfassen((s) => s.belege);
   const [laden, setLaden] = useState<Ladezustand>({ status: 'laden' });
   const [stamm, setStamm] = useState<Stamm | null>(null);
   const [zeile, setZeile] = useState<BuchungZeile | null>(null);
@@ -133,6 +140,8 @@ export function ErfassenSchublade() {
   const [katVorschlag, setKatVorschlag] = useState(false);
   const [katGewaehlt, setKatGewaehlt] = useState(false);
   const [speichert, setSpeichert] = useState(false);
+  /** zu welchem Auftrag (n) das geladene Formular gehört – bis zum Laden zeigt die Schublade noch den alten Stand */
+  const [geladenN, setGeladenN] = useState(0);
 
   // Öffnen bzw. neuer Auftrag ⇒ Stammdaten (und ggf. die Buchung) laden, Formular aufbauen
   const auftragN = open ? (auftrag?.n ?? 0) : 0;
@@ -161,6 +170,7 @@ export function ErfassenSchublade() {
       setZeile(z);
       setForm(f);
       setStart(formularSchluessel(f));
+      setGeladenN(auftrag.n);
       setLaden({ status: 'ok' });
     })().catch((e: unknown) => {
       if (aktiv) setLaden({ status: 'fehler', fehler: fehlerText(e) });
@@ -174,7 +184,18 @@ export function ErfassenSchublade() {
   const sp: Sperre | null = zeile ? sperre(zeile) : null;
   const nurLesen = sp !== null;
   const bearbeitung = auftrag?.art === 'bearbeiten';
-  const dirty = laden.status === 'ok' && !!form && !nurLesen && formularSchluessel(form) !== start;
+  // Belege annehmen: nicht an Gegenbuchungen (Rust lehnt ab) und nicht an stornierte Einträge
+  const gegenbuchung = zeile?.storno_von_id != null;
+  const aktuell = laden.status === 'ok' && geladenN === auftragN;
+  const nimmtBelege = aktuell ? !gegenbuchung && sp !== 'storniert' : laden.status === 'laden' || laden.status === 'ok';
+  const dirty = laden.status === 'ok' && !!form && ((!nurLesen && formularSchluessel(form) !== start) || (nimmtBelege && belege.length > 0));
+
+  useEffect(() => {
+    if (!open) return;
+    useErfassen.setState({ nimmtBelege });
+    // während des Ladens angekommene Dateien, die hier nicht abgelegt werden können, wieder verwerfen
+    if (aktuell && !nimmtBelege && useErfassen.getState().belege.length) belegeLeeren();
+  }, [open, nimmtBelege, aktuell]);
 
   useEffect(() => {
     if (open) useUi.getState().setUngespeichert(dirty);
@@ -218,23 +239,24 @@ export function ErfassenSchublade() {
         return;
       }
       const ui = useUi.getState();
+      const daten = belege.length ? { ...r.daten, belege: belege.map((b) => b.pfad) } : r.daten;
       setSpeichert(true);
       try {
         if (zeile) {
-          await buchungAendern(zeile.id, r.daten);
+          const res = await buchungAendern(zeile.id, daten);
           ui.datenGeaendert();
-          ui.showToast({ text: `Änderung gespeichert (im Protokoll) · ${zeile.nummer}`, icon: 'check' });
+          ui.showToast({ text: `Änderung gespeichert (im Protokoll) · ${zeile.nummer}${belegZusatz(res.belege_neu)}`, icon: 'check' });
           erfassenFertig();
           return;
         }
-        const res = await buchungAnlegen(r.daten);
+        const res = await buchungAnlegen(daten);
         ui.datenGeaendert();
         const { modus, anker } = ui.zeitraum;
         const z = zeitraum(modus, anker);
         const extra = `${res.kunde_neu && res.kunde_nummer ? ` · neuer Kunde ${res.kunde_nummer}` : ''}${imZeitraum(z, r.daten.zahlungsdatum) ? '' : ` · liegt außerhalb von ${z.label}`}`;
         const ziel = { id: res.id, nummer: res.nummer, typ: r.daten.typ };
         ui.showToast({
-          text: `${typName(r.daten.typ)} gespeichert · ${res.nummer}${extra}`,
+          text: `${typName(r.daten.typ)} gespeichert · ${res.nummer}${belegZusatz(res.belege_neu)}${extra}`,
           icon: 'check',
           actions: [
             {
@@ -254,6 +276,7 @@ export function ErfassenSchublade() {
           setStamm(s);
           setForm(f);
           setStart(formularSchluessel(f));
+          belegeLeeren();
           setFehler({});
           setKatVorschlag(false);
           setKatGewaehlt(false);
@@ -266,7 +289,7 @@ export function ErfassenSchublade() {
         setSpeichert(false);
       }
     },
-    [form, stamm, zeile, nurLesen, speichert],
+    [form, stamm, zeile, nurLesen, speichert, belege],
   );
 
   // ⌘↩ speichern, ⇧⌘↩ speichern & neu
@@ -322,6 +345,17 @@ export function ErfassenSchublade() {
       <button type="button" className="btn ghost" onClick={erfassenSchliessen}>
         {nurLesen ? 'Schließen' : 'Abbrechen'}
       </button>
+      {nurLesen && zeile && nimmtBelege && belege.length ? (
+        <button
+          type="button"
+          className="btn-primary sm"
+          title="Nur die Dateien ablegen – der Eintrag selbst bleibt unverändert"
+          onClick={() => void vorgemerkteAnhaengen({ id: zeile.id, nummer: zeile.nummer, typ: zeile.typ })}
+        >
+          <Paperclip />
+          {belege.length === 1 ? 'Beleg anhängen' : `${belegeAnzahl(belege.length)} anhängen`}
+        </button>
+      ) : null}
       {nurLesen ? null : (
         <>
           {bearbeitung ? null : (
@@ -365,6 +399,8 @@ export function ErfassenSchublade() {
             stamm={stamm}
             zeile={zeile}
             sp={sp}
+            belege={belege}
+            nimmtBelege={nimmtBelege}
             fehler={fehler}
             katVorschlag={katVorschlag}
             set={set}
@@ -405,6 +441,10 @@ interface InhaltProps {
   stamm: Stamm;
   zeile: BuchungZeile | null;
   sp: Sperre | null;
+  /** vorgemerkte Dateien (useErfassen.belege) */
+  belege: VorgemerkterBeleg[];
+  /** dürfen hier Dateien abgelegt werden? */
+  nimmtBelege: boolean;
   fehler: Partial<Record<FormFeld, string>>;
   katVorschlag: boolean;
   set: <K extends keyof Formular>(k: K, v: Formular[K]) => void;
@@ -425,7 +465,7 @@ const Fehler = ({ text }: { text?: string }) =>
 const TIP_DATUM = 'Für die EÜR zählt der Tag, an dem das Geld geflossen ist (Zufluss-/Abflussprinzip, § 11 EStG) – nicht das Rechnungsdatum.';
 const TIP_NR = 'Bei Ausgaben die Rechnungs- oder Bonnummer des Geschäfts. Eigene Quittungen und Rechnungen (QU-/RE-…) bekommen ihre Nummer beim Ausstellen.';
 
-function FormularInhalt({ form, stamm, zeile, sp, fehler, katVorschlag, set, fehlerWeg, onTyp, onKategorie, vorschlagen }: InhaltProps) {
+function FormularInhalt({ form, stamm, zeile, sp, belege, nimmtBelege, fehler, katVorschlag, set, fehlerWeg, onTyp, onKategorie, vorschlagen }: InhaltProps) {
   const { pathname } = useLocation();
   const seiteZeitraum = useUi((s) => s.zeitraum);
   const ro = sp !== null;
@@ -473,6 +513,9 @@ function FormularInhalt({ form, stamm, zeile, sp, fehler, katVorschlag, set, feh
 
   const kundenOptionen = useMemo(() => stamm.kunden.map((k) => ({ value: kundenLabel(k), label: k.ort || 'ohne Adresse' })), [stamm.kunden]);
   const katName = useMemo(() => new Map(stamm.kategorien.map((k) => [k.id, k.name])), [stamm.kategorien]);
+  const abgelegt = useBelegeZuBuchung(zeile?.id ?? null);
+  const hatDateien = abgelegt.length > 0 || belege.length > 0;
+  const wann = ro ? 'wird mit „Beleg anhängen“ abgelegt' : 'wird beim Speichern abgelegt';
 
   return (
     <>
@@ -755,45 +798,57 @@ function FormularInhalt({ form, stamm, zeile, sp, fehler, katVorschlag, set, feh
 
       <section>
         <h3>{ausgabe ? 'Beleg' : 'Beleg zum Ertrag'}</h3>
-        {ausgabe ? (
-          <>
-            <div className="dropzone bu-dz bu-dz-aus" aria-disabled="true">
+        {ausgabe ? null : (
+          <div className="bu-ew" role="radiogroup" aria-label="Beleg zum Ertrag">
+            <button type="button" className="bu-zw-opt" role="radio" aria-checked={false} disabled title="kommt in Phase 3">
+              <Receipt />
+              <b>Beleg erstellen</b>
+              <small>kommt in Phase 3</small>
+            </button>
+            <button type="button" className="bu-zw-opt" role="radio" aria-checked={false} disabled title="kommt in Phase 3">
+              <Clock />
+              <b>Offene Rechnung zuordnen</b>
+              <small>kommt in Phase 3</small>
+            </button>
+            <button type="button" className="bu-zw-opt on" role="radio" aria-checked>
               <Upload />
-              <b>Beleg hierher ziehen</b>
-              <span>Belege anhängen kommt noch in Phase 1 (nächster Schritt). Bis dahin zählt der Eintrag als „ohne Beleg“.</span>
-            </div>
+              <b>Ohne eigenen Beleg</b>
+              <small>z. B. Plattform-Auszahlung</small>
+            </button>
+          </div>
+        )}
+        <VorhandeneBelege liste={abgelegt} />
+        {nimmtBelege ? <VorgemerkteBelege belege={belege} wann={wann} /> : null}
+        {nimmtBelege ? (
+          hatDateien ? (
+            <BelegDropzone kompakt titel="Weiteren Beleg hierher ziehen oder klicken" text="" />
+          ) : (
+            <BelegDropzone
+              titel={ausgabe ? 'Beleg hierher ziehen' : 'Abrechnung oder Zahlungsnachweis hierher ziehen'}
+              text={ausgabe ? 'oder klicken zum Auswählen · PDF, Foto oder E-Rechnung (XML), bis 50 MB' : 'oder klicken zum Auswählen · auch Scan oder Foto einer Quittung'}
+            />
+          )
+        ) : null}
+        {ausgabe && !ro && !hatDateien ? (
+          <div className="bu-nobeleg">
+            <p className="hint warn">
+              <TriangleAlert />
+              Ohne Beleg fehlt der Nachweis fürs Finanzamt. Rechnung oder Kassenbon hierher ziehen.
+            </p>
             <div className="bu-nobeleg-links">
               <button type="button" className="link" disabled title="kommt in Phase 3">
                 <FilePlus />
                 Kein Beleg? Eigenbeleg erstellen · kommt in Phase 3
               </button>
             </div>
-          </>
-        ) : (
-          <>
-            <div className="bu-ew" role="radiogroup" aria-label="Beleg zum Ertrag">
-              <button type="button" className="bu-zw-opt" role="radio" aria-checked={false} disabled title="kommt in Phase 3">
-                <Receipt />
-                <b>Beleg erstellen</b>
-                <small>kommt in Phase 3</small>
-              </button>
-              <button type="button" className="bu-zw-opt" role="radio" aria-checked={false} disabled title="kommt in Phase 3">
-                <Clock />
-                <b>Offene Rechnung zuordnen</b>
-                <small>kommt in Phase 3</small>
-              </button>
-              <button type="button" className="bu-zw-opt on" role="radio" aria-checked>
-                <Upload />
-                <b>Ohne eigenen Beleg</b>
-                <small>z. B. Plattform-Auszahlung</small>
-              </button>
-            </div>
-            <div className="dropzone bu-dz bu-dz-aus" aria-disabled="true">
-              <Upload />
-              <span>Abrechnung oder Zahlungsnachweis anhängen kommt noch in Phase 1 (nächster Schritt).</span>
-            </div>
-          </>
-        )}
+          </div>
+        ) : null}
+        {ro && nimmtBelege && belege.length ? (
+          <p className="hint">
+            <Lock />
+            Der Eintrag selbst bleibt unverändert – „Beleg anhängen“ legt nur die Dateien dazu ab (im Protokoll).
+          </p>
+        ) : null}
         {zeile ? (
           <p className="hint">
             <Info />

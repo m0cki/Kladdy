@@ -1,6 +1,7 @@
 /* Ein- & Ausgänge (Startseite, §6.3): ruhige Liste aller geschäftlichen Zahlungen eines Zeitraums – keine Salden, keine Summen.
  * Kopf in drei Teilen (Titel · Zeitraum mittig · „+ Erfassen“), klebrige Filterleiste (Tabs, Suche, Filter-Popover, Chips,
  * „N ohne Beleg“), Tabelle neueste zuerst, darunter nur die Anzahl. Ändern über die Erfassen-Schublade, Entfernen = Storno.
+ * Büroklammer öffnet den Beleg (mehrere: Menü), „Beleg anhängen …“ im Zeilenmenü (nicht bei Gegenbuchungen).
  * Optik und Verhalten wie referenz/prototyp/js/pages/buchungen.js; Logik in lib/buchungen.ts, Daten in lib/queries/buchungen.ts. */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { Link } from 'react-router-dom';
@@ -9,9 +10,9 @@ import {
   Ban,
   CalendarDays,
   Eye,
+  FileUp,
   Funnel,
   Lock,
-  Paperclip,
   Pencil,
   Plus,
   RotateCcw,
@@ -39,6 +40,7 @@ import {
   type KategorieWahl,
   type TypFilter,
 } from '../lib/buchungen';
+import { belegAnhaengenDialog } from '../lib/belegablage';
 import { bearbeiten, erfassen } from '../lib/erfassen';
 import { ladeBuchungen, ladeKategorienWahl } from '../lib/queries/buchungen';
 import { storniereMitNachfrage } from '../lib/storno';
@@ -50,6 +52,7 @@ import { reveal } from '../components/ui/PageHead';
 import { Seg } from '../components/ui/Seg';
 import { ZeitraumWahl } from '../components/ui/ZeitraumWahl';
 import { KategorieIcon, ZAHLUNGSWEG_ICON } from '../components/buchungen/Symbole';
+import { BelegClip } from '../components/belege/BelegClip';
 import { Ladeansicht, useLaden } from './einstellungen/Laden';
 
 const DF_LANG = new Intl.DateTimeFormat('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
@@ -459,9 +462,7 @@ function Zeile({ b, q }: { b: BuchungZeile; q: string }) {
             )
           ) : null}
           {b.belege_anzahl ? (
-            <span className="bu-clip" title={b.belege_anzahl === 1 ? 'Belegdatei vorhanden' : `${b.belege_anzahl} Belegdateien`}>
-              <Paperclip />
-            </span>
+            <BelegClip buchungId={b.id} anzahl={b.belege_anzahl} />
           ) : fehltBeleg(b) ? (
             <span
               className="badge warn bu-missing"
@@ -516,6 +517,17 @@ function Zeile({ b, q }: { b: BuchungZeile; q: string }) {
               >
                 {s ? <Eye /> : <Pencil />}
               </button>
+              {b.storno_von_id == null ? (
+                <button
+                  type="button"
+                  className="icon-btn sm"
+                  title="Beleg anhängen …"
+                  aria-label="Beleg anhängen"
+                  onClick={() => void belegAnhaengenDialog({ id: b.id, nummer: b.nummer, typ: b.typ })}
+                >
+                  <FileUp />
+                </button>
+              ) : null}
               {kannStornieren(b) ? (
                 <button
                   type="button"
