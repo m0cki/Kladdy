@@ -19,6 +19,9 @@ use serde_json::{Map, Value};
 use sqlx::{Connection, SqliteConnection};
 use tauri_plugin_sql::DbInstances;
 
+use std::path::Path;
+
+use crate::belege;
 use crate::datenbank::{self, db_fehler};
 use crate::nummern;
 
@@ -48,6 +51,10 @@ pub struct BuchungEingabe {
     pub beschreibung: String,
     /// heutiges lokales Datum 'YYYY-MM-DD' (Jahr für die Buchungsnummer, siehe nummern::vergeben_fortlaufend)
     pub heute: String,
+    /// Belege als absolute Quellpfade (Datei-Drop, Dateiauswahl); werden in derselben Transaktion unverändert
+    /// abgelegt (src/belege.rs). Fehlt der Schlüssel, keine.
+    #[serde(default)]
+    pub belege: Vec<String>,
 }
 
 /// Antwort an das Frontend.
@@ -63,6 +70,8 @@ pub struct BuchungErgebnis {
     pub kunde_nummer: Option<String>,
     /// true, wenn der Kunde in diesem Vorgang neu angelegt wurde (`neuer_kunde`)
     pub kunde_neu: bool,
+    /// Anzahl der in diesem Vorgang angelegten Zeilen in `belege`
+    pub belege_neu: i64,
 }
 
 /* ---------- Prüfen ohne Datenbank ---------- */
@@ -83,6 +92,7 @@ struct Geprueft {
     belegnummer: Option<String>,
     beschreibung: String,
     jahr_heute: i64,
+    belege: Vec<String>,
 }
 
 /// Getrimmter Text, leer ⇒ None.
@@ -183,6 +193,7 @@ fn pruefen(d: &BuchungEingabe) -> Result<Geprueft, String> {
         belegnummer: text_oder_nichts(&d.belegnummer),
         beschreibung,
         jahr_heute,
+        belege: d.belege.clone(),
     })
 }
 
@@ -250,7 +261,7 @@ async fn kunden_nummer(conn: &mut SqliteConnection, id: i64) -> Result<Option<St
 
 /// Ganze Zeile als JSON-Objekt (Spaltennamen als Schlüssel). Die Spalten kommen aus dem Schema selbst, so sind
 /// auch Spalten späterer Migrationen im Protokoll. `tabelle` ist immer ein fester Name aus diesem Modul.
-async fn zeile_json(
+pub(crate) async fn zeile_json(
     conn: &mut SqliteConnection,
     tabelle: &str,
     id: i64,
@@ -281,7 +292,7 @@ async fn zeile_json(
 }
 
 /// Eintrag ins GoBD-Protokoll (wie protokollSql in src/lib/queries/protokoll.ts, schluessel NULL).
-async fn protokollieren(
+pub(crate) async fn protokollieren(
     conn: &mut SqliteConnection,
     zeitpunkt: &str,
     tabelle: &str,
@@ -380,20 +391,27 @@ async fn in_transaktion<T>(
 
 /* ---------- Anlegen ---------- */
 
-/// Legt eine Buchung an (art 'zahlung'), ggf. mit neuem Kunden, und protokolliert beides.
+/// Legt eine Buchung an (art 'zahlung'), ggf. mit neuem Kunden und Belegen (abgelegt in `ablage`),
+/// und protokolliert alles.
 pub async fn anlegen(
     conn: &mut SqliteConnection,
+    ablage: &Path,
     daten: &BuchungEingabe,
     zeitpunkt: &str,
 ) -> Result<BuchungErgebnis, String> {
     let g = pruefen(daten)?;
-    in_transaktion(conn, async |tx| anlegen_in(tx, &g, zeitpunkt).await).await
+    belege::in_transaktion_mit_ablage(conn, ablage, async |tx, neue| {
+        anlegen_in(tx, ablage, &g, zeitpunkt, neue).await
+    })
+    .await
 }
 
 async fn anlegen_in(
     tx: &mut SqliteConnection,
+    ablage: &Path,
     g: &Geprueft,
     zeitpunkt: &str,
+    neue_dateien: &mut Vec<String>,
 ) -> Result<BuchungErgebnis, String> {
     let bis = festgeschrieben_bis(tx).await?;
     if ist_festgeschrieben(&bis, &g.zahlungsdatum) {
@@ -427,12 +445,23 @@ async fn anlegen_in(
     .last_insert_rowid();
     let neu = zeile_json(tx, "buchungen", id).await?;
     protokollieren(tx, zeitpunkt, "buchungen", id, "neu", None, neu.as_ref()).await?;
+    let belege = belege::belege_ablegen(
+        tx,
+        ablage,
+        id,
+        &g.zahlungsdatum,
+        &g.belege,
+        zeitpunkt,
+        neue_dateien,
+    )
+    .await?;
     Ok(BuchungErgebnis {
         id,
         nummer,
         kunde_id,
         kunde_nummer,
         kunde_neu,
+        belege_neu: belege.len() as i64,
     })
 }
 
@@ -478,22 +507,29 @@ async fn aenderbare_buchung(
 }
 
 /// Ändert eine freie Zahlung. Die Nummer bleibt. Protokolliert nur die geänderten Felder;
-/// hat sich nichts geändert, wird weder geschrieben noch protokolliert.
+/// hat sich nichts geändert, wird weder geschrieben noch protokolliert. Neue Belege (`daten.belege`) kommen dazu;
+/// ändert sich das Zahlungsdatum, verlängert sich die Frist der vorhandenen Belege (nie kürzer).
 pub async fn aendern(
     conn: &mut SqliteConnection,
+    ablage: &Path,
     id: i64,
     daten: &BuchungEingabe,
     zeitpunkt: &str,
 ) -> Result<BuchungErgebnis, String> {
     let g = pruefen(daten)?;
-    in_transaktion(conn, async |tx| aendern_in(tx, id, &g, zeitpunkt).await).await
+    belege::in_transaktion_mit_ablage(conn, ablage, async |tx, neue| {
+        aendern_in(tx, ablage, id, &g, zeitpunkt, neue).await
+    })
+    .await
 }
 
 async fn aendern_in(
     tx: &mut SqliteConnection,
+    ablage: &Path,
     id: i64,
     g: &Geprueft,
     zeitpunkt: &str,
+    neue_dateien: &mut Vec<String>,
 ) -> Result<BuchungErgebnis, String> {
     let alt = aenderbare_buchung(tx, id, "geändert").await?;
     let nummer = feld_text(&alt, "nummer").unwrap_or_default();
@@ -561,13 +597,27 @@ async fn aendern_in(
             Some(&diff_neu),
         )
         .await?;
+        if diff_neu.contains_key("zahlungsdatum") {
+            belege::aufbewahrung_verlaengern(tx, id, &g.zahlungsdatum, zeitpunkt).await?;
+        }
     }
+    let belege = belege::belege_ablegen(
+        tx,
+        ablage,
+        id,
+        &g.zahlungsdatum,
+        &g.belege,
+        zeitpunkt,
+        neue_dateien,
+    )
+    .await?;
     Ok(BuchungErgebnis {
         id,
         nummer,
         kunde_id,
         kunde_nummer,
         kunde_neu,
+        belege_neu: belege.len() as i64,
     })
 }
 
@@ -663,12 +713,13 @@ async fn stornieren_in(
         kunde_id,
         kunde_nummer,
         kunde_neu: false,
+        belege_neu: 0,
     })
 }
 
 /* ---------- Tauri-Commands (dünne Hüllen) ---------- */
 
-async fn verbindung(
+pub(crate) async fn verbindung(
     instanzen: &DbInstances,
 ) -> Result<sqlx::pool::PoolConnection<sqlx::Sqlite>, String> {
     datenbank::pool(instanzen)
@@ -681,22 +732,26 @@ async fn verbindung(
 /// Frontend: `invoke('buchung_anlegen', { daten })`.
 #[tauri::command]
 pub async fn buchung_anlegen(
+    app: tauri::AppHandle,
     instanzen: tauri::State<'_, DbInstances>,
     daten: BuchungEingabe,
 ) -> Result<BuchungErgebnis, String> {
+    let ablage = belege::ablage_ordner(&app)?;
     let mut c = verbindung(&instanzen).await?;
-    anlegen(&mut c, &daten, &datenbank::zeitstempel()).await
+    anlegen(&mut c, &ablage, &daten, &datenbank::zeitstempel()).await
 }
 
 /// Frontend: `invoke('buchung_aendern', { id, daten })`.
 #[tauri::command]
 pub async fn buchung_aendern(
+    app: tauri::AppHandle,
     instanzen: tauri::State<'_, DbInstances>,
     id: i64,
     daten: BuchungEingabe,
 ) -> Result<BuchungErgebnis, String> {
+    let ablage = belege::ablage_ordner(&app)?;
     let mut c = verbindung(&instanzen).await?;
-    aendern(&mut c, id, &daten, &datenbank::zeitstempel()).await
+    aendern(&mut c, &ablage, id, &daten, &datenbank::zeitstempel()).await
 }
 
 /// Frontend: `invoke('buchung_stornieren', { id, heute })`.
@@ -733,7 +788,13 @@ mod tests {
             belegnummer: None,
             beschreibung: " Rasen mähen ".into(),
             heute: "2026-10-15".into(),
+            belege: vec![],
         }
+    }
+
+    /// Ablageordner für Tests ohne Belege (wird nie angefasst).
+    fn ohne() -> &'static Path {
+        Path::new("/kladdy-test-ohne-belegablage")
     }
 
     fn ausgabe() -> BuchungEingabe {
@@ -814,6 +875,7 @@ mod tests {
             let mut c = test_db().await;
             let e1 = anlegen(
                 &mut c,
+                ohne(),
                 &BuchungEingabe {
                     neuer_kunde: Some("  Anna Schmidt ".into()),
                     ..einnahme()
@@ -827,7 +889,7 @@ mod tests {
             assert!(e1.kunde_neu);
             let kunde_id = e1.kunde_id.unwrap();
 
-            let e2 = anlegen(&mut c, &ausgabe(), JETZT).await.unwrap();
+            let e2 = anlegen(&mut c, ohne(), &ausgabe(), JETZT).await.unwrap();
             assert_eq!(
                 e2,
                 BuchungErgebnis {
@@ -835,13 +897,15 @@ mod tests {
                     nummer: "2026-0002".into(),
                     kunde_id: None,
                     kunde_nummer: None,
-                    kunde_neu: false
+                    kunde_neu: false,
+                    belege_neu: 0
                 }
             );
 
             // vorhandener Kunde
             let e3 = anlegen(
                 &mut c,
+                ohne(),
                 &BuchungEingabe {
                     kunde_id: Some(kunde_id),
                     ..einnahme()
@@ -916,7 +980,7 @@ mod tests {
     fn buchungsnummer_im_januar_fuer_dezember() {
         lauf(async {
             let mut c = test_db().await;
-            let alt = anlegen(&mut c, &einnahme(), JETZT).await.unwrap();
+            let alt = anlegen(&mut c, ohne(), &einnahme(), JETZT).await.unwrap();
             assert_eq!(alt.nummer, "2026-0001");
             // Zahlung vom Dezember, erfasst im Januar: Nummer des neuen Jahres
             let jan = BuchungEingabe {
@@ -925,12 +989,15 @@ mod tests {
                 ..einnahme()
             };
             assert_eq!(
-                anlegen(&mut c, &jan, JETZT).await.unwrap().nummer,
+                anlegen(&mut c, ohne(), &jan, JETZT).await.unwrap().nummer,
                 "2027-0001"
             );
             // falsche Rechneruhr (zurück in 2026): Nummern laufen trotzdem nicht zurück
             assert_eq!(
-                anlegen(&mut c, &einnahme(), JETZT).await.unwrap().nummer,
+                anlegen(&mut c, ohne(), &einnahme(), JETZT)
+                    .await
+                    .unwrap()
+                    .nummer,
                 "2027-0002"
             );
         });
@@ -1063,7 +1130,7 @@ mod tests {
                 ),
             ];
             for (d, teil) in faelle {
-                let f = anlegen(&mut c, &d, JETZT).await.unwrap_err();
+                let f = anlegen(&mut c, ohne(), &d, JETZT).await.unwrap_err();
                 assert!(f.contains(teil), "„{f}“ enthält nicht „{teil}“");
             }
             // archivierte Kategorie
@@ -1073,6 +1140,7 @@ mod tests {
                 .unwrap();
             let f = anlegen(
                 &mut c,
+                ohne(),
                 &BuchungEingabe {
                     kategorie_id: 4,
                     ..ausgabe()
@@ -1101,7 +1169,7 @@ mod tests {
                 neuer_kunde: Some("Anna Schmidt".into()),
                 ..einnahme()
             };
-            let f = anlegen(&mut c, &d, JETZT).await.unwrap_err();
+            let f = anlegen(&mut c, ohne(), &d, JETZT).await.unwrap_err();
             assert!(f.contains("Ungültiges Muster"), "{f}");
             assert_eq!(anzahl(&mut c, "SELECT count(*) FROM kunden").await, 0);
             assert_eq!(anzahl(&mut c, "SELECT count(*) FROM buchungen").await, 0);
@@ -1116,7 +1184,7 @@ mod tests {
                 .execute(&mut c)
                 .await
                 .unwrap();
-            let e = anlegen(&mut c, &d, JETZT).await.unwrap();
+            let e = anlegen(&mut c, ohne(), &d, JETZT).await.unwrap();
             assert_eq!(
                 (e.nummer.as_str(), e.kunde_nummer.as_deref()),
                 ("2026-0001", Some("K-0001"))
@@ -1130,6 +1198,7 @@ mod tests {
             let mut c = test_db().await;
             let alt = anlegen(
                 &mut c,
+                ohne(),
                 &BuchungEingabe {
                     zahlungsdatum: "2025-12-20".into(),
                     ..einnahme()
@@ -1138,7 +1207,7 @@ mod tests {
             )
             .await
             .unwrap();
-            let offen = anlegen(&mut c, &einnahme(), JETZT).await.unwrap();
+            let offen = anlegen(&mut c, ohne(), &einnahme(), JETZT).await.unwrap();
             sqlx::query("INSERT INTO festschreibungen (bis_datum, am) VALUES ('2025-12-31', ?)")
                 .bind(JETZT)
                 .execute(&mut c)
@@ -1146,6 +1215,7 @@ mod tests {
                 .unwrap();
             let f = anlegen(
                 &mut c,
+                ohne(),
                 &BuchungEingabe {
                     zahlungsdatum: "2025-12-31".into(),
                     ..einnahme()
@@ -1158,6 +1228,7 @@ mod tests {
             // alte Buchung ändern: nein
             let f = aendern(
                 &mut c,
+                ohne(),
                 alt.id,
                 &BuchungEingabe {
                     betrag_cent: 1,
@@ -1171,6 +1242,7 @@ mod tests {
             // offene Buchung in den festgeschriebenen Zeitraum verschieben: nein
             let f = aendern(
                 &mut c,
+                ohne(),
                 offen.id,
                 &BuchungEingabe {
                     zahlungsdatum: "2025-06-01".into(),
@@ -1190,13 +1262,15 @@ mod tests {
     fn aendern_protokolliert_nur_geaenderte_felder() {
         lauf(async {
             let mut c = test_db().await;
-            let e = anlegen(&mut c, &ausgabe(), JETZT).await.unwrap();
+            let e = anlegen(&mut c, ohne(), &ausgabe(), JETZT).await.unwrap();
             // nichts geändert (nur Leerraum): kein UPDATE, kein Protokoll
             let gleich = BuchungEingabe {
                 beschreibung: " Diesel ".into(),
                 ..ausgabe()
             };
-            let r = aendern(&mut c, e.id, &gleich, SPAETER).await.unwrap();
+            let r = aendern(&mut c, ohne(), e.id, &gleich, SPAETER)
+                .await
+                .unwrap();
             assert_eq!((r.id, r.nummer.as_str()), (e.id, "2026-0001"));
             assert_eq!(anzahl(&mut c, "SELECT count(*) FROM protokoll").await, 1);
             let geaendert_am: String = sqlx::query_scalar("SELECT geaendert_am FROM buchungen")
@@ -1211,7 +1285,7 @@ mod tests {
                 belegnummer: Some("R-77".into()),
                 ..ausgabe()
             };
-            let r = aendern(&mut c, e.id, &neu, SPAETER).await.unwrap();
+            let r = aendern(&mut c, ohne(), e.id, &neu, SPAETER).await.unwrap();
             assert_eq!(r.nummer, "2026-0001", "Nummer bleibt");
             let p = protokoll(&mut c).await;
             assert_eq!(p.len(), 2);
@@ -1240,6 +1314,7 @@ mod tests {
             // Umwandeln in eine Einnahme mit neuem Kunden
             let r = aendern(
                 &mut c,
+                ohne(),
                 e.id,
                 &BuchungEingabe {
                     neuer_kunde: Some("Bob Bauer".into()),
@@ -1258,7 +1333,7 @@ mod tests {
             assert_eq!(json(&p[3].4)["kunde_id"], r.kunde_id.unwrap());
 
             assert!(
-                aendern(&mut c, 999, &einnahme(), SPAETER)
+                aendern(&mut c, ohne(), 999, &einnahme(), SPAETER)
                     .await
                     .unwrap_err()
                     .contains("gibt es nicht")
@@ -1272,6 +1347,7 @@ mod tests {
             let mut c = test_db().await;
             let e = anlegen(
                 &mut c,
+                ohne(),
                 &BuchungEingabe {
                     kategorie_id: 4,
                     ..ausgabe()
@@ -1286,6 +1362,7 @@ mod tests {
                 .unwrap();
             aendern(
                 &mut c,
+                ohne(),
                 e.id,
                 &BuchungEingabe {
                     kategorie_id: 4,
@@ -1303,20 +1380,20 @@ mod tests {
     fn aendern_verweigert_storno_storniert_und_beleg() {
         lauf(async {
             let mut c = test_db().await;
-            let e = anlegen(&mut c, &einnahme(), JETZT).await.unwrap();
+            let e = anlegen(&mut c, ohne(), &einnahme(), JETZT).await.unwrap();
             let s = stornieren(&mut c, e.id, "2026-10-16", SPAETER)
                 .await
                 .unwrap();
-            let f = aendern(&mut c, e.id, &einnahme(), SPAETER)
+            let f = aendern(&mut c, ohne(), e.id, &einnahme(), SPAETER)
                 .await
                 .unwrap_err();
             assert!(f.contains("bereits storniert (2026-0002)"), "{f}");
-            let f = aendern(&mut c, s.id, &einnahme(), SPAETER)
+            let f = aendern(&mut c, ohne(), s.id, &einnahme(), SPAETER)
                 .await
                 .unwrap_err();
             assert!(f.contains("selbst ein Storno"), "{f}");
 
-            let b = anlegen(&mut c, &einnahme(), JETZT).await.unwrap();
+            let b = anlegen(&mut c, ohne(), &einnahme(), JETZT).await.unwrap();
             sqlx::query(
                 "INSERT INTO rechnungen (id, art, nummer, status, erstellt_am, geaendert_am)
                  VALUES (1, 'quittung', 'QU-2026-001', 'bezahlt', ?, ?)",
@@ -1331,7 +1408,7 @@ mod tests {
                 .execute(&mut c)
                 .await
                 .unwrap();
-            let f = aendern(&mut c, b.id, &einnahme(), SPAETER)
+            let f = aendern(&mut c, ohne(), b.id, &einnahme(), SPAETER)
                 .await
                 .unwrap_err();
             assert!(f.contains("nur per Storno des Belegs änderbar"), "{f}");
@@ -1345,7 +1422,7 @@ mod tests {
                 .execute(&mut c)
                 .await
                 .unwrap();
-            let f = aendern(&mut c, b.id, &einnahme(), SPAETER)
+            let f = aendern(&mut c, ohne(), b.id, &einnahme(), SPAETER)
                 .await
                 .unwrap_err();
             assert!(f.contains("Abschreibung oder Pauschale"), "{f}");
@@ -1358,6 +1435,7 @@ mod tests {
             let mut c = test_db().await;
             let e = anlegen(
                 &mut c,
+                ohne(),
                 &BuchungEingabe {
                     neuer_kunde: Some("Anna".into()),
                     privatanteil_prozent: 10,
@@ -1448,6 +1526,7 @@ mod tests {
             let mut c = test_db().await;
             let e = anlegen(
                 &mut c,
+                ohne(),
                 &BuchungEingabe {
                     zahlungsdatum: "2025-12-20".into(),
                     ..ausgabe()
@@ -1472,7 +1551,7 @@ mod tests {
                     .unwrap();
             assert_eq!(datum, "2026-10-16");
             // heute selbst festgeschrieben (sollte nie vorkommen): abgelehnt
-            let e2 = anlegen(&mut c, &ausgabe(), JETZT).await.unwrap();
+            let e2 = anlegen(&mut c, ohne(), &ausgabe(), JETZT).await.unwrap();
             sqlx::query("INSERT INTO festschreibungen (bis_datum, am) VALUES ('2026-12-31', ?)")
                 .bind(JETZT)
                 .execute(&mut c)
@@ -1502,7 +1581,17 @@ mod tests {
         }))
         .unwrap();
         assert_eq!(d.lieferant.as_deref(), Some("Bauhaus"));
-        assert!(d.kunde_id.is_none() && d.belegdatum.is_none());
+        assert!(d.kunde_id.is_none() && d.belegdatum.is_none() && d.belege.is_empty());
+        let mit: BuchungEingabe = serde_json::from_value(serde_json::json!({
+            "typ": "ausgabe", "zahlungsdatum": "2026-10-14", "betrag_cent": 4783, "privatanteil_prozent": 0,
+            "kategorie_id": 2, "zahlungsart": "bank", "beschreibung": "Erde", "heute": "2026-10-15",
+            "belege": ["/Users/x/Downloads/bauhaus.pdf"]
+        }))
+        .unwrap();
+        assert_eq!(
+            mit.belege,
+            vec!["/Users/x/Downloads/bauhaus.pdf".to_string()]
+        );
         let falsch = serde_json::from_value::<BuchungEingabe>(serde_json::json!({
             "typ": "ausgabe", "zahlungsdatum": "2026-10-14", "betrag_cent": 1, "privatanteil_prozent": 0,
             "kategorie_id": 2, "zahlungsart": "bank", "beschreibung": "x", "heute": "2026-10-15", "betrag": 1
@@ -1514,11 +1603,12 @@ mod tests {
             kunde_id: Some(1),
             kunde_nummer: Some("K-0001".into()),
             kunde_neu: true,
+            belege_neu: 2,
         })
         .unwrap();
         assert_eq!(
             aus,
-            serde_json::json!({"id": 3, "nummer": "2026-0003", "kunde_id": 1, "kunde_nummer": "K-0001", "kunde_neu": true})
+            serde_json::json!({"id": 3, "nummer": "2026-0003", "kunde_id": 1, "kunde_nummer": "K-0001", "kunde_neu": true, "belege_neu": 2})
         );
     }
 }

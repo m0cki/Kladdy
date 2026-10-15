@@ -1,8 +1,10 @@
 /* App-Rahmen: Aurora, Seitenleiste, Kopfzeile, Inhalt, Schubladen, Toasts, Update-Prüfung beim Start.
+ * Datei-Drop aufs Fenster: lib/belegablage.ts (Overlay „Beleg hier ablegen“).
  * Globale Kürzel: In der Mac-App gehören ⌘N, ⌘O, ⇧⌘L und ⌘\ dem nativen Menü (Events über lib/menu.ts);
  * im Browser (npm run dev) übernimmt sie der Tastatur-Handler hier. ⌘K (Suche) ist immer Sache der Oberfläche. */
 import { useEffect, useRef } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { watchBelegDrop } from '../../lib/belegablage';
 import { runCommand } from '../../lib/commands';
 import { watchFenster } from '../../lib/fenster';
 import { inTauri, onMenu, type MenuId } from '../../lib/menu';
@@ -14,6 +16,7 @@ import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { UpdateNotesDrawer } from './UpdateNotesDrawer';
 import { ErfassenSchublade } from '../erfassen/ErfassenSchublade';
+import { BelegDropOverlay } from '../belege/BelegDropOverlay';
 
 export function AppShell() {
   const collapsed = useUi((s) => s.sidebarCollapsed);
@@ -30,6 +33,8 @@ export function AppShell() {
 
   useEffect(() => onMenu((id) => runCommand(id, { navigate: (to) => navRef.current(to) })), []);
   useEffect(() => watchFenster(), []);
+  // Datei aufs Fenster ziehen ⇒ Beleg ablegen (nur Mac-App)
+  useEffect(() => watchBelegDrop(), []);
   // Update-Prüfung beim Start: höchstens einmal am Tag, nur wenn eingeschaltet (§3.2)
   useEffect(() => autoCheckOnStart(), []);
 
@@ -90,6 +95,7 @@ export function AppShell() {
       </div>
       <UpdateNotesDrawer />
       <ErfassenSchublade />
+      <BelegDropOverlay />
       <Toasts />
     </>
   );

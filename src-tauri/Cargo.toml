@@ -23,6 +23,9 @@ tauri-plugin-process = "2.4.0"
 tauri-plugin-sql = { version = "2.5.0", features = ["sqlite"] }
 # Dieselbe sqlx-Version wie tauri-plugin-sql; direkt nur für die Sicherung vor Migrationen (src/datenbank.rs).
 sqlx = { version = "0.8", default-features = false, features = ["sqlite", "runtime-tokio", "migrate"] }
+tauri-plugin-dialog = "2.8"
+# SHA-256 der abgelegten Belege (src/belege.rs); dieselbe Version steckt schon im Abhängigkeitsbaum.
+sha2 = "0.10.9"
 
 [profile.release]
 codegen-units = 1

@@ -1,6 +1,7 @@
 //! Kladdy – Tauri-Hülle.
 //! Hier werden Plugins, die native Menüleiste und Commands registriert.
 
+mod belege;
 mod buchungen;
 mod datenbank;
 mod nummern;
@@ -124,11 +125,17 @@ pub fn run() {
             ist_entwicklerversion,
             buchungen::buchung_anlegen,
             buchungen::buchung_aendern,
-            buchungen::buchung_stornieren
+            buchungen::buchung_stornieren,
+            belege::beleg_pruefen,
+            belege::beleg_anhaengen,
+            belege::beleg_oeffnen,
+            belege::beleg_zeigen
         ])
         // Updates aus der App heraus (§3.2): Prüfen/Laden/Installieren und danach Neustart.
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        // Dateiauswahl für Belege (⌘O „Beleg importieren“, Klick auf die Dropzone)
+        .plugin(tauri_plugin_dialog::init())
         .menu(build_menu)
         .on_menu_event(|app, event| {
             let id = event.id().as_ref();

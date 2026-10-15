@@ -25,6 +25,6 @@
 - Datenschutz: kein Tracking, keine Telemetrie, keine externen Schriften. Netz nur für Update-Prüfung und Tectonic-Pakete.
   Kunden mit Buchungen/Belegen erst nach Fristablauf anonymisieren (§2.10), nie vorher löschen.
 - Tests: Vitest für lib/*, cargo test für Rust. Vor jedem Commit: npm run typecheck && npm test.
-- Nach jeder Phase: App mit `npm run tauri dev` starten und Prüfpunkte nennen.
+- Nach jeder Phase: Prüfpunkte nennen. Die App startet der Nutzer selbst (`npm run tauri dev`), Claude startet keine Dev-Server.
 - Git: keine Claude-Hinweise in Commits oder PRs (kein „Co-Authored-By: Claude …“, kein „Generated with Claude Code“).
   Als Contributor erscheint nur m0cki.

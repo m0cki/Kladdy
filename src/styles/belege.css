@@ -1,0 +1,39 @@
+/* Kladdy · Belege ablegen (§6.4 „Beleg“, „Drag & Drop auf das Fenster“)
+ * Dropzone, Overlay und file-chip stehen in components.css (§9.4); hier nur die Ergänzungen für Dateilisten,
+ * die Büroklammer der Liste mit ihrem Menü und ruhigere Bewegung. Farben ausschließlich über Tokens. */
+
+/* ============ Dateilisten in der Schublade ============ */
+.bu-file { gap: 8px; padding: 6px 6px 6px 12px; }
+.bu-file .icon-btn .ic { width: 15px; height: 15px; color: var(--text-2); }
+.bl-dateien { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.bl-dateien li { display: flex; flex-direction: column; gap: 4px; }
+.bl-file-t { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.bl-file-t b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+.bl-file-t small { color: var(--muted); font-size: .72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bl-abgelegt { background: transparent; }
+.bl-dup { padding-left: 12px; }
+.bl-dz-klein { min-height: 0; padding: 10px 14px; grid-auto-flow: column; gap: 8px; }
+.bl-dz-klein .ic { width: 18px; height: 18px; }
+.bl-dz-klein b { margin-top: 0; font-size: .8rem; font-weight: 600; color: var(--text-2); }
+.bu-nobeleg { display: flex; flex-direction: column; gap: 6px; }
+
+/* ============ Büroklammer in der Liste (Knopf) ============ */
+button.bu-clip { width: 22px; height: 22px; border-radius: 7px; }
+button.bu-clip:hover { background: var(--hover); }
+button.bu-clip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* Menü bei mehreren Belegen (hängt am body, fixed) */
+.bl-menue {
+  position: fixed; z-index: 70; min-width: 240px; max-width: 360px; padding: 6px; border-radius: 12px; display: flex; flex-direction: column; gap: 2px;
+  background: var(--surface); box-shadow: var(--shadow-lg), 0 0 0 1px var(--border); animation: fade .15s var(--ease) both;
+}
+.bl-menue-z { display: flex; align-items: center; gap: 2px; }
+.bl-menue-o { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 8px; font-size: .82rem; text-align: left; }
+.bl-menue-o:hover, .bl-menue-o:focus-visible { background: var(--hover); }
+.bl-menue-o .ic { width: 16px; height: 16px; color: var(--accent); }
+.bl-menue-o span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+.bl-menue-o small { color: var(--muted); font-size: .72rem; white-space: nowrap; }
+
+/* ============ Bewegung ============ */
+:root[data-motion="reduced"] .drop-card, :root[data-motion="reduced"] .dropzone.over { transform: none; }
+:root[data-motion="reduced"] .drop-card { transition: none; }

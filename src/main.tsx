@@ -7,6 +7,7 @@ import './styles/base.css';
 import './styles/components.css';
 import './styles/charts.css';
 import './styles/buchungen.css';
+import './styles/belege.css';
 import App from './App';
 import { bindSettingsToDocument } from './store/ui';
 

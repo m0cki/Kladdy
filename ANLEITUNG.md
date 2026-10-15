@@ -1632,7 +1632,7 @@ Hat der Nutzer ein **Firmenlogo** hochgeladen (§6.10), steht dort stattdessen s
 
 ## 10. Umsetzung in Phasen
 
-Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet, startet `npm run tauri dev` → du prüfst die Abnahme-Punkte → Commit.
+Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nennt die Abnahme-Punkte → du startest die App (`npm run tauri dev`) und prüfst → Commit.
 
 ### Stand (15.10.2026)
 - **Veröffentlicht:** v1.0.0 (13.10.2026) mit Phase 0, Einstellungs-Seite, Updater, CI und Release-Action
@@ -1641,14 +1641,19 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet, startet
   1. Datenbank-Fundament: SQLite, Migrationen 0001–0003, Sicherung vor Migrationen, `money.ts`, `numbering.ts`,
      Protokoll – **erledigt** (PR #7)
   2. Einstellungen „Firma“, „Steuern“, „Nummernkreise“ – **erledigt** (PR #7, in der App geprüft)
-  3. Ein- & Ausgänge (§6.3) + die eine Erfassen-Schublade (§6.4) – **umgesetzt** (Branch `phase-1-ein-ausgaenge`):
+  3. Ein- & Ausgänge (§6.3) + die eine Erfassen-Schublade (§6.4) – **erledigt** (PR #10):
      Rust-Commands `buchung_anlegen`/`buchung_aendern`/`buchung_stornieren` (je eine Transaktion: Nummer, ggf. neuer
      Kunde, Buchung, Protokoll), Migration 0004 (Indizes, Schreibschutz-Trigger). Beleg erstellen/zuordnen folgt in
-     Phase 3, Beleg-Dateien in Teil 4 (in der Schublade bis dahin ausgegraut)
-  4. Belege ablegen (Rust-Command, SHA-256) + Drag & Drop aufs Fenster
+     Phase 3
+  4. Belege ablegen (Rust-Command, SHA-256) + Drag & Drop aufs Fenster – **umgesetzt** (Branch `phase-1-belege`):
+     `src-tauri/src/belege.rs` (`beleg_pruefen`, `beleg_anhaengen`, `beleg_oeffnen`, `beleg_zeigen`; Ablage
+     `<appDataDir>/belege/<JJJJ>/<sha256>.<ext>`, im Dev `belege-dev/`, schreibgeschützt, nie überschrieben),
+     Belege in derselben Transaktion wie `buchung_anlegen`/`buchung_aendern`, Frist bis 31.12. (Zahlungsjahr + 8),
+     Migration 0005 (Indizes, Trigger: nie löschen, nur Frist verlängern). Dubletten werden angezeigt, nicht blockiert.
+     Anhängen geht auch an festgeschriebene Buchungen, nicht an Gegenbuchungen. Erkennung (Betrag/Datum) folgt in Phase 3
   5. Kunden-Seite mit Verlauf (§6.8)
   6. Demo-Daten + Einstellungs-Bereich „Daten“ (Demo-Daten, Tectonic-Pfad)
-- **Nächste Migration:** `0005` (ausgelieferte Migrationen nie ändern).
+- **Nächste Migration:** `0006` (ausgelieferte Migrationen nie ändern).
 - **Offen aus Phase 1 (Teil 1+2):** optionale Kategorien (AfA,
   Bewirtung, Geschenke, Homeoffice), Kategorien bearbeiten und EÜR-Zuordnung pro Jahr (braucht eigene Tabelle),
   Firmenlogo (nach der Dateiablage), sichtbare Fehlermeldung statt stillem Abbruch, wenn die Sicherung vor einer
