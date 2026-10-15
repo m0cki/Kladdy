@@ -11,6 +11,7 @@ import {
   withTheme,
   type Settings,
 } from '../lib/settings';
+import { heute, type ZeitraumModus } from '../lib/zeitraum';
 
 const UI_KEY = 'kladdy.ui.v1';
 
@@ -36,7 +37,7 @@ function loadSidebar(): boolean {
   }
 }
 
-export type DrawerId = 'update-notes' | null;
+export type DrawerId = 'update-notes' | 'erfassen' | null;
 export type ToastIcon = 'check' | 'info' | 'warn' | 'download';
 export interface ToastAction {
   label: string;
@@ -77,6 +78,12 @@ interface UiState {
   /** Letzte Seite außerhalb der Einstellungen (⚙ oder Esc führt dorthin zurück) */
   zurueck: string;
   setZurueck: (path: string) => void;
+  /** Zählt bei jedem Schreibvorgang hoch; Listen und Zähler (Seitenleiste) laden dann neu. */
+  datenStand: number;
+  datenGeaendert: () => void;
+  /** Zeitraum von Ein- & Ausgänge (bleibt beim Seitenwechsel erhalten) */
+  zeitraum: { modus: ZeitraumModus; anker: string };
+  setZeitraum: (z: { modus: ZeitraumModus; anker: string }) => void;
 }
 
 let toastId = 0;
@@ -126,6 +133,10 @@ export const useUi = create<UiState>((set, get) => {
     dismissToast: (id) => set({ toasts: get().toasts.filter((t) => t.id !== id) }),
     zurueck: '',
     setZurueck: (zurueck) => set({ zurueck }),
+    datenStand: 0,
+    datenGeaendert: () => set({ datenStand: get().datenStand + 1 }),
+    zeitraum: { modus: 'monat', anker: heute() },
+    setZeitraum: (zeitraum) => set({ zeitraum }),
   };
 });
 

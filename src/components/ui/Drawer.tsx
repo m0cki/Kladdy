@@ -11,11 +11,13 @@ interface Props {
   width?: number;
   children: ReactNode;
   foot?: ReactNode;
+  /** Zusatzklasse am .drawer (seitenspezifische Styles) */
+  className?: string;
 }
 
 const CLOSE_MS = 450;
 
-export function Drawer({ open, onClose, title, sub, icon: Icon, width = 440, children, foot }: Props) {
+export function Drawer({ open, onClose, title, sub, icon: Icon, width = 440, children, foot, className }: Props) {
   const [mounted, setMounted] = useState(open);
   const [shown, setShown] = useState(false);
 
@@ -43,7 +45,7 @@ export function Drawer({ open, onClose, title, sub, icon: Icon, width = 440, chi
   return (
     <div className={`overlay ${shown ? 'open' : ''}`}>
       <div className="drawer-backdrop" onClick={onClose} />
-      <aside className="drawer" role="dialog" aria-modal="true" aria-label={title} style={{ ['--drawer-w' as string]: `${width}px` }}>
+      <aside className={className ? `drawer ${className}` : 'drawer'} role="dialog" aria-modal="true" aria-label={title} style={{ ['--drawer-w' as string]: `${width}px` }}>
         <header className="drawer-head">
           <h2>
             <Icon />

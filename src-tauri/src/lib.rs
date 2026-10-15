@@ -1,7 +1,9 @@
 //! Kladdy – Tauri-Hülle.
 //! Hier werden Plugins, die native Menüleiste und Commands registriert.
 
+mod buchungen;
 mod datenbank;
+mod nummern;
 
 use tauri::menu::{Menu, MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{AppHandle, Emitter, Runtime};
@@ -119,7 +121,10 @@ pub fn run() {
         .plugin(datenbank::sql_plugin())
         .invoke_handler(tauri::generate_handler![
             datenbank::datenbank_url,
-            ist_entwicklerversion
+            ist_entwicklerversion,
+            buchungen::buchung_anlegen,
+            buchungen::buchung_aendern,
+            buchungen::buchung_stornieren
         ])
         // Updates aus der App heraus (§3.2): Prüfen/Laden/Installieren und danach Neustart.
         .plugin(tauri_plugin_updater::Builder::new().build())
