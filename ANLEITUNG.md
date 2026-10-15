@@ -409,6 +409,16 @@ für die eigene App.
    neue Version, ein Toast „Version 1.2.0 ist da · Was ist neu? · Jetzt aktualisieren“ → `downloadAndInstall()` mit
    Fortschritt → `relaunch()`. **Vorher automatisch ein Backup** der Datenbank anlegen. Berechtigungen in
    `capabilities/default.json`: `"updater:default"`, `"process:allow-restart"`.
+   **Geplante Änderung (nach Test am 15.10.2026):** Laden und Neustart trennen, wie bei Mac-Apps üblich.
+   „Jetzt aktualisieren“ lädt und installiert nur (Fortschritt im Toast, man kann weiterarbeiten). Danach Toast
+   „Update bereit · Jetzt neu starten · Später“. „Später“ (oder Toast wegklicken) ⇒ die neue Version ist beim nächsten
+   Start einfach da, ohne weitere Frage. Neustart nie automatisch; ist eine Schublade mit ungespeicherten Eingaben
+   offen, vor dem Neustart nachfragen. Technik: statt `downloadAndInstall()` getrennt `download()` und `install()`
+   des Update-Objekts verwenden (gegen die aktuelle Doku von `@tauri-apps/plugin-updater` prüfen); `relaunch()` nur
+   auf Klick. **In Debug-Builds (`npm run tauri dev`) nie installieren:** Dort ist die App keine `.app`, der Updater
+   hält `src-tauri/target/debug` für das Bundle, ersetzt den Ordner durch die Release-App und der Neustart findet
+   nichts mehr (genau so passiert). Im Dev nur „Version X ist da (in der Entwicklerversion wird nicht installiert)“
+   anzeigen. Die Dev-App meldet immer ein Update, weil `main` die Version 0.1.0 behält (§10 Stand).
 6. Versionsnummer nach SemVer in `tauri.conf.json` und `package.json` gleich halten; „Was ist neu“ in `notes`.
    Nach dem ersten Update einmal prüfen, dass die App ohne erneute Freigabe startet.
 
@@ -1617,6 +1627,28 @@ Hat der Nutzer ein **Firmenlogo** hochgeladen (§6.10), steht dort stattdessen s
 ## 10. Umsetzung in Phasen
 
 Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet, startet `npm run tauri dev` → du prüfst die Abnahme-Punkte → Commit.
+
+### Stand (15.10.2026)
+- **Veröffentlicht:** v1.0.0 (13.10.2026) mit Phase 0, Einstellungs-Seite, Updater, CI und Release-Action
+  (Ablauf: `RELEASE.md`; nur von Hand, Release-Commits liegen nur auf den Tags, `main` behält 0.1.0).
+- **Phase 1 in Teilen (je ein PR):**
+  1. Datenbank-Fundament: SQLite, Migrationen 0001–0003, Sicherung vor Migrationen, `money.ts`, `numbering.ts`,
+     Protokoll – **erledigt** (PR #7)
+  2. Einstellungen „Firma“, „Steuern“, „Nummernkreise“ – **erledigt** (PR #7, in der App geprüft)
+  3. Ein- & Ausgänge (§6.3) + die eine Erfassen-Schublade (§6.4) – **als Nächstes**
+  4. Belege ablegen (Rust-Command, SHA-256) + Drag & Drop aufs Fenster
+  5. Kunden-Seite mit Verlauf (§6.8)
+  6. Demo-Daten + Einstellungs-Bereich „Daten“ (Demo-Daten, Tectonic-Pfad)
+- **Nächste Migration:** `0004` (ausgelieferte Migrationen nie ändern).
+- **Offen aus Phase 1 (Teil 1+2):** atomare Nummernvergabe mit Rücksetzen zum Jahreswechsel als Rust-Command
+  (kommt mit dem ersten Ausstellen), Schreibschutz-Trigger nach dem Festschreiben, optionale Kategorien (AfA,
+  Bewirtung, Geschenke, Homeoffice), Kategorien bearbeiten und EÜR-Zuordnung pro Jahr (braucht eigene Tabelle),
+  Firmenlogo (nach der Dateiablage), sichtbare Fehlermeldung statt stillem Abbruch, wenn die Sicherung vor einer
+  Migration fehlschlägt, Regelbesteuerung wirkt noch nicht auf Buchungen/Belege.
+- **Updater überarbeiten (eigener kleiner PR, vor dem nächsten Release):** Laden und Neustart trennen,
+  „Später“ ⇒ beim nächsten Start aktiv, im Dev nie installieren (Details §3.2 Punkt 5). Danach 1.0.1
+  veröffentlichen und das Update von der installierten 1.0.0 aus testen. Hinweis: Die 1.0.0 hat noch den alten
+  Ablauf (laden + sofort neu starten); erst Updates *ab* der Version mit dem neuen Ablauf verhalten sich neu.
 
 ### Phase 0 – Grundgerüst & Design
 > Setze Phase 0 aus `ANLEITUNG.md` um: `git init`; Tauri-2-Projekt mit React + TypeScript + Vite (`npm create tauri-app@latest`);
