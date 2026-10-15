@@ -12,6 +12,8 @@ import {
   Palette,
   type LucideIcon,
 } from 'lucide-react';
+import { KREIS_NAMEN, KREIS_REIHENFOLGE, NUMMER_NAMEN } from './numbering';
+import { KENNWERTE } from './steuer-kennwerte';
 
 export type BereichId =
   | 'darstellung'
@@ -41,10 +43,10 @@ export const bereichPfad = (id: BereichId, feld?: string) =>
 
 export const BEREICHE: readonly Bereich[] = [
   { id: 'darstellung', label: 'Darstellung', icon: Palette },
-  { id: 'firma', label: 'Firma', icon: Building2, phase: 1, inhalt: 'Name, Anschrift, Steuernummer, Bankverbindung und Firmenlogo.' },
+  { id: 'firma', label: 'Firma', icon: Building2 },
   { id: 'belege', label: 'Belege', icon: FileText, phase: 3, inhalt: 'Beleg bei Einnahmen: Quittung oder Rechnung.' },
-  { id: 'steuern', label: 'Steuern', icon: Landmark, phase: 1, inhalt: 'Kleinunternehmer oder Regelbesteuerung, Kennwerte pro Jahr, Kategorien, EÜR-Zuordnung.' },
-  { id: 'nummernkreise', label: 'Nummernkreise', icon: Hash, phase: 1, inhalt: 'Muster für Rechnungs- und Quittungsnummern mit Vorschau.' },
+  { id: 'steuern', label: 'Steuern', icon: Landmark },
+  { id: 'nummernkreise', label: 'Nummernkreise', icon: Hash },
   { id: 'datensicherung', label: 'Datensicherung', icon: HardDriveDownload, phase: 5, inhalt: 'Sicherungsziel, „Jetzt sichern“ und „Wiederherstellen …“.' },
   { id: 'daten', label: 'Daten', icon: Database, phase: 1, inhalt: 'Tectonic-Pfad, Demo-Daten laden oder entfernen.' },
   { id: 'updates', label: 'Updates & Über Kladdy', icon: Info },
@@ -83,14 +85,38 @@ export const EINSTELLUNGEN: readonly EinstellungsEintrag[] = [
   { id: 'nach-updates-suchen', label: 'Nach Updates suchen …', bereich: 'updates', keywords: ['Update', 'Aktualisieren', 'neue Version'] },
   { id: 'haftung', label: 'Keine Steuerberatung', bereich: 'updates', keywords: ['Haftung', 'Gewähr', 'Hinweis'] },
   { id: 'datenschutz', label: 'Deine Daten bleiben auf diesem Mac', bereich: 'updates', keywords: ['Datenschutz', 'Tracking', 'Cloud', 'Privatsphäre'] },
-  /* Noch nicht gebaut – springen in den Bereich */
-  { id: 'firma', label: 'Firma', bereich: 'firma', keywords: ['Firmenname', 'Inhaber', 'Anschrift', 'Adresse', 'Kontakt', 'Bankverbindung', 'IBAN', 'PayPal'] },
+  /* Firma (§6.10, Pflichtangaben §2.3) */
+  { id: 'firma-pflichtangaben', label: 'Pflichtangaben für Belege', bereich: 'firma', keywords: ['§ 34a UStDV', 'Rechnung', 'Quittung', 'fehlt'] },
+  { id: 'firma-name', label: 'Name des Gewerbes', bereich: 'firma', keywords: ['Firma', 'Firmenname', 'Absender', 'Unternehmen'] },
+  { id: 'firma-inhaber', label: 'Inhaber/in', bereich: 'firma', keywords: ['Inhaber', 'Name', 'Unterschrift', 'Gruß'] },
+  { id: 'firma-strasse', label: 'Anschrift', bereich: 'firma', keywords: ['Adresse', 'Straße', 'Hausnummer', 'PLZ', 'Ort'] },
+  { id: 'firma-email', label: 'E-Mail', bereich: 'firma', keywords: ['Kontakt', 'Mail'] },
+  { id: 'firma-telefon', label: 'Telefon', bereich: 'firma', keywords: ['Kontakt', 'Handy', 'Telefonnummer'] },
+  { id: 'firma-web', label: 'Website', bereich: 'firma', keywords: ['Kontakt', 'Internet', 'Homepage', 'Web'] },
+  { id: 'firma-steuernummer', label: 'Steuernummer', bereich: 'firma', keywords: ['St.-Nr.', 'Finanzamt'] },
+  { id: 'firma-ust_idnr', label: 'USt-IdNr.', bereich: 'firma', keywords: ['Umsatzsteuer-Identifikationsnummer', 'Umsatzsteuer-ID', 'VAT'] },
+  { id: 'firma-ku_id', label: 'KU-ID', bereich: 'firma', keywords: ['Kleinunternehmer-Identifikationsnummer', 'KU-IdNr'] },
+  { id: 'firma-bank', label: 'Bankverbindung', bereich: 'firma', keywords: ['Bank', 'Konto', 'GiroCode', 'Überweisung'] },
+  { id: 'firma-iban', label: 'IBAN', bereich: 'firma', keywords: ['Bankverbindung', 'Konto', 'GiroCode'] },
+  { id: 'firma-bic', label: 'BIC', bereich: 'firma', keywords: ['Bankverbindung', 'SWIFT'] },
+  { id: 'firma-paypal', label: 'PayPal-Adresse', bereich: 'firma', keywords: ['PayPal', 'Zahlung'] },
   { id: 'firmenlogo', label: 'Firmenlogo', bereich: 'firma', keywords: ['Logo', 'Bild'] },
-  { id: 'steuernummer', label: 'Steuernummer', bereich: 'firma', keywords: ['USt-IdNr', 'Umsatzsteuer-ID', 'KU-ID'] },
+  /* Steuern (§2.6, §6.10) */
+  { id: 'steuermodus', label: 'Kleinunternehmer / Regelbesteuerung', bereich: 'steuern', keywords: ['Steuern', 'KU', '§ 19', 'Umsatzsteuer', 'Regelmodus'] },
+  { id: 'kennwerte', label: 'Steuer-Kennwerte pro Jahr', bereich: 'steuern', keywords: ['Kennwerte', 'Grenzen', 'Pauschalen', 'Parameter'] },
+  { id: 'kennwerte-jahr', label: 'Steuer-Kennwerte: Jahr anlegen', bereich: 'steuern', keywords: ['neues Jahr', 'Kennwerte', 'kopieren'] },
+  ...KENNWERTE.map((k) => ({ id: `kw-${k.schluessel}`, label: k.label, bereich: 'steuern' as const, keywords: ['Kennwert', ...(k.hinweis ? [k.hinweis] : [])] })),
+  { id: 'kategorien', label: 'Kategorien & EÜR-Zuordnung', bereich: 'steuern', keywords: ['EÜR', 'Kategorie', 'abziehbar'] },
+  /* Nummernkreise (§5, §6.10) */
+  { id: 'nummernkreise', label: 'Nummernkreise', bereich: 'nummernkreise', keywords: ['Muster', 'Nummer', 'Platzhalter', 'fortlaufend'] },
+  ...KREIS_REIHENFOLGE.map((id) => ({
+    id: `nk-${id}`,
+    label: NUMMER_NAMEN[id],
+    bereich: 'nummernkreise' as const,
+    keywords: ['Nummernkreis', 'Muster', 'Nächste Nummer', KREIS_NAMEN[id]],
+  })),
+  /* Noch nicht gebaut – springen in den Bereich */
   { id: 'beleg-bei-einnahmen', label: 'Beleg bei Einnahmen', bereich: 'belege', keywords: ['Quittung', 'Rechnung', 'Vorauswahl'] },
-  { id: 'steuermodus', label: 'Kleinunternehmer / Regelbesteuerung', bereich: 'steuern', keywords: ['Steuern', 'KU', '§ 19', 'Umsatzsteuer'] },
-  { id: 'kategorien', label: 'Kategorien', bereich: 'steuern', keywords: ['EÜR-Zuordnung', 'Kennwerte'] },
-  { id: 'nummernkreise', label: 'Nummernkreise', bereich: 'nummernkreise', keywords: ['Rechnungsnummer', 'Quittungsnummer', 'Muster', 'Nummer'] },
   { id: 'datensicherung', label: 'Datensicherung', bereich: 'datensicherung', keywords: ['Backup', 'Sicherung', 'Wiederherstellen', 'USB-Stick', 'iCloud'] },
   { id: 'tectonic', label: 'Tectonic-Pfad', bereich: 'daten', keywords: ['LaTeX', 'PDF'] },
   { id: 'demo-daten', label: 'Demo-Daten', bereich: 'daten', keywords: ['Beispieldaten', 'Daten'] },
