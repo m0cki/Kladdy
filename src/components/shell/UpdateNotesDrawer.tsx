@@ -1,6 +1,7 @@
-/* „Was ist neu?“ zur gefundenen Version (Release-Notizen aus latest.json) mit „Jetzt aktualisieren“. */
-import { Download, Sparkles } from 'lucide-react';
-import { installUpdate, useUpdates } from '../../lib/updates';
+/* „Was ist neu?“ zur gefundenen Version (Release-Notizen aus latest.json) mit „Jetzt aktualisieren“ bzw. nach dem
+ * Installieren „Jetzt neu starten“. In der Entwicklerversion nur lesen, nie installieren. */
+import { Download, RotateCw, Sparkles } from 'lucide-react';
+import { installUpdate, kannInstallieren, neuStarten, useUpdates } from '../../lib/updates';
 import { useUi } from '../../store/ui';
 import { Drawer } from '../ui/Drawer';
 
@@ -16,6 +17,7 @@ export function UpdateNotesDrawer() {
   const notes = useUpdates((s) => s.notes);
   const date = useUpdates((s) => s.date);
   const status = useUpdates((s) => s.status);
+  const entwickler = useUpdates((s) => s.entwickler);
   const datum = date ? fmtDatum(date) : '';
 
   return (
@@ -31,16 +33,29 @@ export function UpdateNotesDrawer() {
           <button type="button" className="btn ghost" onClick={close}>
             Später
           </button>
-          <button type="button" className="btn-primary" disabled={status !== 'available'} onClick={() => void installUpdate()}>
-            <Download />
-            Jetzt aktualisieren
-          </button>
+          {status === 'ready' ? (
+            <button type="button" className="btn-primary" onClick={() => void neuStarten()}>
+              <RotateCw />
+              Jetzt neu starten
+            </button>
+          ) : (
+            <button type="button" className="btn-primary" disabled={!kannInstallieren(status, entwickler)} onClick={() => void installUpdate()}>
+              <Download />
+              Jetzt aktualisieren
+            </button>
+          )}
         </>
       }
     >
       <section>
         {notes ? <div className="update-notes">{notes}</div> : <p className="hint">Zu dieser Version gibt es keine Notizen.</p>}
-        <p className="hint">Kladdy lädt das Update, installiert es und startet danach neu.</p>
+        <p className="hint">
+          {entwickler
+            ? 'In der Entwicklerversion wird nicht installiert. Updates nur in der installierten Kladdy-App.'
+            : status === 'ready'
+              ? 'Das Update ist installiert. Die neue Version startet mit dem nächsten Neustart von Kladdy.'
+              : 'Kladdy lädt das Update und installiert es, du kannst dabei weiterarbeiten. Neu gestartet wird erst, wenn du es sagst.'}
+        </p>
       </section>
     </Drawer>
   );

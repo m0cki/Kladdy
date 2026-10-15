@@ -60,6 +60,9 @@ interface UiState {
   systemDark: boolean;
   sidebarCollapsed: boolean;
   drawer: DrawerId;
+  /** Offene Schublade hat ungespeicherte Eingaben (setzt die Schublade selbst). Vor einem Neustart wird dann nachgefragt. */
+  ungespeichert: boolean;
+  setUngespeichert: (ungespeichert: boolean) => void;
   toasts: Toast[];
   setSetting: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
   setTheme: (id: string) => void;
@@ -88,6 +91,7 @@ export const useUi = create<UiState>((set, get) => {
     systemDark: systemDarkQuery?.matches ?? true,
     sidebarCollapsed: loadSidebar(),
     drawer: null,
+    ungespeichert: false,
     toasts: [],
     setSetting: (key, value) => commit(withSetting(get().settings, key, value)),
     setTheme: (id) => commit(withTheme(get().settings, id)),
@@ -102,8 +106,9 @@ export const useUi = create<UiState>((set, get) => {
       }
       set({ sidebarCollapsed });
     },
-    openDrawer: (drawer) => set({ drawer }),
-    closeDrawer: () => set({ drawer: null }),
+    openDrawer: (drawer) => set({ drawer, ungespeichert: false }),
+    closeDrawer: () => set({ drawer: null, ungespeichert: false }),
+    setUngespeichert: (ungespeichert) => set({ ungespeichert }),
     toast: (text, icon = 'check') => {
       const id = ++toastId;
       set({ toasts: [...get().toasts, { id, text, icon }] });

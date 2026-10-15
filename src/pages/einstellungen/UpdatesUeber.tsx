@@ -1,8 +1,8 @@
 /* Einstellungen › Updates & Über Kladdy (§6.10 „Über Kladdy“, §3.2). Auch über das macOS-Menü „Kladdy → Über Kladdy“. */
 import { useEffect, useState } from 'react';
-import { Download, Info, LoaderCircle, Lock, RefreshCw, Sparkles } from 'lucide-react';
+import { Download, Info, LoaderCircle, Lock, RefreshCw, RotateCw, Sparkles } from 'lucide-react';
 import { inTauri } from '../../lib/menu';
-import { appVersion, checkForUpdate, installUpdate, useUpdates } from '../../lib/updates';
+import { appVersion, checkForUpdate, installUpdate, neuStarten, useUpdates } from '../../lib/updates';
 import { useUi } from '../../store/ui';
 import { Logo } from '../../components/ui/Logo';
 import { Switch } from '../../components/ui/Switch';
@@ -18,6 +18,7 @@ export default function UpdatesUeber() {
   const lastCheck = useUpdates((s) => s.lastCheck);
   const status = useUpdates((s) => s.status);
   const neu = useUpdates((s) => s.version);
+  const entwickler = useUpdates((s) => s.entwickler);
   const openDrawer = useUi((s) => s.openDrawer);
   const nativ = inTauri();
 
@@ -58,17 +59,23 @@ export default function UpdatesUeber() {
               {sucht ? <LoaderCircle className="ic spin" /> : <RefreshCw />}
               {sucht ? 'Suche …' : 'Nach Updates suchen …'}
             </button>
-            {status === 'available' && neu ? (
-              <>
-                <button type="button" className="btn ghost" onClick={() => openDrawer('update-notes')}>
-                  <Sparkles />
-                  Was ist neu?
-                </button>
-                <button type="button" className="btn-primary sm" onClick={() => void installUpdate()}>
-                  <Download />
-                  Version {neu} installieren
-                </button>
-              </>
+            {(status === 'available' || status === 'ready') && neu ? (
+              <button type="button" className="btn ghost" onClick={() => openDrawer('update-notes')}>
+                <Sparkles />
+                Was ist neu?
+              </button>
+            ) : null}
+            {status === 'available' && neu && !entwickler ? (
+              <button type="button" className="btn-primary sm" onClick={() => void installUpdate()}>
+                <Download />
+                Version {neu} installieren
+              </button>
+            ) : null}
+            {status === 'ready' ? (
+              <button type="button" className="btn-primary sm" onClick={() => void neuStarten()}>
+                <RotateCw />
+                Jetzt neu starten
+              </button>
             ) : null}
           </div>
           <p className="hint">
@@ -76,9 +83,13 @@ export default function UpdatesUeber() {
               ? 'Die Update-Prüfung gibt es nur in der Mac-App.'
               : laedt
                 ? 'Update wird geladen …'
-                : lastCheck
-                  ? `Zuletzt geprüft: ${fmtZeit(lastCheck)}`
-                  : 'Noch nie nach Updates gesucht.'}
+                : status === 'ready' && neu
+                  ? `Version ${neu} ist installiert und startet mit dem nächsten Neustart.`
+                  : status === 'available' && neu && entwickler
+                    ? `Version ${neu} ist da. In der Entwicklerversion wird nicht installiert.`
+                    : lastCheck
+                      ? `Zuletzt geprüft: ${fmtZeit(lastCheck)}`
+                      : 'Noch nie nach Updates gesucht.'}
           </p>
         </div>
       </SetCard>
