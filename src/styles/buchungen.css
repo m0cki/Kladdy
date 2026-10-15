@@ -1,0 +1,296 @@
+/* Kladdy · Seite „Ein- & Ausgänge“ und Erfassen-Schublade (§6.3, §6.4)
+ * Übernommen aus referenz/prototyp/css/buchungen.css (nur die Teile, die schon gebaut sind), plus Ergänzungen unten.
+ * Farben ausschließlich über Tokens; Kategorie-Farben kommen aus der Datenbank und nur als --c. */
+
+/* hidden-Attribut gewinnt gegen display:flex/grid der Bausteine */
+.bu-page [hidden], .bu-drawer [hidden] { display: none !important; }
+
+/* ============ Kopf: Titel · Zeitraum (mittig) · Erfassen ============ */
+/* beide Seiten gleich breit (Basis 0) → der Zeitraum steht in der Mitte; wird der Kopf zu schmal (Fenster klein,
+   Seitenleiste offen), rutscht der Zeitraum in eine eigene Zeile unter den Titel – Erfassen bleibt rechts oben */
+.bu-head { container-type: inline-size; }
+.bu-head-titel, .bu-head-neu { flex: 1 1 0; }
+.bu-head-titel { min-width: max-content; }
+.bu-head-zeit { flex: none; }
+.bu-head-neu { display: flex; justify-content: flex-end; align-self: flex-end; }
+@container (max-width: 960px) {
+  .bu-head-zeit { order: 3; flex-basis: 100%; }
+  .bu-head-titel { min-width: 0; }
+}
+
+/* ============ Filterleiste (eine Zeile) ============ */
+.bu-bar { flex-direction: column; align-items: stretch; gap: 8px; padding: 8px 10px; }
+.bu-bar-top { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.bu-bar-top .spacer { flex: 1 1 0; min-width: 0; }
+.bu-bar .seg.tabs { flex: none; }
+.bu-bar .seg.tabs button { padding: 7px 12px; font-size: .84rem; }
+.bu-bar .seg.tabs button .cnt { margin-left: 6px; font-variant-numeric: tabular-nums; }
+.bu-bar .seg.tabs button.active .cnt { color: var(--text-2); }
+/* wächst bis 260px, schrumpft vor dem Umbrechen der Leiste (Basis 150px) */
+.bu-search { position: relative; flex: 1 1 150px; min-width: 150px; max-width: 260px; }
+.bu-search > .ic { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: var(--muted); pointer-events: none; }
+.bu-search .input { padding-left: 33px; }
+.bu-filter { position: relative; flex: none; }
+.bu-filter-btn { height: 34px; padding: 0 12px; border-radius: 10px; font-size: .82rem; }
+.bu-filter-btn.on { border-color: var(--accent-line); background: var(--accent-soft); }
+.bu-badge { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 99px; display: inline-grid; place-items: center; font-size: .66rem; font-weight: 750; background: var(--accent); color: var(--on-accent); font-variant-numeric: tabular-nums; }
+.bu-ob-link { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px; border-radius: 99px; font-size: .78rem; font-weight: 600; color: var(--warn); border: 1px solid color-mix(in oklab, var(--warn) 35%, transparent); background: color-mix(in oklab, var(--warn) 8%, transparent); transition: background .15s, border-color .15s; white-space: nowrap; }
+.bu-ob-link .ic { width: 14px; height: 14px; }
+.bu-ob-link:hover { border-color: color-mix(in oklab, var(--warn) 60%, transparent); }
+.bu-ob-link.on { color: var(--text); border-color: var(--accent-line); background: var(--accent-soft); }
+
+/* Popover „Filter“ */
+.bu-pop {
+  position: absolute; right: 0; top: calc(100% + 10px); z-index: 40; width: 320px; padding: 6px 14px 12px; border-radius: 16px;
+  background: var(--surface); border: 1px solid var(--border-strong); box-shadow: var(--shadow-lg); animation: bu-pop .22s var(--ease) both;
+}
+@keyframes bu-pop { from { opacity: 0; transform: translateY(-6px) scale(.98); } }
+.bu-pop-sec { padding: 10px 0; border-bottom: 1px solid var(--border); }
+.bu-pop-sec h4 { margin: 0 0 8px; font-size: .68rem; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); font-weight: 650; }
+.bu-pop-kats { display: flex; flex-direction: column; gap: 1px; }
+.bu-check { display: flex; align-items: center; gap: 9px; padding: 6px 8px; margin: 0 -8px; border-radius: 9px; cursor: pointer; font-size: .85rem; transition: background .15s, opacity .2s; }
+.bu-check:hover { background: var(--hover); }
+.bu-check input { width: 15px; height: 15px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.bu-check span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bu-check small { color: var(--muted); font-size: .74rem; }
+.bu-check.zero { opacity: .45; }
+.bu-pop-za { display: flex; flex-wrap: wrap; gap: 6px; }
+.bu-pop-za .chip { cursor: pointer; }
+.bu-pop-za .chip .ic { width: 13px; height: 13px; }
+.bu-pop-ob { font-size: .85rem; }
+.bu-pop-ob small { display: block; font-size: .72rem; color: var(--muted); font-weight: 400; }
+.bu-pop-foot { display: flex; align-items: center; justify-content: space-between; padding-top: 10px; }
+.bu-pop-foot .link { font-size: .8rem; }
+.bu-pop-foot .btn { padding: 7px 14px; }
+
+/* aktive Filter (zweite Zeile, nur wenn nötig) */
+.bu-active { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 2px 0; border-top: 1px solid var(--border); }
+.bu-active-l { font-size: .72rem; color: var(--muted); font-weight: 600; margin-right: 2px; }
+.bu-active .chip { cursor: pointer; padding: 3px 6px 3px 10px; }
+.bu-active .chip .ic { width: 13px; height: 13px; }
+.bu-active .chip > .ic:last-child { color: var(--muted); }
+.bu-active .chip:hover > .ic:last-child { color: var(--text); }
+.bu-active .link { font-size: .76rem; margin-left: 4px; }
+
+/* ============ Liste ============ */
+.bu-card { padding-top: 6px; padding-bottom: 4px; container: bu-card / inline-size; }
+.bu-card .table-wrap { overflow: visible; }
+.bu-table { table-layout: fixed; min-width: 760px; }
+.bu-table thead th { top: calc(var(--topbar-h) + 8px + var(--bu-bar-h, 0px) + 6px); z-index: 2; box-shadow: 0 1px 0 var(--border); padding-top: 10px; padding-bottom: 10px; }
+/* feste Spalten – die Beschreibung bekommt den Rest */
+.bu-table th.bu-c-dat { width: 76px; }
+.bu-table th.bu-c-bnr { width: 140px; }
+.bu-table th.bu-c-kat { width: 176px; }
+.bu-table th.bu-c-zw { width: 132px; }
+.bu-table th.bu-c-amt { width: 196px; }
+/* schmal: Zahlungsweg nur als Symbol, Aktionen schweben links neben dem Betrag (Spalte braucht keinen Platz dafür) */
+@container bu-card (max-width: 980px) {
+  .bu-table { min-width: 640px; } /* ~1100 px Fensterbreite: Betrag bleibt sichtbar, erst darunter wird gescrollt */
+  .bu-table th.bu-c-dat { width: 66px; }
+  .bu-table th.bu-c-bnr { width: 124px; }
+  .bu-table th.bu-c-kat { width: 150px; }
+  .bu-table th.bu-c-zw { width: 48px; font-size: 0; }
+  .bu-table th.bu-c-amt { width: 128px; }
+  .bu-zw-c > span { display: none; }
+}
+.bu-table td { overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+.bu-table tbody tr.row td { height: 46px; padding-top: 0; padding-bottom: 0; }
+.bu-table tr.row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.bu-table mark { background: color-mix(in oklab, var(--accent) 32%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
+.bu-dat { color: var(--text-2); font-variant-numeric: tabular-nums; }
+.bu-table .cell-main .t { gap: 1px; }
+.bu-table .cell-main .t b { line-height: 1.3; font-weight: 550; }
+.bu-table .cell-main .t small { line-height: 1.3; }
+
+/* Beleg-Nr. */
+.bu-bnr { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.bu-nr { font-family: var(--mono); font-size: .74rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.bu-nr-chip {
+  font: 600 .7rem/20px var(--mono); padding: 0 7px; border-radius: 7px; white-space: nowrap; color: var(--accent);
+  background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent-line); transition: background .15s, color .15s;
+}
+.bu-nr-chip:hover { background: var(--accent); color: var(--on-accent); }
+.bu-clip { flex: none; display: inline-grid; place-items: center; color: var(--muted); }
+.bu-clip .ic { width: 13px; height: 13px; }
+.bu-clip:hover { color: var(--accent); }
+.bu-missing { flex: none; padding: 1px 7px; font-size: .64rem; cursor: help; }
+.bu-dash { color: var(--muted); opacity: .6; }
+
+/* Kategorie, Zahlungsweg */
+.bu-table .cat-tag { max-width: 100%; vertical-align: middle; }
+.bu-kat-n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bu-pill { margin-left: 6px; vertical-align: middle; }
+.bu-zw-c { display: inline-flex; align-items: center; gap: 7px; max-width: 100%; vertical-align: middle; font-size: .8rem; color: var(--text-2); }
+.bu-zw-c .ic { flex: none; width: 15px; height: 15px; color: var(--muted); }
+.bu-zw-c span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Betrag (+ grün / − rot) mit Aktionen beim Überfahren links daneben */
+.bu-amt-w { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
+.bu-amt { font-weight: 650; white-space: nowrap; }
+.bu-amt.ein { color: var(--pos); }
+.bu-amt.aus { color: color-mix(in oklab, var(--neg) 78%, var(--text)); }
+.bu-acts { display: flex; gap: 2px; opacity: 0; pointer-events: none; transform: translateX(4px); transition: opacity .15s, transform .2s var(--ease); }
+.bu-acts .icon-btn.sm { width: 30px; height: 30px; }
+.bu-acts .bu-del:hover { color: var(--neg); background: color-mix(in oklab, var(--neg) 12%, transparent); }
+.bu-acts .bu-lock { color: var(--muted); cursor: help; }
+.bu-table tr.row:hover .bu-acts, .bu-table tr.row:focus-within .bu-acts { opacity: 1; pointer-events: auto; transform: none; }
+/* schmal (siehe oben): Aktionen schweben links neben dem Betrag */
+@container bu-card (max-width: 980px) {
+  .bu-table td.bu-amt-td { overflow: visible; }
+  .bu-amt-w { position: relative; }
+  .bu-acts { position: absolute; right: calc(100% + 6px); top: 50%; transform: translate(4px, -50%); padding: 2px; border-radius: 11px; background: var(--surface); box-shadow: var(--shadow), 0 0 0 1px var(--border); }
+  .bu-table tr.row:hover .bu-acts, .bu-table tr.row:focus-within .bu-acts { transform: translate(0, -50%); }
+}
+
+
+/* leerer Zustand, Anzahl unter der Tabelle */
+.bu-table tr.bu-empty td { border-bottom: 0; white-space: normal; height: auto; }
+.bu-table tr.bu-empty .empty span { line-height: 1.6; }
+.bu-table tr.bu-empty .row { justify-content: center; margin-top: 6px; }
+.bu-erf { display: inline-flex; align-items: center; gap: 4px; padding: 1px 9px 1px 6px; border-radius: 8px; font-weight: 650; font-size: .8rem; color: var(--on-accent); background: var(--accent); vertical-align: 1px; }
+.bu-erf .ic { width: 13px; height: 13px; }
+.bu-foot { padding: 10px 12px 8px; border-top: 1px solid var(--border); font-size: .76rem; color: var(--muted); }
+
+/* frisch gespeicherte Zeile */
+@keyframes bu-flash { 0%, 35% { background: color-mix(in oklab, var(--accent) 24%, transparent); } 100% { background: transparent; } }
+.bu-table tr.row.bu-flash td { animation: bu-flash 2s var(--ease) both; }
+.bu-table tr.row.bu-flash td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+:root[data-motion="off"] .bu-table tr.row.bu-flash td { background: var(--accent-soft); }
+
+@media (max-width: 1100px) {
+  .bu-card .table-wrap { overflow-x: auto; }
+  .bu-table thead th { top: 0; }
+  .bu-bar-top { flex-wrap: wrap; }
+}
+
+/* ============ Schublade ============ */
+.bu-drawer .drawer-body > section { gap: 12px; }
+.bu-drawer .seg.full { align-self: stretch; flex-wrap: nowrap; }
+.bu-drawer .seg.full button { padding: 7px 6px; }
+.bu-drawer .seg.bu-locked { pointer-events: none; opacity: .55; }
+.bu-drawer .field-label { min-height: 17px; }
+.bu-drawer .field-label .q { margin-left: 0; }
+.bu-drawer .sugg-tag { margin-left: auto; white-space: nowrap; animation: fade .3s var(--ease) both; }
+.bu-drawer .sugg-tag.low { color: var(--warn); }
+.bu-drawer .hint .ic { width: 14px; height: 14px; vertical-align: -3px; margin-right: 5px; }
+.bu-drawer .hint b { color: var(--text); font-weight: 650; }
+.bu-drawer .money-input { height: 60px; font-size: 1.75rem; }
+.bu-drawer .input[readonly] { color: var(--text-2); background: transparent; border-style: dashed; cursor: default; }
+.bu-drawer .bu-sec-betrag { padding-top: 16px; }
+.bu-drawer .bu-err { margin-top: -2px; }
+.bu-drawer .field:has(.bu-err) .bu-betrag-hint, .bu-drawer .field:has(.bu-err) .bu-wer-hint:not(.bu-wahl) { display: none; }
+.bu-drawer .btn-primary kbd {
+  margin-left: 2px; padding: 1px 6px; border-radius: 6px; font-size: .68rem; font-weight: 650; color: var(--on-accent);
+  background: color-mix(in srgb, var(--on-accent) 14%, transparent); border: 1px solid color-mix(in srgb, var(--on-accent) 28%, transparent); opacity: .9;
+}
+.bu-nr-in { font-family: var(--mono); font-size: .84rem; }
+.bu-wer-hint .ic { color: var(--accent); }
+/* gleiche Kundennamen: wer ist gemeint? (ein Knopf je Kunde + „Neuer Kunde mit diesem Namen“) */
+.bu-wer-hint.bu-wahl { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; color: var(--text-2); }
+.bu-kwahl { display: flex; flex-direction: column; align-items: stretch; gap: 4px; align-self: stretch; }
+.bu-kwahl-btn {
+  display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 9px; text-align: left; font-size: .78rem; color: var(--text);
+  border: 1px solid var(--border); background: var(--surface-2); transition: border-color .15s, background .15s;
+}
+.bu-kwahl-btn:hover, .bu-kwahl-btn:focus-visible { border-color: var(--accent-line); background: var(--accent-soft); }
+.bu-kwahl-btn .mono { font: 600 .72rem var(--mono); color: var(--accent); }
+.bu-kwahl-btn.neu { border-style: dashed; color: var(--text-2); }
+.bu-drawer .bu-kwahl-btn .ic { margin-right: 0; }
+/* dezenter Link „Andere Person? Als neuen Kunden anlegen“ bzw. „Doch K-0012 nehmen“ */
+.bu-wer-hint .bu-kalt { font-size: inherit; margin-left: 4px; white-space: nowrap; }
+@keyframes bu-shake { 20%, 60% { transform: translateX(-5px); } 40%, 80% { transform: translateX(5px); } }
+.bu-shake { animation: bu-shake .38s var(--ease); }
+.bu-drawer .drawer-foot .btn-primary.sm { height: 38px; }
+.bu-foot-lock { display: inline-flex; align-items: center; gap: 6px; font-size: .8rem; color: var(--muted); cursor: help; }
+.bu-foot-lock .ic { width: 15px; height: 15px; }
+
+/* Kacheln: Kategorie, Zahlungsweg, Beleg-Art (Radio-Stil) */
+.bu-tiles { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; }
+.bu-tile {
+  --c: var(--accent); position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; padding: 11px 12px; border-radius: 13px; text-align: left;
+  border: 1px solid var(--border); background: var(--surface-2); transition: border-color .15s, background .15s, box-shadow .2s, transform .2s var(--spring);
+}
+.bu-tile:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+.bu-tile.on { border-color: color-mix(in oklab, var(--c) 60%, transparent); background: color-mix(in oklab, var(--c) 10%, var(--surface)); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--c) 45%, transparent); }
+.bu-tile.on::after { content: ""; position: absolute; top: 10px; right: 10px; width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+.bu-tile-ic { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; font-style: normal; color: var(--c); background: color-mix(in oklab, var(--c) 15%, transparent); margin-bottom: 2px; }
+.bu-tile-ic .ic { width: 17px; height: 17px; }
+.bu-tile b { font-size: .84rem; font-weight: 650; line-height: 1.25; }
+.bu-tile small { font-size: .7rem; color: var(--muted); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.bu-kat-tiles.suggested { border-radius: 14px; box-shadow: 0 0 0 3px var(--accent-soft); }
+.bu-kat-tiles.invalid .bu-tile { border-color: var(--neg); }
+
+/* „Bezahlt per“: drei Kacheln Bar · Überweisung · PayPal */
+.bu-zw { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.bu-zw-opt {
+  display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; padding: 11px 8px 10px; border-radius: 12px; text-align: center;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2); transition: border-color .15s, background .15s, color .15s;
+}
+.bu-zw-opt .ic { width: 19px; height: 19px; color: var(--muted); margin-bottom: 2px; }
+.bu-zw-opt b { font-size: .8rem; font-weight: 650; line-height: 1.2; color: var(--text); }
+.bu-zw-opt small { font-size: .66rem; color: var(--muted); line-height: 1.3; max-width: 100%; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.bu-zw-opt:hover { border-color: var(--border-strong); }
+.bu-zw-opt.on { border-color: var(--accent-line); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent-line); }
+.bu-zw-opt.on .ic { color: var(--accent); }
+/* festgeschrieben (Zahlungsart steht so auf der ausgestellten Quittung bzw. dem Eigenbeleg) */
+.bu-zw-opt:disabled { cursor: default; }
+.bu-zw-opt:disabled:not(.on) { opacity: .5; }
+.bu-zw-opt:disabled:not(.on):hover { border-color: var(--border); }
+
+/* Mehr Optionen (Privatanteil) */
+.bu-more { border-top: 1px dashed var(--border); padding-top: 10px; }
+.bu-more > summary { cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; font-weight: 600; color: var(--muted); }
+.bu-more > summary::-webkit-details-marker { display: none; }
+.bu-more > summary .ic { width: 14px; height: 14px; transition: transform .2s var(--ease); }
+.bu-more[open] > summary .ic { transform: rotate(180deg); }
+.bu-more > summary:hover { color: var(--text); }
+.bu-more-body { display: flex; align-items: flex-end; gap: 12px; padding-top: 10px; }
+.bu-more-body .field { width: 130px; }
+
+/* Zahlung zu einem eigenen Beleg */
+.bu-link { display: flex; align-items: center; gap: 10px; margin-top: 16px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); font-size: .8rem; color: var(--text-2); }
+.bu-link > .ic { color: var(--accent); width: 16px; height: 16px; flex: none; }
+.bu-link > span { min-width: 0; }
+.bu-link b { color: var(--text); font-family: var(--mono); font-size: .76rem; }
+.bu-link small { display: block; color: var(--muted); font-size: .72rem; margin-top: 2px; }
+.bu-link.lock > .ic { color: var(--muted); }
+.bu-link .link { margin-left: auto; font-size: .8rem; flex: none; }
+
+/* Beleg zur Einnahme */
+.bu-ew { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
+.bu-ew .bu-zw-opt { padding: 10px 4px 9px; }
+.bu-ew .bu-zw-opt b { white-space: normal; font-size: .76rem; }
+.bu-ew .bu-zw-opt small { font-size: .64rem; white-space: nowrap; text-overflow: ellipsis; display: block; }
+
+/* Beleg-Datei */
+.bu-dz { min-height: 120px; gap: 4px; }
+.bu-dz b { color: var(--text); font-size: .9rem; font-weight: 650; margin-top: 4px; }
+.bu-dz span { font-size: .76rem; line-height: 1.5; }
+.bu-dz:focus-visible { outline-offset: 3px; border-radius: var(--radius); }
+.bu-nobeleg-links { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.bu-nobeleg .link { font-size: .8rem; }
+
+/* ============ Ergänzungen der App ============ */
+/* Kategorie-Farbe aus den Daten (--c) */
+.bu-table .cat-tag i, .bu-dot { background: var(--c, var(--muted)); }
+/* Zeilen-Sperre: Zahlung zu einem eigenen Beleg (nur über Storno des Belegs änderbar) */
+.bu-lock-ic { flex: none; display: inline-grid; place-items: center; color: var(--muted); cursor: help; }
+.bu-lock-ic .ic { width: 13px; height: 13px; }
+/* stornierte Originale: gedämpft und durchgestrichen, mit Badge (die Gegenbuchung selbst wird nicht gezeigt) */
+.bu-table tr.row.bu-storniert td { color: var(--muted); }
+.bu-table tr.row.bu-storniert .cell-main .t b, .bu-table tr.row.bu-storniert .bu-amt, .bu-table tr.row.bu-storniert .bu-nr { text-decoration: line-through; text-decoration-color: var(--muted); }
+.bu-table tr.row.bu-storniert .bu-amt { color: var(--muted); }
+.bu-table tr.row.bu-storniert .cat-tag, .bu-table tr.row.bu-storniert .bu-zw-c { opacity: .6; }
+.bu-table tr.row.bu-storniert { cursor: default; }
+.badge.storniert { margin-left: 6px; padding: 1px 7px; font-size: .64rem; vertical-align: 1px; }
+/* Dropzone und Wege, die noch nicht gebaut sind */
+.bu-dz-aus { cursor: default; opacity: .6; border-style: dashed; }
+.bu-dz-aus:hover { border-color: var(--border-strong); color: var(--muted); }
+.bu-nobeleg-links .link:disabled, .bu-zw-opt:disabled { cursor: not-allowed; }
+.bu-nobeleg-links .link:disabled { opacity: .55; text-decoration: none; }
+.bu-nobeleg-links .link .ic { width: 14px; height: 14px; vertical-align: -2px; margin-right: 4px; }
+/* Ladeplatzhalter in der Schublade */
+.bu-sk { height: 260px; }
+/* Fragezeichen am Feldnamen (Tooltip über title) */
+.bu-drawer .field-label { display: flex; align-items: center; gap: 6px; }
+.bu-drawer .field-label small { font-weight: 500; }

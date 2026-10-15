@@ -2,16 +2,37 @@
  * Auf der Einstellungsseite wird sie zur Einstellungs-Navigation: „Zurück“ (zur gemerkten Seite, wie Esc / ⚙)
  * und die Bereiche der Einstellungen – gleiche Optik wie die Menüpunkte (Wunsch des Nutzers).
  * .sb-head ist Ziehfläche des Fensters; links darin sitzen die Ampel-Knöpfe (§3.1). */
+import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { BEREICHE, bereichPfad, isEinstellungen } from '../../lib/einstellungen-index';
+import { datenbankVerfuegbar } from '../../lib/db';
 import { NAV, START } from '../../lib/navigation';
+import { ladeOhneBelegAnzahl } from '../../lib/queries/buchungen';
 import { useUi } from '../../store/ui';
 import { Logo } from '../ui/Logo';
 
 const isActive = (path: string, to: string) => path === to || path.startsWith(to + '/');
 
+/** Zähler an „Ein- & Ausgänge“: Zahlungen ohne Beleg (§6.1). Neu geladen nach jedem Schreiben (datenStand). */
+function useOhneBeleg(): number {
+  const stand = useUi((s) => s.datenStand);
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    if (!datenbankVerfuegbar()) return;
+    let aktiv = true;
+    ladeOhneBelegAnzahl()
+      .then((x) => aktiv && setN(x))
+      .catch(() => undefined);
+    return () => {
+      aktiv = false;
+    };
+  }, [stand]);
+  return n;
+}
+
 function Hauptmenue({ pathname }: { pathname: string }) {
+  const ohneBeleg = useOhneBeleg();
   return (
     <nav className="sb-scroll sb-swap" data-modus="haupt" aria-label="Hauptmenü">
       <div className="sb-section">
@@ -23,6 +44,11 @@ function Hauptmenue({ pathname }: { pathname: string }) {
                 <Link to={to} title={label} aria-current={active ? 'page' : undefined}>
                   <Icon />
                   <span className="sb-label">{label}</span>
+                  {to === '/ein-ausgaenge' && ohneBeleg > 0 ? (
+                    <span className="sb-badge" title={`${ohneBeleg} ohne Beleg`}>
+                      {ohneBeleg}
+                    </span>
+                  ) : null}
                 </Link>
               </li>
             );

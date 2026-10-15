@@ -4,13 +4,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshCw, TriangleAlert, type LucideIcon } from 'lucide-react';
 import { datenbankVerfuegbar } from '../../lib/db';
+import { fehlerText } from '../../lib/fehler';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { reveal } from '../../components/ui/PageHead';
 
 export type Ladezustand<T> = { status: 'laden' } | { status: 'ohne-db' } | { status: 'fehler'; fehler: string } | { status: 'ok'; daten: T };
 
-/** Fehler aus Datenbank/Tauri (Error oder String) als Text. */
-export const fehlerText = (e: unknown): string => (e instanceof Error ? e.message : typeof e === 'string' ? e : 'Unbekannter Fehler');
+export { fehlerText };
 
 /** `laden` sollte stabil sein (Modulfunktion oder useCallback). */
 export function useLaden<T>(laden: () => Promise<T>) {

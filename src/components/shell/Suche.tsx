@@ -4,10 +4,11 @@
  * Kunden, Kennzahlen) und weitere Befehle in BEFEHLE – Logik und Darstellung bleiben gleich (lib/suche.ts). */
 import { forwardRef, useMemo, useState, type ForwardedRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileStack, Moon, RefreshCw, Search, Settings, SlidersHorizontal, type LucideIcon } from 'lucide-react';
+import { FileStack, Minus, Moon, Plus, RefreshCw, Search, Settings, SlidersHorizontal, type LucideIcon } from 'lucide-react';
 import { EINSTELLUNGEN, EINSTELLUNGEN_PFAD, bereich, bereichPfad } from '../../lib/einstellungen-index';
 import { AUSWERTUNG, NAV } from '../../lib/navigation';
 import { gruppiere, suche, teile, type SuchEintrag } from '../../lib/suche';
+import { erfassen } from '../../lib/erfassen';
 import { checkForUpdate } from '../../lib/updates';
 import { toggleMode } from '../../store/ui';
 
@@ -50,6 +51,8 @@ const EINSTELLUNGS_ZIELE: Ziel[] = EINSTELLUNGEN.map((e) => {
 });
 
 const BEFEHLE: Ziel[] = [
+  { id: 'befehl:ausgabe', art: 'befehl', gruppe: 'Befehle', label: 'Ausgabe erfassen', sub: '⌘N', keywords: ['Erfassen', 'Neu', 'Buchung', 'Kosten'], icon: Minus, run: () => erfassen({ typ: 'ausgabe' }) },
+  { id: 'befehl:einnahme', art: 'befehl', gruppe: 'Befehle', label: 'Einnahme erfassen', sub: '⌘N', keywords: ['Erfassen', 'Neu', 'Buchung', 'Umsatz'], icon: Plus, run: () => erfassen({ typ: 'einnahme' }) },
   { id: 'befehl:hell-dunkel', art: 'befehl', gruppe: 'Befehle', label: 'Hell/Dunkel umschalten', sub: '⇧⌘L', keywords: ['Modus', 'Dark Mode'], icon: Moon, run: () => toggleMode() },
   { id: 'befehl:einstellungen', art: 'befehl', gruppe: 'Befehle', label: 'Einstellungen öffnen', keywords: ['Optionen'], icon: Settings, run: go(EINSTELLUNGEN_PFAD) },
   { id: 'befehl:updates', art: 'befehl', gruppe: 'Befehle', label: 'Nach Updates suchen …', keywords: ['Update', 'Version'], icon: RefreshCw, run: () => void checkForUpdate({ manual: true }) },

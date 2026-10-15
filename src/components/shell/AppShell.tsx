@@ -13,6 +13,7 @@ import { Toasts } from '../ui/Toasts';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { UpdateNotesDrawer } from './UpdateNotesDrawer';
+import { ErfassenSchublade } from '../erfassen/ErfassenSchublade';
 
 export function AppShell() {
   const collapsed = useUi((s) => s.sidebarCollapsed);
@@ -64,9 +65,10 @@ export function AppShell() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  // Seitenwechsel: offene Schublade schließen, nach oben scrollen
+  // Seitenwechsel: offene Schublade schließen (außer einer Erfassen-Schublade mit ungespeicherten Eingaben), nach oben scrollen
   useEffect(() => {
-    closeDrawer();
+    const { drawer, ungespeichert } = useUi.getState();
+    if (!(drawer === 'erfassen' && ungespeichert)) closeDrawer();
     window.scrollTo({ top: 0 });
   }, [pathname, closeDrawer]);
 
@@ -87,6 +89,7 @@ export function AppShell() {
         </div>
       </div>
       <UpdateNotesDrawer />
+      <ErfassenSchublade />
       <Toasts />
     </>
   );

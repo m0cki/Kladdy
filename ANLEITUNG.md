@@ -653,6 +653,12 @@ Regeln:
   Homeoffice-Pauschale) haben keinen Zahlungsweg, zählen in der EÜR, aber **nicht** in der Liquiditätsvorschau und nicht
   in „ohne Beleg“. Sie erscheinen in Ein- & Ausgänge mit eigenem Symbol und sind nur über das Anlagen- bzw.
   Pauschalen-Modul änderbar.
+- **Storno einer Buchung:** Gegenbuchung mit `storno_von_id` (höchstens eine je Buchung, eindeutiger Index), gleicher
+  Typ, gleiche Kategorie, `betrag_cent` ebenfalls positiv. **Zeilen mit `storno_von_id` zählen in allen Summen negativ.**
+  Zahlungsdatum wie das Original, liegt es im festgeschriebenen Zeitraum, dann der Tag des Stornos. Die Liste zeigt das
+  Original durchgestrichen mit „storniert“, die Gegenbuchung selbst nicht.
+- **Buchungsnummer:** Jahr der Erfassung (nicht das Zahlungsdatum), der Kreis läuft nie rückwärts; Nachträge im Januar
+  für Dezember erhalten also eine Nummer des neuen Jahres.
 - **Kauf eines Anlageguts** (über der GWG-Grenze): echte Zahlung (`art` 'zahlung', mit Beleg und Zahlungsweg), aber in der
   EÜR nicht sofort abziehbar – sie verweist per `anlage_id` auf die Anlage, abgezogen wird über die AfA-Buchungen.
 
@@ -1635,20 +1641,21 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet, startet
   1. Datenbank-Fundament: SQLite, Migrationen 0001–0003, Sicherung vor Migrationen, `money.ts`, `numbering.ts`,
      Protokoll – **erledigt** (PR #7)
   2. Einstellungen „Firma“, „Steuern“, „Nummernkreise“ – **erledigt** (PR #7, in der App geprüft)
-  3. Ein- & Ausgänge (§6.3) + die eine Erfassen-Schublade (§6.4) – **als Nächstes**
+  3. Ein- & Ausgänge (§6.3) + die eine Erfassen-Schublade (§6.4) – **umgesetzt** (Branch `phase-1-ein-ausgaenge`):
+     Rust-Commands `buchung_anlegen`/`buchung_aendern`/`buchung_stornieren` (je eine Transaktion: Nummer, ggf. neuer
+     Kunde, Buchung, Protokoll), Migration 0004 (Indizes, Schreibschutz-Trigger). Beleg erstellen/zuordnen folgt in
+     Phase 3, Beleg-Dateien in Teil 4 (in der Schublade bis dahin ausgegraut)
   4. Belege ablegen (Rust-Command, SHA-256) + Drag & Drop aufs Fenster
   5. Kunden-Seite mit Verlauf (§6.8)
   6. Demo-Daten + Einstellungs-Bereich „Daten“ (Demo-Daten, Tectonic-Pfad)
-- **Nächste Migration:** `0004` (ausgelieferte Migrationen nie ändern).
-- **Offen aus Phase 1 (Teil 1+2):** atomare Nummernvergabe mit Rücksetzen zum Jahreswechsel als Rust-Command
-  (kommt mit dem ersten Ausstellen), Schreibschutz-Trigger nach dem Festschreiben, optionale Kategorien (AfA,
+- **Nächste Migration:** `0005` (ausgelieferte Migrationen nie ändern).
+- **Offen aus Phase 1 (Teil 1+2):** optionale Kategorien (AfA,
   Bewirtung, Geschenke, Homeoffice), Kategorien bearbeiten und EÜR-Zuordnung pro Jahr (braucht eigene Tabelle),
   Firmenlogo (nach der Dateiablage), sichtbare Fehlermeldung statt stillem Abbruch, wenn die Sicherung vor einer
   Migration fehlschlägt, Regelbesteuerung wirkt noch nicht auf Buchungen/Belege.
 - **Updater überarbeitet** (eigener kleiner PR): Laden und Neustart getrennt, „Später“ ⇒ beim nächsten Start aktiv,
-  im Dev nie installieren (Details §3.2 Punkt 5). **Als Nächstes:** 1.0.1 veröffentlichen und das Update von der
-  installierten 1.0.0 aus testen. Hinweis: Die 1.0.0 hat noch den alten Ablauf (laden + sofort neu starten); erst
-  Updates *ab* 1.0.1 verhalten sich neu.
+  im Dev nie installieren (Details §3.2 Punkt 5). v1.0.1 veröffentlicht (15.10.2026), Update von 1.0.0 aus getestet
+  (noch mit dem alten Ablauf der 1.0.0); den neuen Ablauf zeigt erst das nächste Update ab 1.0.1.
 
 ### Phase 0 – Grundgerüst & Design
 > Setze Phase 0 aus `ANLEITUNG.md` um: `git init`; Tauri-2-Projekt mit React + TypeScript + Vite (`npm create tauri-app@latest`);

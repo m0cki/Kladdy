@@ -55,6 +55,11 @@ pub const MIGRATIONEN: &[MigrationsDatei] = &[
         beschreibung: "protokoll_schluessel",
         sql: include_str!("../migrations/0003_protokoll_schluessel.sql"),
     },
+    MigrationsDatei {
+        version: 4,
+        beschreibung: "buchungen",
+        sql: include_str!("../migrations/0004_buchungen.sql"),
+    },
 ];
 
 /// Verbindungs-URL, wie sie das Plugin und `Database.load` erwarten.
@@ -107,6 +112,25 @@ pub fn sicherungs_plugin<R: Runtime>() -> TauriPlugin<R> {
         .build()
 }
 
+/// Die geladene Datenbank des SQL-Plugins (Schlüssel = URL aus `db_url()`, wie im Frontend geladen).
+/// Die Rust-Commands teilen sich so den Pool mit dem Frontend, statt eine zweite Verbindung zu öffnen.
+pub async fn pool(instanzen: &tauri_plugin_sql::DbInstances) -> Result<sqlx::SqlitePool, String> {
+    let karte = instanzen.0.read().await;
+    match karte.get(&db_url()) {
+        Some(tauri_plugin_sql::DbPool::Sqlite(pool)) => Ok(pool.clone()),
+        None => Err("Die Datenbank ist noch nicht geöffnet.".into()),
+    }
+}
+
+/// Fehler aus sqlx als Text fürs Frontend. Meldungen aus der Datenbank selbst (z. B. RAISE in einem Trigger)
+/// werden ohne technischen Vorspann weitergegeben, sie sind schon für Menschen geschrieben.
+pub fn db_fehler(e: sqlx::Error) -> String {
+    match &e {
+        sqlx::Error::Database(d) => d.message().to_string(),
+        _ => format!("Datenbankfehler: {e}"),
+    }
+}
+
 fn jetzt_sekunden() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -125,8 +149,8 @@ pub fn offene_migrationen(angewendet: &[i64], bekannt: &[i64]) -> Vec<i64> {
     offen
 }
 
-/// UTC-Zeitstempel `JJJJMMTT-hhmmss` ohne Zusatz-Crate (Tage → Datum nach H. Hinnant, „civil_from_days“).
-pub fn utc_stempel(sekunden: u64) -> String {
+/// Datum und Uhrzeit (UTC) aus Unix-Sekunden ohne Zusatz-Crate (Tage → Datum nach H. Hinnant, „civil_from_days“).
+fn utc_teile(sekunden: u64) -> (i64, i64, i64, u64, u64, u64) {
     let tage = (sekunden / 86_400) as i64;
     let rest = sekunden % 86_400;
     let (h, mi, s) = (rest / 3600, rest % 3600 / 60, rest % 60);
@@ -139,7 +163,25 @@ pub fn utc_stempel(sekunden: u64) -> String {
     let tag = doy - (153 * mp + 2) / 5 + 1;
     let monat = if mp < 10 { mp + 3 } else { mp - 9 };
     let jahr = yoe + era * 400 + i64::from(monat <= 2);
+    (jahr, monat, tag, h, mi, s)
+}
+
+/// UTC-Zeitstempel `JJJJMMTT-hhmmss` (Dateinamen der Sicherungen).
+pub fn utc_stempel(sekunden: u64) -> String {
+    let (jahr, monat, tag, h, mi, s) = utc_teile(sekunden);
     format!("{jahr:04}{monat:02}{tag:02}-{h:02}{mi:02}{s:02}")
+}
+
+/// UTC-Zeitstempel `JJJJ-MM-TTThh:mm:ssZ`, dasselbe Format wie `zeitstempel()` in src/lib/db.ts
+/// (erstellt_am, geaendert_am, protokoll.zeitpunkt).
+pub fn utc_iso(sekunden: u64) -> String {
+    let (jahr, monat, tag, h, mi, s) = utc_teile(sekunden);
+    format!("{jahr:04}-{monat:02}-{tag:02}T{h:02}:{mi:02}:{s:02}Z")
+}
+
+/// Jetzt als `utc_iso`.
+pub fn zeitstempel() -> String {
+    utc_iso(jetzt_sekunden())
 }
 
 /// Dateiname der Kopie, z. B. `kladdy-vor-migration-0003-20261013-221500.db` (Zeit in UTC).
@@ -220,17 +262,19 @@ async fn sichern_mit(
     Ok(Some(ziel))
 }
 
+/// Gemeinsame Testhilfen (auch für buchungen.rs und nummern.rs).
 #[cfg(test)]
-mod tests {
+pub(crate) mod testhilfe {
     use super::*;
     use sqlx::error::BoxDynError;
     use sqlx::migrate::{Migration as SqlxMigration, MigrationSource, MigrationType, Migrator};
     use std::future::Future;
     use std::pin::Pin;
+    use std::str::FromStr;
 
     /// Migrationen so, wie tauri-plugin-sql sie an sqlx übergibt (gleiche Prüfsummen, gleiche Transaktionen).
     #[derive(Debug)]
-    struct Quelle(Vec<&'static MigrationsDatei>);
+    pub struct Quelle(pub Vec<&'static MigrationsDatei>);
 
     impl MigrationSource<'static> for Quelle {
         fn resolve(
@@ -254,6 +298,27 @@ mod tests {
             })
         }
     }
+
+    /// Frische Datenbank im Arbeitsspeicher, mit allen Migrationen (wie beim ersten Start der App).
+    pub async fn test_db() -> SqliteConnection {
+        let mut c = SqliteConnectOptions::from_str("sqlite::memory:")
+            .unwrap()
+            .connect()
+            .await
+            .unwrap();
+        let migrator = Migrator::new(Quelle(MIGRATIONEN.iter().collect()))
+            .await
+            .unwrap();
+        migrator.run_direct(&mut c).await.unwrap();
+        c
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::testhilfe::Quelle;
+    use super::*;
+    use sqlx::migrate::Migrator;
 
     /// Eigener leerer Ordner je Test (ohne tempfile-Crate).
     fn testordner(name: &str) -> PathBuf {
@@ -422,6 +487,118 @@ mod tests {
             c.close().await.unwrap();
         });
         let _ = std::fs::remove_dir_all(&ordner);
+    }
+
+    #[test]
+    fn trigger_schuetzen_den_festgeschriebenen_zeitraum() {
+        tauri::async_runtime::block_on(async {
+            let mut c = testhilfe::test_db().await;
+            let einfuegen = |nummer: &'static str, datum: &'static str| {
+                sqlx::query(
+                    "INSERT INTO buchungen (nummer, typ, zahlungsdatum, betrag_cent, kategorie_id, zahlungsart, beschreibung, erstellt_am, geaendert_am)
+                     VALUES (?, 'ausgabe', ?, 100, 2, 'bar', 'x', 'jetzt', 'jetzt')",
+                )
+                .bind(nummer)
+                .bind(datum)
+            };
+            // ohne Festschreibung ist alles erlaubt
+            einfuegen("2025-0001", "2025-12-31")
+                .execute(&mut c)
+                .await
+                .unwrap();
+            einfuegen("2026-0001", "2026-01-01")
+                .execute(&mut c)
+                .await
+                .unwrap();
+            einfuegen("2026-0002", "2026-01-02")
+                .execute(&mut c)
+                .await
+                .unwrap();
+            sqlx::query("UPDATE buchungen SET beschreibung = 'y'")
+                .execute(&mut c)
+                .await
+                .unwrap();
+            sqlx::query("DELETE FROM buchungen WHERE nummer = '2026-0002'")
+                .execute(&mut c)
+                .await
+                .unwrap();
+
+            sqlx::query(
+                "INSERT INTO festschreibungen (bis_datum, am) VALUES ('2025-12-31', 'jetzt')",
+            )
+            .execute(&mut c)
+            .await
+            .unwrap();
+            let meldung = |e: sqlx::Error| db_fehler(e);
+            let f =
+                sqlx::query("UPDATE buchungen SET beschreibung = 'z' WHERE nummer = '2025-0001'")
+                    .execute(&mut c)
+                    .await
+                    .map_err(meldung)
+                    .unwrap_err();
+            assert!(
+                f.starts_with("Die Buchung liegt im festgeschriebenen Zeitraum"),
+                "{f}"
+            );
+            // offene Buchung in den festgeschriebenen Zeitraum verschieben
+            let f = sqlx::query(
+                "UPDATE buchungen SET zahlungsdatum = '2025-12-01' WHERE nummer = '2026-0001'",
+            )
+            .execute(&mut c)
+            .await
+            .map_err(meldung)
+            .unwrap_err();
+            assert!(f.contains("festgeschrieben"), "{f}");
+            let f = sqlx::query("DELETE FROM buchungen WHERE nummer = '2025-0001'")
+                .execute(&mut c)
+                .await
+                .map_err(meldung)
+                .unwrap_err();
+            assert!(f.contains("nicht gelöscht"), "{f}");
+            let f = einfuegen("2026-0003", "2025-06-30")
+                .execute(&mut c)
+                .await
+                .map_err(meldung)
+                .unwrap_err();
+            assert!(f.contains("keine Buchungen mehr angelegt"), "{f}");
+            // offener Zeitraum bleibt frei
+            sqlx::query("UPDATE buchungen SET beschreibung = 'z' WHERE nummer = '2026-0001'")
+                .execute(&mut c)
+                .await
+                .unwrap();
+            einfuegen("2026-0003", "2026-01-01")
+                .execute(&mut c)
+                .await
+                .unwrap();
+            // eine Buchung wird höchstens einmal storniert (eindeutiger Index)
+            sqlx::query("UPDATE buchungen SET storno_von_id = (SELECT id FROM buchungen WHERE nummer = '2026-0001') WHERE nummer = '2026-0003'")
+                .execute(&mut c)
+                .await
+                .unwrap();
+            einfuegen("2026-0004", "2026-01-01")
+                .execute(&mut c)
+                .await
+                .unwrap();
+            assert!(
+                sqlx::query("UPDATE buchungen SET storno_von_id = (SELECT id FROM buchungen WHERE nummer = '2026-0001') WHERE nummer = '2026-0004'")
+                    .execute(&mut c)
+                    .await
+                    .is_err()
+            );
+            let alle: i64 = sqlx::query_scalar("SELECT count(*) FROM buchungen")
+                .fetch_one(&mut c)
+                .await
+                .unwrap();
+            assert_eq!(alle, 4);
+        });
+    }
+
+    #[test]
+    fn iso_zeitstempel_wie_im_frontend() {
+        assert_eq!(utc_iso(0), "1970-01-01T00:00:00Z");
+        assert_eq!(utc_iso(1_791_929_700), "2026-10-13T22:15:00Z");
+        assert_eq!(utc_iso(951_825_600), "2000-02-29T12:00:00Z");
+        assert_eq!(zeitstempel().len(), 20);
     }
 
     #[test]
