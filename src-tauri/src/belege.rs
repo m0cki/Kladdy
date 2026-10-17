@@ -1,6 +1,7 @@
 //! Belege ablegen (ANLEITUNG §2.5, §5 Tabelle `belege`, §6.4 „Original-Datei immer unverändert ablegen (Hash)“).
 //!
-//! - Ablage: `<appDataDir>/belege/` (Debug-Builds: `belege-dev/`, wie DB_DATEI in datenbank.rs), darin
+//! - Ablage: `<appDataDir>/belege/` (Debug-Builds: `belege-dev/`, wie DB_DATEI in datenbank.rs; im Demo-Modus
+//!   `belege-dev-demo/`, siehe src/demo.rs), darin
 //!   `<JJJJ>/<sha256>.<endung>` mit JJJJ = Jahr des Zahlungsdatums. `belege.pfad` ist dieser relative Pfad.
 //! - Gleicher Inhalt = gleicher Name: Liegt die Datei schon da, wird nicht erneut kopiert und nie überschrieben.
 //!   Sonst: Kopie in eine Zwischendatei im selben Ordner, deren Prüfsumme nachrechnen, schreibschützen (0o444),
@@ -60,11 +61,20 @@ fn dateityp(endung: &str) -> Option<(&'static str, &'static str)> {
     Some((mime, "beleg"))
 }
 
-/// Ablageordner der App.
+/// Unterordner der aktiven Datenbank: im Demo-Modus (nur Debug) ein eigener, sonst `BELEGE_ORDNER`.
+pub fn aktiver_ordner() -> &'static str {
+    #[cfg(debug_assertions)]
+    if crate::demo::aktiv() {
+        return crate::demo::DEMO_BELEGE_ORDNER;
+    }
+    BELEGE_ORDNER
+}
+
+/// Ablageordner der App (der aktiven Datenbank).
 pub fn ablage_ordner<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<PathBuf, String> {
     app.path()
         .app_data_dir()
-        .map(|d| d.join(BELEGE_ORDNER))
+        .map(|d| d.join(aktiver_ordner()))
         .map_err(|e| format!("App-Verzeichnis nicht gefunden: {e}"))
 }
 

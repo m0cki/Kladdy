@@ -5,15 +5,25 @@
 //!   `appDataDir()` (beide `~/Library/Application Support/<identifier>`).
 //! - Debug-Builds (`npm run tauri dev`) benutzen eine eigene Datei, damit die Entwicklung nie die Daten der
 //!   installierten App berührt (gleicher Identifier, gleicher Ordner).
+//! - Nur Debug-Builds: Demo-Daten liegen in einer dritten Datei (src/demo.rs). Ist der Demo-Modus an, zeigt
+//!   `db_url()` auf sie; die echte Datei bleibt unberührt. Release-Builds kennen nur `DB_DATEI`.
 //! - Migrationen laufen beim ersten `Database.load` aus dem Frontend, nur vorwärts, jede in einer Transaktion.
 //!   sqlx merkt sich je Version eine Prüfsumme: ausgelieferte Dateien NIE ändern, sondern eine neue anhängen.
 //! - Vorher (§3.2 „vorher Backup“): Hat eine vorhandene Datenbank noch offene Migrationen, legt das Plugin
 //!   `db-sicherung` beim Start eine Kopie per `VACUUM INTO` an. Schlägt das fehl, startet die App nicht
 //!   (lieber kein Start als eine Migration ohne Sicherung).
 
+#[cfg(any(test, debug_assertions))]
+use std::future::Future;
 use std::path::{Path, PathBuf};
+#[cfg(any(test, debug_assertions))]
+use std::pin::Pin;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+#[cfg(any(test, debug_assertions))]
+use sqlx::error::BoxDynError;
+#[cfg(any(test, debug_assertions))]
+use sqlx::migrate::{Migration as SqlxMigration, MigrationSource, MigrationType};
 use sqlx::sqlite::SqliteConnectOptions;
 use sqlx::{ConnectOptions, Connection, SqliteConnection};
 use tauri::plugin::{Builder as PluginBuilder, TauriPlugin};
@@ -72,9 +82,18 @@ pub const MIGRATIONEN: &[MigrationsDatei] = &[
     },
 ];
 
-/// Verbindungs-URL, wie sie das Plugin und `Database.load` erwarten.
+/// Verbindungs-URL zu einer Datei im App-Verzeichnis, wie sie das Plugin und `Database.load` erwarten.
+pub fn url_zu(datei: &str) -> String {
+    format!("sqlite:{datei}")
+}
+
+/// URL der aktiven Datenbank: `DB_DATEI`, im Debug-Build mit eingeschaltetem Demo-Modus die Demo-Datei.
 pub fn db_url() -> String {
-    format!("sqlite:{DB_DATEI}")
+    #[cfg(debug_assertions)]
+    if crate::demo::aktiv() {
+        return url_zu(crate::demo::DEMO_DB_DATEI);
+    }
+    url_zu(DB_DATEI)
 }
 
 /// Für das Frontend (src/lib/db.ts): welche Datenbank geladen wird. Muss exakt der URL entsprechen,
@@ -84,9 +103,8 @@ pub fn datenbank_url() -> String {
     db_url()
 }
 
-/// tauri-plugin-sql mit unseren Migrationen.
-pub fn sql_plugin<R: Runtime>() -> TauriPlugin<R, Option<tauri_plugin_sql::PluginConfig>> {
-    let migrationen = MIGRATIONEN
+fn plugin_migrationen() -> Vec<Migration> {
+    MIGRATIONEN
         .iter()
         .map(|m| Migration {
             version: m.version,
@@ -94,14 +112,54 @@ pub fn sql_plugin<R: Runtime>() -> TauriPlugin<R, Option<tauri_plugin_sql::Plugi
             sql: m.sql,
             kind: MigrationKind::Up,
         })
-        .collect();
-    tauri_plugin_sql::Builder::new()
-        .add_migrations(&db_url(), migrationen)
-        .build()
+        .collect()
+}
+
+/// tauri-plugin-sql mit unseren Migrationen. Feste URLs statt `db_url()`: Das Plugin wird gebaut, bevor der
+/// Demo-Modus feststeht, und muss beide Dateien kennen (die Demo-Datei nur im Debug-Build).
+pub fn sql_plugin<R: Runtime>() -> TauriPlugin<R, Option<tauri_plugin_sql::PluginConfig>> {
+    let builder =
+        tauri_plugin_sql::Builder::new().add_migrations(&url_zu(DB_DATEI), plugin_migrationen());
+    #[cfg(debug_assertions)]
+    let builder = builder.add_migrations(&url_zu(crate::demo::DEMO_DB_DATEI), plugin_migrationen());
+    builder.build()
+}
+
+/// Migrationen so, wie tauri-plugin-sql sie an sqlx übergibt (gleiche Prüfsummen, gleiche Transaktionen).
+/// Für Tests und das Anlegen der Demo-Datenbank (src/demo.rs), die nicht über das Plugin migriert wird.
+#[cfg(any(test, debug_assertions))]
+#[derive(Debug)]
+pub struct MigrationsQuelle(pub Vec<&'static MigrationsDatei>);
+
+#[cfg(any(test, debug_assertions))]
+impl MigrationSource<'static> for MigrationsQuelle {
+    fn resolve(
+        self,
+    ) -> Pin<Box<dyn Future<Output = Result<Vec<SqlxMigration>, BoxDynError>> + Send + 'static>>
+    {
+        Box::pin(async move {
+            Ok(self
+                .0
+                .into_iter()
+                .map(|m| {
+                    SqlxMigration::new(
+                        m.version,
+                        m.beschreibung.into(),
+                        MigrationType::ReversibleUp,
+                        m.sql.into(),
+                        false,
+                    )
+                })
+                .collect())
+        })
+    }
 }
 
 /// Sicherung vor Migrationen. Muss VOR `sql_plugin()` registriert werden: Plugins werden in der Reihenfolge
 /// ihrer Registrierung eingerichtet, noch bevor ein Fenster existiert und das Frontend die Datenbank öffnen kann.
+/// Gesichert wird immer die echte Datei `DB_DATEI`, auch im Demo-Modus: Sie wird dann erst nach dem Entfernen der
+/// Demo-Daten (oder beim nächsten Start) geladen und migriert, und bis dahin sichert jeder Start erneut, solange
+/// Migrationen offen sind. Die Demo-Datei braucht keine Sicherung (wird frisch angelegt, siehe src/demo.rs).
 pub fn sicherungs_plugin<R: Runtime>() -> TauriPlugin<R> {
     PluginBuilder::new("db-sicherung")
         .setup(|app, _api| {
@@ -276,38 +334,8 @@ async fn sichern_mit(
 #[cfg(test)]
 pub(crate) mod testhilfe {
     use super::*;
-    use sqlx::error::BoxDynError;
-    use sqlx::migrate::{Migration as SqlxMigration, MigrationSource, MigrationType, Migrator};
-    use std::future::Future;
-    use std::pin::Pin;
+    use sqlx::migrate::Migrator;
     use std::str::FromStr;
-
-    /// Migrationen so, wie tauri-plugin-sql sie an sqlx übergibt (gleiche Prüfsummen, gleiche Transaktionen).
-    #[derive(Debug)]
-    pub struct Quelle(pub Vec<&'static MigrationsDatei>);
-
-    impl MigrationSource<'static> for Quelle {
-        fn resolve(
-            self,
-        ) -> Pin<Box<dyn Future<Output = Result<Vec<SqlxMigration>, BoxDynError>> + Send + 'static>>
-        {
-            Box::pin(async move {
-                Ok(self
-                    .0
-                    .into_iter()
-                    .map(|m| {
-                        SqlxMigration::new(
-                            m.version,
-                            m.beschreibung.into(),
-                            MigrationType::ReversibleUp,
-                            m.sql.into(),
-                            false,
-                        )
-                    })
-                    .collect())
-            })
-        }
-    }
 
     /// Frische Datenbank im Arbeitsspeicher, mit allen Migrationen (wie beim ersten Start der App).
     pub async fn test_db() -> SqliteConnection {
@@ -316,7 +344,7 @@ pub(crate) mod testhilfe {
             .connect()
             .await
             .unwrap();
-        let migrator = Migrator::new(Quelle(MIGRATIONEN.iter().collect()))
+        let migrator = Migrator::new(MigrationsQuelle(MIGRATIONEN.iter().collect()))
             .await
             .unwrap();
         migrator.run_direct(&mut c).await.unwrap();
@@ -326,7 +354,6 @@ pub(crate) mod testhilfe {
 
 #[cfg(test)]
 mod tests {
-    use super::testhilfe::Quelle;
     use super::*;
     use sqlx::migrate::Migrator;
 
@@ -350,7 +377,7 @@ mod tests {
     /// Wendet die ersten `bis` Migrationen an.
     async fn migrieren(pfad: &Path, bis: usize) {
         let mut c = verbinden(pfad).await;
-        let migrator = Migrator::new(Quelle(MIGRATIONEN.iter().take(bis).collect()))
+        let migrator = Migrator::new(MigrationsQuelle(MIGRATIONEN.iter().take(bis).collect()))
             .await
             .unwrap();
         migrator.run_direct(&mut c).await.unwrap();
@@ -369,7 +396,7 @@ mod tests {
         } else {
             assert_eq!(DB_DATEI, "kladdy.db");
         }
-        assert_eq!(db_url(), format!("sqlite:{DB_DATEI}"));
+        assert_eq!(url_zu(DB_DATEI), format!("sqlite:{DB_DATEI}"));
     }
 
     #[test]
@@ -877,6 +904,25 @@ mod tests {
         assert!(erste.is_some());
         // gleicher Zeitstempel ⇒ VACUUM INTO verweigert, statt die Kopie zu ersetzen
         assert!(sichern_vor_migration(&db, &ziel, &versionen(), 5).is_err());
+        let _ = std::fs::remove_dir_all(&ordner);
+    }
+
+    /// Demo-Modus (nur Debug): Die echte Datei wird nicht geladen, bleibt also unmigriert. Jeder Start sichert sie
+    /// dann erneut, bis sie wieder geladen und migriert ist; eine Migration ohne vorherige Sicherung gibt es so nie.
+    #[test]
+    fn unmigrierte_datei_wird_bei_jedem_start_gesichert() {
+        let ordner = testordner("demo-start");
+        let db = ordner.join(DB_DATEI);
+        let ziel = ordner.join("sicherungen");
+        tauri::async_runtime::block_on(migrieren(&db, 1));
+        let erster_start = sichern_vor_migration(&db, &ziel, &versionen(), 10).unwrap();
+        let zweiter_start = sichern_vor_migration(&db, &ziel, &versionen(), 20).unwrap();
+        assert!(erster_start.is_some() && zweiter_start.is_some());
+        assert_ne!(erster_start, zweiter_start);
+        let name = zweiter_start.unwrap();
+        let name = name.file_name().unwrap().to_str().unwrap();
+        assert!(name.starts_with(DB_DATEI.strip_suffix(".db").unwrap()));
+        assert!(!name.contains("demo"));
         let _ = std::fs::remove_dir_all(&ordner);
     }
 }
