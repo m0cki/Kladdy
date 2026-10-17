@@ -1,4 +1,5 @@
-/* Kladdy · Diagramme (ANLEITUNG §9.6) – Komponenten folgen in Phase 2 */
+/* Kladdy · Diagramme (ANLEITUNG §9.6, §9.5) – Komponenten in src/components/charts, Mathematik in src/lib/charts.ts.
+ * Farben kommen als CSS-Variable --c ans Element (Token oder Kategoriefarbe), nie als feste Farbe im Markup. */
 
 /* ============ Diagramme ============ */
 .chart { position: relative; width: 100%; min-height: 120px; }
@@ -6,7 +7,11 @@
 .c-grid { stroke: var(--grid); stroke-width: 1; }
 .c-base { stroke: var(--axis); stroke-width: 1; }
 .c-tick { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
-.c-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.c-line { fill: none; stroke: var(--c, var(--accent)); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+/* Bezugswert (Vorjahr, Ziel): gestrichelt 3 4 in --muted, nie als eigene Serie (Regel 7) */
+.c-line.bezug { stroke: var(--muted); stroke-dasharray: 3 4; }
+.c-stop-oben { stop-color: var(--c, var(--accent)); stop-opacity: .32; }
+.c-stop-unten { stop-color: var(--c, var(--accent)); stop-opacity: 0; }
 .c-line.dashed { stroke-dasharray: 5 5; }
 .c-draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 1.3s var(--ease) forwards; }
 .c-line.dashed.c-draw { stroke-dasharray: 5 5; stroke-dashoffset: 0; animation: fade 1s .5s var(--ease) both; }
@@ -14,9 +19,10 @@
 .c-fade { animation: fade 1s .35s var(--ease) both; }
 .c-grow { animation: grow .7s var(--spring) both; }
 @keyframes grow { from { transform: scaleY(0); } }
-.c-bar { transition: opacity .15s; }
-.c-marker { stroke: var(--surface); stroke-width: 2; }
-.c-dot { stroke: var(--surface); stroke-width: 2; }
+.c-bar { fill: var(--c, var(--accent)); transition: opacity .15s; }
+.c-bar.blass { opacity: .45; }
+.c-marker { fill: var(--c, var(--accent)); stroke: var(--surface); stroke-width: 2; }
+.c-dot { fill: var(--c, var(--accent)); stroke: var(--surface); stroke-width: 2; }
 .c-pulse { animation: pulse 2.4s ease-out infinite; transform-box: fill-box; transform-origin: center; }
 @keyframes pulse { 0% { filter: drop-shadow(0 0 0 var(--accent)); } 60% { filter: drop-shadow(0 0 7px var(--accent)); } 100% { filter: drop-shadow(0 0 0 var(--accent)); } }
 .c-ref { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 4; opacity: .8; }
@@ -29,13 +35,15 @@
 .c-today { stroke: var(--text-2); stroke-width: 1; stroke-dasharray: 2 3; opacity: .7; }
 .c-todaylabel { fill: var(--text-2); font-size: 10.5px; font-weight: 600; }
 .c-endtext { fill: var(--on-accent); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.c-endlabel rect { fill: var(--c, var(--accent)); }
 .c-endlabel { transition: opacity .2s; }
 .hovering .c-endlabel { opacity: .35; }
 .c-cross { stroke: var(--axis); stroke-width: 1; opacity: 0; transition: opacity .12s; }
-.c-hoverdot { stroke: var(--surface); stroke-width: 2.5; opacity: 0; transition: opacity .12s; }
+.c-hoverdot { fill: var(--c, var(--accent)); stroke: var(--surface); stroke-width: 2.5; opacity: 0; transition: opacity .12s; }
 .c-band { fill: var(--hover); opacity: 0; transition: opacity .12s, x .12s; }
 .hovering .c-cross, .hovering .c-hoverdot, .hovering .c-band { opacity: 1; }
 .c-overlay { fill: transparent; cursor: crosshair; }
+.c-overlay.klickbar { cursor: pointer; }
 .c-minlabel rect { fill: var(--surface); stroke: var(--border-strong); }
 .c-minlabel text { fill: var(--text); font-size: 10.5px; font-weight: 650; font-variant-numeric: tabular-nums; }
 .chart-tip {
@@ -46,19 +54,22 @@
 .chart-tip.show { opacity: 1; }
 .ct-title { font-weight: 700; margin-bottom: 4px; color: var(--text); }
 .ct-row { display: flex; align-items: center; gap: 7px; color: var(--text-2); }
-.ct-row i { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+.ct-row i { width: 9px; height: 9px; border-radius: 3px; flex: none; background: var(--c, var(--muted)); }
 .ct-row b { margin-left: auto; padding-left: 14px; color: var(--text); font-family: var(--num-font); font-variant-numeric: tabular-nums; }
 .ct-note { margin-top: 5px; padding-top: 5px; border-top: 1px solid var(--border); color: var(--muted); font-size: .72rem; max-width: 240px; }
 .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: .78rem; color: var(--text-2); }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
-.legend i { width: 10px; height: 10px; border-radius: 3px; }
+.legend i { width: 10px; height: 10px; border-radius: 3px; background: var(--c, var(--muted)); color: var(--c, var(--muted)); }
 .legend i.dash { height: 2px; width: 14px; border-radius: 0; background: repeating-linear-gradient(90deg, currentColor 0 4px, transparent 4px 7px) !important; }
 .spark { display: block; }
+.spark-flaeche { fill: var(--c, var(--accent)); opacity: .12; }
+.spark-linie { fill: none; stroke: var(--c, var(--accent)); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+.spark-punkt { fill: var(--c, var(--accent)); }
 /* Donut */
 .donut-wrap { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 18px; align-items: center; }
 .donut { position: relative; width: 170px; height: 170px; }
 .donut svg { display: block; overflow: visible; }
-.donut path { transition: opacity .2s, transform .3s var(--spring); transform-origin: 85px 85px; cursor: pointer; }
+.donut path { fill: var(--c, var(--muted)); transition: opacity .2s, transform .3s var(--spring); transform-origin: 85px 85px; cursor: pointer; }
 .donut.hovering path { opacity: .35; }
 .donut.hovering path.on { opacity: 1; transform: scale(1.04); }
 .donut-center { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; pointer-events: none; }
@@ -67,7 +78,24 @@
 .donut-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; font-size: .82rem; min-width: 0; }
 .donut-list li { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 8px; transition: background .15s; cursor: default; }
 .donut-list li.on, .donut-list li:hover { background: var(--hover); }
-.donut-list li i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.donut-list li:focus-visible { outline: 2px solid var(--accent-line); outline-offset: -2px; }
+.donut-list li i { width: 10px; height: 10px; border-radius: 3px; flex: none; background: var(--c, var(--muted)); }
 .donut-list li span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-2); }
 .donut-list li b { font-family: var(--num-font); font-variant-numeric: tabular-nums; font-weight: 600; }
 .donut-list li small { color: var(--muted); font-size: .72rem; width: 38px; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Tabellen-Entsprechung unter dem Diagramm (Regel 8) */
+.chart-data { margin-top: 10px; font-size: .8rem; }
+.chart-data summary { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; color: var(--muted); font-weight: 600; list-style: none; border-radius: 6px; }
+.chart-data summary::-webkit-details-marker { display: none; }
+.chart-data summary:hover, .chart-data summary:focus-visible { color: var(--text); }
+.chart-data summary .ic { width: 14px; height: 14px; transition: transform .2s var(--ease); }
+.chart-data[open] summary .ic { transform: rotate(180deg); }
+.chart-data .table-wrap { margin-top: 8px; }
+.chart-data .fin-table th, .chart-data .fin-table td { padding: 6px 12px; }
+.chart-data .fin-table .link { font: inherit; }
+
+/* Weniger Bewegung: Linien nicht zeichnen und Balken nicht wachsen lassen, nur einblenden (§9.5) */
+:root[data-motion="reduced"] .c-draw:not(.dashed):not(.bezug) { stroke-dasharray: none; stroke-dashoffset: 0; animation: fade .4s var(--ease) both; }
+:root[data-motion="reduced"] .c-grow { animation: fade .4s var(--ease) both; }
+:root[data-motion="reduced"] .c-pulse { animation: none; }

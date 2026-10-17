@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  listenAdresse,
+  listenVorgabe,
   LEERER_FILTER,
   abziehbar,
   anzahlErweitert,
@@ -291,5 +293,27 @@ describe('markiere', () => {
     expect(markiere('Dünger für Rasen', 'rasen DÜN')).toEqual([[0, 3], [11, 16]]);
     expect(markiere('Aral', 'ar ral')).toEqual([[0, 4]]);
     expect(markiere('Aral', '  ')).toEqual([]);
+  });
+});
+
+describe('Filter aus der Adresse (Sprung aus der Auswertung)', () => {
+  it('Typ, „nur ohne Beleg“ und Zeitraum; übrige Filter leer', () => {
+    expect(listenVorgabe(new URLSearchParams('typ=ausgabe&modus=monat&anker=2026-10-01'))).toEqual({
+      filter: { ...LEERER_FILTER, typ: 'ausgabe' },
+      zeitraum: { modus: 'monat', anker: '2026-10-01' },
+    });
+    expect(listenVorgabe(new URLSearchParams('ohne-beleg=1'))).toEqual({ filter: { ...LEERER_FILTER, ohneBeleg: true }, zeitraum: null });
+  });
+  it('nichts Bekanntes ⇒ null, unbekannter Typ ⇒ alle', () => {
+    expect(listenVorgabe(new URLSearchParams(''))).toBeNull();
+    expect(listenVorgabe(new URLSearchParams('typ=privat'))).toBeNull();
+    expect(listenVorgabe(new URLSearchParams('typ=privat&ohne-beleg=1'))?.filter.typ).toBe('alle');
+  });
+  it('listenAdresse ⇒ listenVorgabe liefert genau diesen Filter', () => {
+    const url = listenAdresse({ typ: 'einnahme', ohneBeleg: true, modus: 'quartal', anker: '2026-07-01' });
+    expect(url).toBe('/ein-ausgaenge?typ=einnahme&ohne-beleg=1&modus=quartal&anker=2026-07-01');
+    const v = listenVorgabe(new URLSearchParams(url.split('?')[1]));
+    expect(v).toEqual({ filter: { ...LEERER_FILTER, typ: 'einnahme', ohneBeleg: true }, zeitraum: { modus: 'quartal', anker: '2026-07-01' } });
+    expect(listenAdresse({ modus: 'jahr', anker: '2025-01-01' })).toBe('/ein-ausgaenge?modus=jahr&anker=2025-01-01');
   });
 });

@@ -1,10 +1,11 @@
 /* Ein- & Ausgänge (Startseite, §6.3): ruhige Liste aller geschäftlichen Zahlungen eines Zeitraums – keine Salden, keine Summen.
  * Kopf in drei Teilen (Titel · Zeitraum mittig · „+ Erfassen“), klebrige Filterleiste (Tabs, Suche, Filter-Popover, Chips,
  * „N ohne Beleg“), Tabelle neueste zuerst, darunter nur die Anzahl. Ändern über die Erfassen-Schublade, Entfernen = Storno.
+ * Filter und Zeitraum lassen sich per Adresse vorgeben (Sprung aus der Auswertung, lib/buchungen.ts → listenVorgabe).
  * Büroklammer öffnet den Beleg (mehrere: Menü), „Beleg anhängen …“ im Zeilenmenü (nicht bei Gegenbuchungen).
  * Optik und Verhalten wie referenz/prototyp/js/pages/buchungen.js; Logik in lib/buchungen.ts, Daten in lib/queries/buchungen.ts. */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeftRight,
   Ban,
@@ -32,6 +33,7 @@ import {
   filtere,
   gegenueber,
   kannStornieren,
+  listenVorgabe,
   markiere,
   sperre,
   zahlungswegName,
@@ -79,6 +81,18 @@ export default function EinAusgaenge() {
   const datenStand = useUi((s) => s.datenStand);
   const z = zeitraum(modus, anker);
 
+  // Sprung aus der Auswertung (?typ=…&ohne-beleg=1&modus=…&anker=…): Filter und Zeitraum übernehmen, Adresse wieder leeren
+  const [params, setParams] = useSearchParams();
+  const [listenKey, setListenKey] = useState(0);
+  useLayoutEffect(() => {
+    const v = listenVorgabe(params);
+    if (!v) return;
+    if (v.zeitraum) setZeitraum(v.zeitraum);
+    gemerkterFilter = v.filter;
+    setListenKey((k) => k + 1); // Liste neu aufbauen ⇒ übernimmt den Filter
+    setParams({}, { replace: true });
+  }, [params, setParams, setZeitraum]);
+
   const laden = useCallback(
     async (): Promise<Daten> => {
       void datenStand; // nach jedem Schreibvorgang neu laden
@@ -110,7 +124,7 @@ export default function EinAusgaenge() {
         </div>
       </div>
       {zustand.status === 'ok' ? (
-        <Liste zeilen={zustand.daten.zeilen} kategorien={zustand.daten.kategorien} zeitraumLabel={z.label} />
+        <Liste key={listenKey} zeilen={zustand.daten.zeilen} kategorien={zustand.daten.kategorien} zeitraumLabel={z.label} />
       ) : (
         <Ladeansicht zustand={zustand} icon={ArrowLeftRight} was="Ein- und Ausgänge" erneut={erneut} />
       )}

@@ -5,7 +5,7 @@
  * Geld nur in Cent (money.ts). Mit Vitest getestet (buchungen.test.ts). */
 import { anteil, formatBetrag, parseBetrag } from './money';
 import { normalize, normalizeWithMap } from './suche';
-import { istDatum } from './zeitraum';
+import { istDatum, zeitraumAusParams, zeitraumParams, type ZeitraumModus } from './zeitraum';
 
 export type BuchungTyp = 'einnahme' | 'ausgabe';
 export type Zahlungsart = 'bar' | 'bank' | 'paypal';
@@ -186,6 +186,33 @@ export function filtere(alle: readonly BuchungZeile[], f: Filter): ListenErgebni
   }
   const zeilen = basis.filter((b) => passt(b, f)).sort(neuesteZuerst);
   return { zeilen, tabs, proKategorie, ohneBeleg };
+}
+
+/* ---------- Filter aus der Adresse (Sprung aus der Auswertung): ?typ=einnahme&ohne-beleg=1&modus=monat&anker=… ---------- */
+
+export interface ListenVorgabe {
+  /** neuer Filter: leer bis auf Typ und „nur ohne Beleg“ */
+  filter: Filter;
+  zeitraum: { modus: ZeitraumModus; anker: string } | null;
+}
+
+/** Vorgabe aus den Adress-Parametern; null, wenn keine drinsteht. */
+export function listenVorgabe(p: Pick<URLSearchParams, 'get'>): ListenVorgabe | null {
+  const typ = p.get('typ');
+  const ohneBeleg = p.get('ohne-beleg') === '1';
+  const z = zeitraumAusParams(p);
+  const t: TypFilter = typ === 'einnahme' || typ === 'ausgabe' ? typ : 'alle';
+  if (t === 'alle' && !ohneBeleg && !z) return null;
+  return { filter: { ...LEERER_FILTER, typ: t, ohneBeleg }, zeitraum: z };
+}
+
+/** Adresse von Ein- & Ausgänge mit genau diesem Filter und Zeitraum. */
+export function listenAdresse(o: { typ?: BuchungTyp; ohneBeleg?: boolean; modus: ZeitraumModus; anker: string }): string {
+  const p = new URLSearchParams();
+  if (o.typ) p.set('typ', o.typ);
+  if (o.ohneBeleg) p.set('ohne-beleg', '1');
+  for (const [k, v] of Object.entries(zeitraumParams(o.modus, o.anker))) p.set(k, v);
+  return `/ein-ausgaenge?${p.toString()}`;
 }
 
 /** Suchwörter (wie in filtere) ⇒ markierte Bereiche im Originaltext, für <mark> über teile() aus lib/suche.ts. */

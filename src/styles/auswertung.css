@@ -1,0 +1,14 @@
+/* Kladdy · Auswertung › Überblick (ANLEITUNG §6.9.1) – wie referenz/prototyp/css/ueberblick.css */
+
+/* Status auf einen Blick: eine Zeile Pillen unter dem Umschalter */
+.ub-pills { flex-direction: row; flex-wrap: wrap; min-width: 0; }
+.ub-pills .status-pill { flex: 1 1 200px; flex-direction: column; align-items: flex-start; gap: 2px; padding: 10px 14px 10px 30px; position: relative; }
+.ub-pills .status-pill .status-dot { position: absolute; left: 13px; top: 15px; }
+.ub-pills .status-pill span { margin-left: 0; padding-left: 0; font-size: .76rem; white-space: normal; }
+.ub-pills a.status-pill:hover { transform: translateY(-2px); }
+:root[data-motion="reduced"] .ub-pills a.status-pill:hover { transform: none; }
+
+/* Skeleton beim ersten Laden (§9.5) */
+.ub-sk-pills { height: 58px; }
+.ub-sk-kpi { height: 92px; }
+.ub-sk-chart { height: 340px; }

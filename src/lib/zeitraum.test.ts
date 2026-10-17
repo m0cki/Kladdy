@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hatNaechsten, heute, imZeitraum, istDatum, naechsterAnker, verschiebe, zeitraum } from './zeitraum';
+import { hatNaechsten, heute, imZeitraum, istDatum, naechsterAnker, plusTage, verschiebe, zeitraum, zeitraumAusParams, zeitraumParams } from './zeitraum';
 
 describe('zeitraum', () => {
   it('Monat mit Label und letztem Tag', () => {
@@ -61,5 +61,32 @@ describe('heute / istDatum', () => {
     expect(istDatum('2026-13-01')).toBe(false);
     expect(istDatum('26-01-01')).toBe(false);
     expect(istDatum(null)).toBe(false);
+  });
+});
+
+describe('plusTage', () => {
+  it('über Monats-, Jahres- und Schaltjahresgrenzen', () => {
+    expect(plusTage('2026-10-17', 0)).toBe('2026-10-17');
+    expect(plusTage('2026-01-31', 1)).toBe('2026-02-01');
+    expect(plusTage('2026-01-01', -1)).toBe('2025-12-31');
+    expect(plusTage('2028-02-28', 1)).toBe('2028-02-29');
+    expect(plusTage('2026-03-28', 2)).toBe('2026-03-30'); // Sommerzeit-Wechsel egal
+  });
+});
+
+describe('Zeitraum in der Adresse', () => {
+  it('liest gültige Parameter', () => {
+    expect(zeitraumAusParams(new URLSearchParams('modus=quartal&anker=2026-07-01'))).toEqual({ modus: 'quartal', anker: '2026-07-01' });
+  });
+  it('ungültig oder fehlend ⇒ null', () => {
+    expect(zeitraumAusParams(new URLSearchParams(''))).toBeNull();
+    expect(zeitraumAusParams(new URLSearchParams('modus=woche&anker=2026-07-01'))).toBeNull();
+    expect(zeitraumAusParams(new URLSearchParams('modus=monat&anker=2026-02-30'))).toBeNull();
+    expect(zeitraumAusParams(new URLSearchParams('modus=monat'))).toBeNull();
+  });
+  it('hin und zurück', () => {
+    const p = new URLSearchParams(zeitraumParams('jahr', '2025-05-03'));
+    expect(p.toString()).toBe('modus=jahr&anker=2025-05-03');
+    expect(zeitraumAusParams(p)).toEqual({ modus: 'jahr', anker: '2025-05-03' });
   });
 });
