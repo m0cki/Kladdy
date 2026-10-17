@@ -1675,6 +1675,23 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
 - **Nächste Migration:** `0007` (ausgelieferte Migrationen nie ändern).
 - **Phase 1 abgeschlossen.** Weiter mit **Phase 2** in Teilen (je ein PR): 1. Diagramm-Komponenten (§9.6, §9.5) ·
   2. Auswertung mit großem Umschalter + Überblick (§6.9.1) · 3. Liquidität (§6.9.2) · 4. Suche/Befehlspalette ⌘K (§6.2)
+- **Phase 2 in Teilen:**
+  1. + 2. Diagramm-Komponenten und Auswertung › Überblick – **umgesetzt (Branch `phase-2-ueberblick`)**:
+     `src/components/charts/` (`BarChart`, `AreaChart` mit gestricheltem Bezugswert und Endwert-Pille, `Donut` mit
+     Werteliste, `Sparkline`, `ChartTip`, `Legend`, `ChartTabelle` = aufklappbare „Werte als Tabelle“ unter jedem
+     Diagramm, `useBreite` mit ResizeObserver), Mathematik in `src/lib/charts.ts` (Achsenteilung, Pfade, Donut-Bögen,
+     Achsenbeschriftung „12 Tsd.“, Hochzählen), Farben nur als CSS-Variable `--c` (`charts.css`, weniger Bewegung =
+     nur Einblenden). Überblick (`src/pages/auswertung/Ueberblick.tsx`): Zeitraum im Kopf und in der Adresse
+     (`?modus=…&anker=…`, gilt auch für Ein- & Ausgänge), Status-Pillen Kleinunternehmer (nur bei `ust_modus` 'klein',
+     Grenzen aus den Steuer-Kennwerten des Jahres) · offene Rechnungen · ohne Beleg (im Zeitraum, springt in Ein- &
+     Ausgänge mit genau diesem Filter), KPI-Reihe mit Hochzählen und ▲/▼ ggü. gleich langer Vorperiode (Kacheln
+     springen in die passend gefilterte Liste), Balken je Monat (Klick wählt den Monat), Überschuss kumuliert vs.
+     Vorjahr, Donuts Kategorien/Zahlungswege. Rechnen in `src/lib/auswertung.ts` (Storno-Gegenbuchungen negativ an
+     ihrem Zahlungsdatum, Ausgaben = abziehbarer Teil, Aufträge = Besuche wie `lib/kunden.ts`), Daten in
+     `src/lib/queries/auswertung.ts` (alle Buchungen in einer Abfrage). Ein- & Ausgänge übernimmt Filter und Zeitraum
+     aus der Adresse (`listenVorgabe` in `lib/buchungen.ts`). „Nächste 90 Tage“ folgt mit Liquidität, „Meine
+     Kennzahlen“ mit Phase 4; die Pillen Kleinunternehmer und offene Rechnungen zeigen bis Phase 5 bzw. 3 auf die
+     Platzhalter von Steuer & Export bzw. Rechnungen & Quittungen
 - **Offen aus Phase 1 (Teil 1+2):** optionale Kategorien (AfA,
   Bewirtung, Geschenke, Homeoffice), Kategorien bearbeiten und EÜR-Zuordnung pro Jahr (braucht eigene Tabelle),
   Firmenlogo (nach der Dateiablage), sichtbare Fehlermeldung statt stillem Abbruch, wenn die Sicherung vor einer

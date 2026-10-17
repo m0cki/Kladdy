@@ -73,3 +73,23 @@ export function naechsterAnker(modus: ZeitraumModus, anker: string, richtung: -1
   const neu = verschiebe(modus, anker, richtung);
   return imZeitraum(zeitraum(modus, neu), heuteIso) ? heuteIso : neu;
 }
+
+/** Kalendertage addieren (negativ = zurück), rechnet in UTC, damit Sommerzeit nichts verschiebt. */
+export function plusTage(iso: string, tage: number): string {
+  const d = new Date(Date.UTC(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10)) + tage));
+  return `${pad(d.getUTCFullYear(), 4)}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+}
+
+/* ---------- Zeitraum in der Adresse (Deep-Link, Zurück-Taste): ?modus=monat&anker=2026-10-01 ---------- */
+
+const istModus = (v: unknown): v is ZeitraumModus => v === 'monat' || v === 'quartal' || v === 'jahr';
+
+/** Zeitraum aus den Adress-Parametern; null, wenn keiner (oder ein ungültiger) drinsteht. */
+export function zeitraumAusParams(p: Pick<URLSearchParams, 'get'>): { modus: ZeitraumModus; anker: string } | null {
+  const modus = p.get('modus');
+  const anker = p.get('anker');
+  return istModus(modus) && istDatum(anker) ? { modus, anker } : null;
+}
+
+/** Parameter für einen Zeitraum (Anker bleibt, wie er ist: liegt heute im Zeitraum, ist es heute – wie ZeitraumWahl). */
+export const zeitraumParams = (modus: ZeitraumModus, anker: string): Record<string, string> => ({ modus, anker });
