@@ -1651,7 +1651,7 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
      Belege in derselben Transaktion wie `buchung_anlegen`/`buchung_aendern`, Frist bis 31.12. (Zahlungsjahr + 8),
      Migration 0005 (Indizes, Trigger: nie löschen, nur Frist verlängern). Dubletten werden angezeigt, nicht blockiert.
      Anhängen geht auch an festgeschriebene Buchungen, nicht an Gegenbuchungen. Erkennung (Betrag/Datum) folgt in Phase 3
-  5. Kunden-Seite mit Verlauf (§6.8) – **umgesetzt** (PR #12, Branch `phase-1-kunden`): Liste (zuletzt da zuerst, Suche, Alle ·
+  5. Kunden-Seite mit Verlauf (§6.8) – **erledigt** (PR #12): Liste (zuletzt da zuerst, Suche, Alle ·
      Stammkunden · mit Notiz, sortierbar nach Name/Besuche/Zuletzt) und Kunden-Schublade (Kontakt-Links über
      `link_oeffnen`, Kennzeile, Hinweise, Notiz speichert selbst, Stammdaten, Verlauf, „Neuen Auftrag erfassen“ öffnet die
      Erfassen-Schublade vorbelegt). Logik in `src/lib/kunden.ts` (Besuch = Quittung/Rechnung bis heute ohne Storno und
@@ -1660,7 +1660,7 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
      denselben Weg wie die Erfassen-Schublade). Löschen nur ohne Buchungen, Belege, Termine und Fahrten, sonst Schloss
      „Löschen ab JJJJ“ (letzte Buchung bzw. letzter Beleg + 10 Jahre); Anonymisieren folgt in Phase 5. Migration 0006
      (Indizes, Protokoll-Aktion `geloescht`). „Termin eintragen“ folgt mit Phase 3, Kunden in der Suche ⌘K später
-  6. Demo-Daten + Einstellungs-Bereich „Daten“ (Demo-Daten, Tectonic-Pfad) – **umgesetzt** (Branch `phase-1-demo-daten`):
+  6. Demo-Daten + Einstellungs-Bereich „Daten“ (Demo-Daten, Tectonic-Pfad) – **erledigt** (PR #13, nachgereicht in PR #14):
      Demo-Daten **nur in der Entwicklerversion** (Debug-Build: Rust-Modul `src-tauri/src/demo.rs` mit `demo_status`,
      `demo_laden`, `demo_entfernen` nur dort übersetzt und registriert; Oberfläche nur bei `import.meta.env.DEV`, der
      Generator wird dynamisch importiert und fehlt im Release-Bundle). Eigene Datenbankdatei `kladdy-dev-demo.db` neben
@@ -1673,6 +1673,8 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
      Reihenfolge aus §3.1, für `compile_latex` wiederverwendbar; `tectonic_suchen`, `tectonic_pfad_pruefen`,
      `tectonic_pruefen` mit `--version` und Zeitlimit), eigener Pfad in `einstellungen['tectonic_pfad']`
 - **Nächste Migration:** `0007` (ausgelieferte Migrationen nie ändern).
+- **Phase 1 abgeschlossen.** Weiter mit **Phase 2** in Teilen (je ein PR): 1. Diagramm-Komponenten (§9.6, §9.5) ·
+  2. Auswertung mit großem Umschalter + Überblick (§6.9.1) · 3. Liquidität (§6.9.2) · 4. Suche/Befehlspalette ⌘K (§6.2)
 - **Offen aus Phase 1 (Teil 1+2):** optionale Kategorien (AfA,
   Bewirtung, Geschenke, Homeoffice), Kategorien bearbeiten und EÜR-Zuordnung pro Jahr (braucht eigene Tabelle),
   Firmenlogo (nach der Dateiablage), sichtbare Fehlermeldung statt stillem Abbruch, wenn die Sicherung vor einer
