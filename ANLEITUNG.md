@@ -1634,7 +1634,7 @@ Hat der Nutzer ein **Firmenlogo** hochgeladen (§6.10), steht dort stattdessen s
 
 Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nennt die Abnahme-Punkte → du startest die App (`npm run tauri dev`) und prüfst → Commit.
 
-### Stand (17.10.2026)
+### Stand (18.10.2026)
 - **Veröffentlicht:** v1.0.0 (13.10.2026) mit Phase 0, Einstellungs-Seite, Updater, CI und Release-Action
   (Ablauf: `RELEASE.md`; nur von Hand, Release-Commits liegen nur auf den Tags, `main` behält 0.1.0).
 - **Phase 1 in Teilen (je ein PR):**
@@ -1676,7 +1676,7 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
 - **Phase 1 abgeschlossen.** Weiter mit **Phase 2** in Teilen (je ein PR): 1. Diagramm-Komponenten (§9.6, §9.5) ·
   2. Auswertung mit großem Umschalter + Überblick (§6.9.1) · 3. Liquidität (§6.9.2) · 4. Suche/Befehlspalette ⌘K (§6.2)
 - **Phase 2 in Teilen:**
-  1. + 2. Diagramm-Komponenten und Auswertung › Überblick – **umgesetzt (Branch `phase-2-ueberblick`)**:
+  1. + 2. Diagramm-Komponenten und Auswertung › Überblick – **erledigt (PR #15)**:
      `src/components/charts/` (`BarChart`, `AreaChart` mit gestricheltem Bezugswert und Endwert-Pille, `Donut` mit
      Werteliste, `Sparkline`, `ChartTip`, `Legend`, `ChartTabelle` = aufklappbare „Werte als Tabelle“ unter jedem
      Diagramm, `useBreite` mit ResizeObserver), Mathematik in `src/lib/charts.ts` (Achsenteilung, Pfade, Donut-Bögen,
@@ -1689,9 +1689,24 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
      Vorjahr, Donuts Kategorien/Zahlungswege. Rechnen in `src/lib/auswertung.ts` (Storno-Gegenbuchungen negativ an
      ihrem Zahlungsdatum, Ausgaben = abziehbarer Teil, Aufträge = Besuche wie `lib/kunden.ts`), Daten in
      `src/lib/queries/auswertung.ts` (alle Buchungen in einer Abfrage). Ein- & Ausgänge übernimmt Filter und Zeitraum
-     aus der Adresse (`listenVorgabe` in `lib/buchungen.ts`). „Nächste 90 Tage“ folgt mit Liquidität, „Meine
-     Kennzahlen“ mit Phase 4; die Pillen Kleinunternehmer und offene Rechnungen zeigen bis Phase 5 bzw. 3 auf die
-     Platzhalter von Steuer & Export bzw. Rechnungen & Quittungen
+     aus der Adresse (`listenVorgabe` in `lib/buchungen.ts`). „Meine Kennzahlen“ folgen mit Phase 4; die Pillen
+     Kleinunternehmer und offene Rechnungen zeigen bis Phase 5 bzw. 3 auf die Platzhalter von Steuer & Export bzw.
+     Rechnungen & Quittungen
+  3. Auswertung › Liquidität (§6.9.2) – **umgesetzt (Branch `phase-2-liquiditaet`)**: Modell `src/lib/liquiditaet.ts`
+     (Port von `prognose()` aus dem Prototyp, Start heute bei 0 €: offene Rechnungen zur Fälligkeit + Ø Zahlungsverzug
+     aus bezahlten Rechnungen, überfällige frühestens heute + 3; wiederkehrende Kosten ab `naechstes_datum` alle
+     1/3/12 Monate, Tag am Monatsende gekappt; Planposten; Ø übrige Ein-/Ausgänge je Woche aus den letzten 90 Tagen
+     ohne Rechnungszahlungen, AfA/Pauschalen und ohne die Termine aktiver wiederkehrender Kosten, damit nichts doppelt
+     zählt; engster Moment, ISO-Kalenderwochen). Seite `src/pages/auswertung/Liquiditaet.tsx` (+ `LiqPosten.tsx`):
+     30/60/90 Tage in der Adresse (`?tage=`), vier Kennzahlen, Treppen-Diagramm `PrognoseChart` (unter 0 in --neg,
+     Einnahme = Punkt, Ausgabe = Ring, Heute-Linie, engster Moment, Tooltip, Tabelle), Engpass-Hinweis mit „Um 30 Tage
+     verschieben“ und Rechnung öffnen, erwartete Zahlungen je Kalenderwoche (Ø-Zeilen markiert und ausblendbar),
+     Annahmen (Schalter + Regler wirken sofort, gespeichert als `einstellungen['liquiditaet_annahmen']`, Regler
+     entprellt). Planposten und wiederkehrende Kosten anlegen/ändern/löschen über `src-tauri/src/liquiditaet.rs`
+     (`planposten_*`, `wiederkehrend_*`, je eine Transaktion mit Protokoll; Löschen mit Rückgängig; wiederkehrende
+     Posten erzeugen keine Buchungen, Löschen nur ohne verknüpfte Buchungen – das kommt mit Phase 7). `vorlage_json`
+     Version 1 ist in `lib/liquiditaet.ts` beschrieben. Überblick: Pille „Nächste 90 Tage“ (erwarteter Überschuss mit
+     ▲/▼, führt zur Liquidität). Demo-Daten mit drei Planposten und den drei festen Kosten. Keine Migration nötig
 - **Offen aus Phase 1 (Teil 1+2):** optionale Kategorien (AfA,
   Bewirtung, Geschenke, Homeoffice), Kategorien bearbeiten und EÜR-Zuordnung pro Jahr (braucht eigene Tabelle),
   Firmenlogo (nach der Dateiablage), sichtbare Fehlermeldung statt stillem Abbruch, wenn die Sicherung vor einer

@@ -12,6 +12,8 @@
 .c-line.bezug { stroke: var(--muted); stroke-dasharray: 3 4; }
 .c-stop-oben { stop-color: var(--c, var(--accent)); stop-opacity: .32; }
 .c-stop-unten { stop-color: var(--c, var(--accent)); stop-opacity: 0; }
+.c-stop-neg-oben { stop-color: var(--c, var(--neg)); stop-opacity: .06; }
+.c-stop-neg-unten { stop-color: var(--c, var(--neg)); stop-opacity: .3; }
 .c-line.dashed { stroke-dasharray: 5 5; }
 .c-draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 1.3s var(--ease) forwards; }
 .c-line.dashed.c-draw { stroke-dasharray: 5 5; stroke-dashoffset: 0; animation: fade 1s .5s var(--ease) both; }
@@ -25,6 +27,10 @@
 .c-dot { fill: var(--c, var(--accent)); stroke: var(--surface); stroke-width: 2; }
 .c-pulse { animation: pulse 2.4s ease-out infinite; transform-box: fill-box; transform-origin: center; }
 @keyframes pulse { 0% { filter: drop-shadow(0 0 0 var(--accent)); } 60% { filter: drop-shadow(0 0 7px var(--accent)); } 100% { filter: drop-shadow(0 0 0 var(--accent)); } }
+/* Erwartete Zahlung (Liquidität): Einnahme gefüllt, Ausgabe als Ring – Plus/Minus nie nur über Farbe */
+.c-ev { stroke-width: 1.6; }
+.c-ev.pos { fill: var(--pos); stroke: var(--surface); }
+.c-ev.neg { fill: var(--surface); stroke: var(--neg); }
 .c-ref { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 4; opacity: .8; }
 .c-ref.neg { stroke: var(--neg); opacity: .7; }
 .c-reflabel rect { fill: var(--surface-2); stroke: var(--border-strong); stroke-width: 1; }
@@ -36,6 +42,8 @@
 .c-todaylabel { fill: var(--text-2); font-size: 10.5px; font-weight: 600; }
 .c-endtext { fill: var(--on-accent); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .c-endlabel rect { fill: var(--c, var(--accent)); }
+.c-endlabel.neutral rect { fill: var(--surface-3); stroke: var(--accent-line); }
+.c-endlabel.neutral .c-endtext { fill: var(--text); }
 .c-endlabel { transition: opacity .2s; }
 .hovering .c-endlabel { opacity: .35; }
 .c-cross { stroke: var(--axis); stroke-width: 1; opacity: 0; transition: opacity .12s; }

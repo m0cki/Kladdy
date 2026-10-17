@@ -37,6 +37,10 @@ export interface AuswertungBuchung {
   zahlungsart: Zahlungsart | null;
   rechnung_id: number | null;
   storno_von_id: number | null;
+  /** Vorlage aus wiederkehrend (ab Phase 7) – für den Ø der Liquidität */
+  wiederkehrend_id: number | null;
+  /** Art des zugehörigen Belegs ('rechnung', 'quittung' …) – für den Ø der Liquidität */
+  rechnung_art: string | null;
   belege_anzahl: number;
   /** 1 = es gibt eine Gegenbuchung zu dieser Buchung */
   storniert: number;

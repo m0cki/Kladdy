@@ -2,8 +2,9 @@
  * Eingänge & Ausgaben je Monat (Klick wählt den Monat), Überschuss kumuliert vs. Vorjahr, zwei Donuts.
  * Zeitraum steht in der Adresse (?modus=…&anker=…, Deep-Link und Zurück-Taste) und gilt auch für Ein- & Ausgänge.
  * Optik wie referenz/prototyp/js/pages/ueberblick.js; Rechnen in lib/auswertung.ts, Daten in lib/queries/auswertung.ts.
- * Bewusst NICHT hier: „Nächste 90 Tage“ (kommt mit Liquidität) und „Meine Kennzahlen“ (Phase 4). */
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+ * Pille „Nächste 90 Tage“: erwarteter Überschuss aus der Liquiditätsvorschau (lib/liquiditaet.ts, gespeicherte Annahmen),
+ * führt zu Auswertung › Liquidität. Bewusst NICHT hier: „Meine Kennzahlen“ (Phase 4). */
+import { useCallback, useEffect, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ArrowLeftRight, ChartColumn, CreditCard, Info, LayoutDashboard, List, Sigma } from 'lucide-react';
 import {
@@ -25,7 +26,7 @@ import {
   type Anteil,
 } from '../../lib/auswertung';
 import { listenAdresse } from '../../lib/buchungen';
-import { hochzaehlWert } from '../../lib/charts';
+import { vorschau } from '../../lib/liquiditaet';
 import { formatBetrag } from '../../lib/money';
 import { ladeUeberblick, type UeberblickDaten } from '../../lib/queries/auswertung';
 import { heute, zeitraum, zeitraumAusParams, zeitraumParams, type ZeitraumModus } from '../../lib/zeitraum';
@@ -39,6 +40,7 @@ import { reveal } from '../../components/ui/PageHead';
 import { ZeitraumWahl } from '../../components/ui/ZeitraumWahl';
 import { Ladeansicht, useLaden } from '../einstellungen/Laden';
 import { AuswertungKopf } from './AuswertungKopf';
+import { useHochzaehlen } from './useHochzaehlen';
 
 type Wahl = { modus: ZeitraumModus; anker: string };
 
@@ -173,6 +175,22 @@ function Inhalt({ d, wahl, waehle }: { d: UeberblickDaten; wahl: Wahl; waehle: (
           {offen.ueberfaellig ? ` · ${zahl(offen.ueberfaellig)} überfällig` : ''}
         </b>
         <span>{euro0(offen.summe)}</span>
+      </Link>,
+    );
+  const prognose = vorschau({ buchungen: d.buchungen, offen: d.offen, ...d.vorschau }, h, 90, d.vorschau.annahmen);
+  if (prognose.zahlungen.length)
+    pillen.push(
+      <Link
+        key="liq"
+        className={`status-pill ${prognose.ueberschuss < 0 ? 'alarm' : 'ok'}`}
+        to="/auswertung/liquiditaet?tage=90"
+        title={`Erwartete Eingänge ${euro0(prognose.eingaenge)}, erwartete Ausgaben ${euro0(prognose.ausgaben)} bis ${prognose.bis.slice(8, 10)}.${prognose.bis.slice(5, 7)}. – Details unter Liquidität.`}
+      >
+        <i className="status-dot" />
+        <b>Nächste 90 Tage</b>
+        <span>
+          {prognose.ueberschuss < 0 ? '▼' : '▲'} {formatBetrag(prognose.ueberschuss, { nachkomma: 0, vorzeichen: 'immer' })} erwartet
+        </span>
       </Link>,
     );
   if (ohne)
@@ -340,28 +358,7 @@ function Anteile({ eintraege, was, titel }: { eintraege: Anteil[]; was: string; 
   return <Donut eintraege={eintraege} mitte={euro0(gesamt)} mitteSub={was} format={euro0} titel={titel} />;
 }
 
-/* ================= KPI-Kachel mit Hochzählen (§9.5: 900 ms, ease-out cubic) ================= */
-
-function useHochzaehlen(ziel: number): number {
-  const voll = useUi((s) => s.settings.motion === 'full');
-  const [wert, setWert] = useState(voll ? 0 : ziel);
-  useEffect(() => {
-    if (!voll) {
-      setWert(ziel);
-      return;
-    }
-    const t0 = performance.now();
-    let raf = 0;
-    const schritt = (jetzt: number) => {
-      const t = (jetzt - t0) / 900;
-      setWert(hochzaehlWert(ziel, t));
-      if (t < 1) raf = requestAnimationFrame(schritt);
-    };
-    raf = requestAnimationFrame(schritt);
-    return () => cancelAnimationFrame(raf);
-  }, [ziel, voll]);
-  return wert;
-}
+/* ================= KPI-Kachel mit Hochzählen (useHochzaehlen.ts) ================= */
 
 interface KpiProps {
   i: number;

@@ -8,6 +8,7 @@ mod datenbank;
 #[cfg(debug_assertions)]
 mod demo;
 mod kunden;
+mod liquiditaet;
 mod nummern;
 mod tectonic;
 
@@ -144,6 +145,13 @@ pub fn run() {
             kunden::kunde_notiz,
             kunden::kunde_loeschen,
             kunden::link_oeffnen,
+            liquiditaet::planposten_anlegen,
+            liquiditaet::planposten_aendern,
+            liquiditaet::planposten_loeschen,
+            liquiditaet::wiederkehrend_anlegen,
+            liquiditaet::wiederkehrend_aendern,
+            liquiditaet::wiederkehrend_aktiv,
+            liquiditaet::wiederkehrend_loeschen,
             tectonic::tectonic_suchen,
             tectonic::tectonic_pfad_pruefen,
             tectonic::tectonic_pruefen,

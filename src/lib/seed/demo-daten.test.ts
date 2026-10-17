@@ -154,4 +154,21 @@ describe('demoDaten', () => {
       expect(kuUmsatz(x, +heute.slice(0, 4) - 1)).toBeLessThan(2_500_000);
     }
   });
+
+  it('liefert Planposten und feste Kosten für die Liquidität (Termine nach heute, Tag passt zum Datum)', () => {
+    for (const heute of [HEUTE, '2026-01-31', '2027-12-31']) {
+      const x = demoDaten(heute);
+      expect(x.planposten.length).toBeGreaterThan(0);
+      expect(x.planposten.every((p) => p.datum > heute && p.datum <= plusTage(heute, 90) && ganzeCent(p.betrag_cent) && p.betrag_cent !== 0)).toBe(true);
+      expect(x.wiederkehrend.map((w) => w.name)).toEqual(['Handyvertrag', 'Kfz-Versicherung Transporter', 'Betriebshaftpflicht']);
+      for (const w of x.wiederkehrend) {
+        expect(istDatum(w.naechstes_datum)).toBe(true);
+        expect(w.naechstes_datum > heute).toBe(true);
+        expect(w.naechstes_datum <= plusTage(heute, w.rhythmus === 'monatlich' ? 31 : 92)).toBe(true);
+        expect(Number(w.naechstes_datum.slice(8))).toBe(Math.min(w.tag, new Date(Date.UTC(+w.naechstes_datum.slice(0, 4), +w.naechstes_datum.slice(5, 7), 0)).getUTCDate()));
+      }
+    }
+    // Betriebshaftpflicht vierteljährlich am 15.1./4./7./10. ⇒ nach dem 17.10. erst wieder am 15.01.
+    expect(d.wiederkehrend[2]).toMatchObject({ rhythmus: 'vierteljaehrlich', naechstes_datum: '2027-01-15' });
+  });
 });
