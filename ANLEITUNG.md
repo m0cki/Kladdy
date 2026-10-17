@@ -1634,7 +1634,7 @@ Hat der Nutzer ein **Firmenlogo** hochgeladen (§6.10), steht dort stattdessen s
 
 Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nennt die Abnahme-Punkte → du startest die App (`npm run tauri dev`) und prüfst → Commit.
 
-### Stand (15.10.2026)
+### Stand (17.10.2026)
 - **Veröffentlicht:** v1.0.0 (13.10.2026) mit Phase 0, Einstellungs-Seite, Updater, CI und Release-Action
   (Ablauf: `RELEASE.md`; nur von Hand, Release-Commits liegen nur auf den Tags, `main` behält 0.1.0).
 - **Phase 1 in Teilen (je ein PR):**
@@ -1645,15 +1645,23 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
      Rust-Commands `buchung_anlegen`/`buchung_aendern`/`buchung_stornieren` (je eine Transaktion: Nummer, ggf. neuer
      Kunde, Buchung, Protokoll), Migration 0004 (Indizes, Schreibschutz-Trigger). Beleg erstellen/zuordnen folgt in
      Phase 3
-  4. Belege ablegen (Rust-Command, SHA-256) + Drag & Drop aufs Fenster – **umgesetzt** (Branch `phase-1-belege`):
+  4. Belege ablegen (Rust-Command, SHA-256) + Drag & Drop aufs Fenster – **erledigt** (PR #11):
      `src-tauri/src/belege.rs` (`beleg_pruefen`, `beleg_anhaengen`, `beleg_oeffnen`, `beleg_zeigen`; Ablage
      `<appDataDir>/belege/<JJJJ>/<sha256>.<ext>`, im Dev `belege-dev/`, schreibgeschützt, nie überschrieben),
      Belege in derselben Transaktion wie `buchung_anlegen`/`buchung_aendern`, Frist bis 31.12. (Zahlungsjahr + 8),
      Migration 0005 (Indizes, Trigger: nie löschen, nur Frist verlängern). Dubletten werden angezeigt, nicht blockiert.
      Anhängen geht auch an festgeschriebene Buchungen, nicht an Gegenbuchungen. Erkennung (Betrag/Datum) folgt in Phase 3
-  5. Kunden-Seite mit Verlauf (§6.8)
+  5. Kunden-Seite mit Verlauf (§6.8) – **umgesetzt** (Branch `phase-1-kunden`): Liste (zuletzt da zuerst, Suche, Alle ·
+     Stammkunden · mit Notiz, sortierbar nach Name/Besuche/Zuletzt) und Kunden-Schublade (Kontakt-Links über
+     `link_oeffnen`, Kennzeile, Hinweise, Notiz speichert selbst, Stammdaten, Verlauf, „Neuen Auftrag erfassen“ öffnet die
+     Erfassen-Schublade vorbelegt). Logik in `src/lib/kunden.ts` (Besuch = Quittung/Rechnung bis heute ohne Storno und
+     Entwürfe + Einnahme mit Kunde ohne Beleg; Angebote und Termine nur im Verlauf). `src-tauri/src/kunden.rs`
+     (`kunde_anlegen`, `kunde_aendern`, `kunde_notiz`, `kunde_loeschen`; je eine Transaktion mit Protokoll, Nummer über
+     denselben Weg wie die Erfassen-Schublade). Löschen nur ohne Buchungen, Belege, Termine und Fahrten, sonst Schloss
+     „Löschen ab JJJJ“ (letzte Buchung bzw. letzter Beleg + 10 Jahre); Anonymisieren folgt in Phase 5. Migration 0006
+     (Indizes, Protokoll-Aktion `geloescht`). „Termin eintragen“ folgt mit Phase 3, Kunden in der Suche ⌘K später
   6. Demo-Daten + Einstellungs-Bereich „Daten“ (Demo-Daten, Tectonic-Pfad)
-- **Nächste Migration:** `0006` (ausgelieferte Migrationen nie ändern).
+- **Nächste Migration:** `0007` (ausgelieferte Migrationen nie ändern).
 - **Offen aus Phase 1 (Teil 1+2):** optionale Kategorien (AfA,
   Bewirtung, Geschenke, Homeoffice), Kategorien bearbeiten und EÜR-Zuordnung pro Jahr (braucht eigene Tabelle),
   Firmenlogo (nach der Dateiablage), sichtbare Fehlermeldung statt stillem Abbruch, wenn die Sicherung vor einer

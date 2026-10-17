@@ -23,6 +23,7 @@ use std::path::Path;
 
 use crate::belege;
 use crate::datenbank::{self, db_fehler};
+use crate::kunden;
 use crate::nummern;
 
 /// Eingabe aus der Erfassen-Schublade (src/lib/…). Feldnamen exakt so (snake_case).
@@ -96,7 +97,7 @@ struct Geprueft {
 }
 
 /// Getrimmter Text, leer ⇒ None.
-fn text_oder_nichts(t: &Option<String>) -> Option<String> {
+pub(crate) fn text_oder_nichts(t: &Option<String>) -> Option<String> {
     t.as_deref()
         .map(str::trim)
         .filter(|s| !s.is_empty())
@@ -318,27 +319,6 @@ pub(crate) async fn protokollieren(
     Ok(())
 }
 
-/// Legt einen Kunden mit Namen an (Nummer aus dem Kreis 'kunde') und protokolliert ihn. Gibt (id, nummer) zurück.
-async fn kunde_anlegen(
-    conn: &mut SqliteConnection,
-    name: &str,
-    jahr_heute: i64,
-    zeitpunkt: &str,
-) -> Result<(i64, String), String> {
-    let nummer = nummern::vergeben(conn, "kunde", jahr_heute).await?;
-    let id = sqlx::query("INSERT INTO kunden (nummer, name, erstellt_am) VALUES (?, ?, ?)")
-        .bind(&nummer)
-        .bind(name)
-        .bind(zeitpunkt)
-        .execute(&mut *conn)
-        .await
-        .map_err(db_fehler)?
-        .last_insert_rowid();
-    let neu = zeile_json(conn, "kunden", id).await?;
-    protokollieren(conn, zeitpunkt, "kunden", id, "neu", None, neu.as_ref()).await?;
-    Ok((id, nummer))
-}
-
 /// Kunde der Buchung: vorhandener (muss existieren) oder neu angelegter. (id, nummer, neu?)
 async fn kunde_bestimmen(
     conn: &mut SqliteConnection,
@@ -346,7 +326,8 @@ async fn kunde_bestimmen(
     zeitpunkt: &str,
 ) -> Result<(Option<i64>, Option<String>, bool), String> {
     if let Some(name) = &g.neuer_kunde {
-        let (id, nummer) = kunde_anlegen(conn, name, g.jahr_heute, zeitpunkt).await?;
+        let stamm = kunden::Stammdaten::nur_name(name);
+        let (id, nummer) = kunden::anlegen_in(conn, &stamm, g.jahr_heute, zeitpunkt).await?;
         return Ok((Some(id), Some(nummer), true));
     }
     match g.kunde_id {
@@ -369,7 +350,7 @@ fn feld_text(m: &Map<String, Value>, k: &str) -> Option<String> {
 /// Führt `arbeit` in einer Transaktion aus: Erfolg ⇒ COMMIT, Fehler ⇒ ROLLBACK (nichts bleibt zurück).
 /// BEGIN IMMEDIATE: Die Schreibsperre wird sofort geholt, so kann zwischen dem Lesen des Nummernkreises und dem
 /// UPDATE niemand dazwischenschreiben.
-async fn in_transaktion<T>(
+pub(crate) async fn in_transaktion<T>(
     conn: &mut SqliteConnection,
     arbeit: impl AsyncFnOnce(&mut SqliteConnection) -> Result<T, String>,
 ) -> Result<T, String> {
