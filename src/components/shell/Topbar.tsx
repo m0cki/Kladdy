@@ -1,9 +1,11 @@
 /* Kopfzeile (§6.2): links Seitenleisten-Knopf, Mitte Suche (⌘K), rechts nur Hell/Dunkel · ⚙ (Einstellungsseite).
- * Kein Erfassen-Knopf hier. Die ganze Leiste ist Ziehfläche des Fensters (Knöpfe/Eingaben ausgenommen). */
+ * Kein Erfassen-Knopf hier. Die ganze Leiste ist Ziehfläche des Fensters (Knöpfe/Eingaben ausgenommen).
+ * Nur Entwicklerversion: kleiner Hinweis „Demo“, solange die Demo-Datenbank offen ist (führt zu Einstellungen › Daten). */
 import { forwardRef } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { Moon, Settings, Sun } from 'lucide-react';
-import { EINSTELLUNGEN_PFAD, isEinstellungen } from '../../lib/einstellungen-index';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { FlaskConical, Moon, Settings, Sun } from 'lucide-react';
+import { useDemo } from '../../lib/demo';
+import { EINSTELLUNGEN_PFAD, bereichPfad, isEinstellungen } from '../../lib/einstellungen-index';
 import { START } from '../../lib/navigation';
 import { toggleMode, useEffectiveMode, useUi } from '../../store/ui';
 import { PanelIcon } from '../ui/PanelIcon';
@@ -19,6 +21,7 @@ export const Topbar = forwardRef<HTMLInputElement>(function Topbar(_props, searc
   const mode = useEffectiveMode();
   const sbLabel = collapsed ? 'Seitenleiste ausklappen (⌘\\)' : 'Seitenleiste einklappen (⌘\\)';
   const modeLabel = mode === 'dark' ? 'Hell (⇧⌘L)' : 'Dunkel (⇧⌘L)';
+  const demo = useDemo((s) => s.aktiv);
 
   return (
     <header className="topbar" data-tauri-drag-region="deep">
@@ -37,6 +40,12 @@ export const Topbar = forwardRef<HTMLInputElement>(function Topbar(_props, searc
       </div>
       <Suche ref={searchRef} />
       <div className="tb-actions">
+        {import.meta.env.DEV && demo ? (
+          <Link to={bereichPfad('daten', 'demo-daten')} className="badge warn tb-demo" title="Demo-Daten sind geladen: Einstellungen › Daten">
+            <FlaskConical />
+            Demo
+          </Link>
+        ) : null}
         <button
           type="button"
           className="icon-btn"

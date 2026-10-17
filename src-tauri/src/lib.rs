@@ -4,8 +4,12 @@
 mod belege;
 mod buchungen;
 mod datenbank;
+// Demo-Daten nur in der Entwicklung (`npm run tauri dev`): im Release-Build gibt es weder Modul noch Commands.
+#[cfg(debug_assertions)]
+mod demo;
 mod kunden;
 mod nummern;
+mod tectonic;
 
 use tauri::menu::{Menu, MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{AppHandle, Emitter, Runtime};
@@ -117,7 +121,11 @@ fn ist_entwicklerversion() -> bool {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    // Nur Entwicklung: Demo-Modus aus der Markierung lesen, bevor jemand die Datenbank-URL abfragt.
+    #[cfg(debug_assertions)]
+    let builder = builder.plugin(demo::modus_plugin());
+    builder
         // Datenbank (§5): erst sichern, dann darf das SQL-Plugin migrieren – Reihenfolge nicht vertauschen.
         .plugin(datenbank::sicherungs_plugin())
         .plugin(datenbank::sql_plugin())
@@ -135,12 +143,21 @@ pub fn run() {
             kunden::kunde_aendern,
             kunden::kunde_notiz,
             kunden::kunde_loeschen,
-            kunden::link_oeffnen
+            kunden::link_oeffnen,
+            tectonic::tectonic_suchen,
+            tectonic::tectonic_pfad_pruefen,
+            tectonic::tectonic_pruefen,
+            #[cfg(debug_assertions)]
+            demo::demo_status,
+            #[cfg(debug_assertions)]
+            demo::demo_laden,
+            #[cfg(debug_assertions)]
+            demo::demo_entfernen
         ])
         // Updates aus der App heraus (§3.2): Prüfen/Laden/Installieren und danach Neustart.
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
-        // Dateiauswahl für Belege (⌘O „Beleg importieren“, Klick auf die Dropzone)
+        // Dateiauswahl für Belege (⌘O „Beleg importieren“, Klick auf die Dropzone) und den Tectonic-Pfad
         .plugin(tauri_plugin_dialog::init())
         .menu(build_menu)
         .on_menu_event(|app, event| {

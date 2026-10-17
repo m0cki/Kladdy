@@ -5,6 +5,7 @@
 import { useEffect, useRef } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { watchBelegDrop } from '../../lib/belegablage';
+import { demoStatusLaden } from '../../lib/demo';
 import { runCommand } from '../../lib/commands';
 import { watchFenster } from '../../lib/fenster';
 import { inTauri, onMenu, type MenuId } from '../../lib/menu';
@@ -38,6 +39,10 @@ export function AppShell() {
   useEffect(() => watchBelegDrop(), []);
   // Update-Prüfung beim Start: höchstens einmal am Tag, nur wenn eingeschaltet (§3.2)
   useEffect(() => autoCheckOnStart(), []);
+  // Nur Entwicklerversion: Ist die Demo-Datenbank offen? (Hinweis in der Kopfzeile)
+  useEffect(() => {
+    if (import.meta.env.DEV) void demoStatusLaden().catch(() => undefined);
+  }, []);
 
   // Rückweg aus den Einstellungen merken
   useEffect(() => {
