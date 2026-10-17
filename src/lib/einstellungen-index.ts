@@ -48,7 +48,7 @@ export const BEREICHE: readonly Bereich[] = [
   { id: 'steuern', label: 'Steuern', icon: Landmark },
   { id: 'nummernkreise', label: 'Nummernkreise', icon: Hash },
   { id: 'datensicherung', label: 'Datensicherung', icon: HardDriveDownload, phase: 5, inhalt: 'Sicherungsziel, „Jetzt sichern“ und „Wiederherstellen …“.' },
-  { id: 'daten', label: 'Daten', icon: Database, phase: 1, inhalt: 'Tectonic-Pfad, Demo-Daten laden oder entfernen.' },
+  { id: 'daten', label: 'Daten', icon: Database },
   { id: 'updates', label: 'Updates & Über Kladdy', icon: Info },
 ];
 
@@ -115,9 +115,13 @@ export const EINSTELLUNGEN: readonly EinstellungsEintrag[] = [
     bereich: 'nummernkreise' as const,
     keywords: ['Nummernkreis', 'Muster', 'Nächste Nummer', KREIS_NAMEN[id]],
   })),
+  /* Daten (§3.1, §6.10); Demo-Daten nur in der Entwicklerversion (lib/demo.ts) */
+  { id: 'tectonic', label: 'Tectonic-Pfad', bereich: 'daten', keywords: ['LaTeX', 'PDF', 'Homebrew', 'Programm'] },
+  { id: 'tectonic-pruefen', label: 'Tectonic prüfen', bereich: 'daten', keywords: ['LaTeX', 'PDF', 'Version', 'testen'] },
+  ...(import.meta.env.DEV
+    ? [{ id: 'demo-daten', label: 'Demo-Daten', bereich: 'daten' as const, keywords: ['Beispieldaten', 'Testdaten', 'laden', 'entfernen'] }]
+    : []),
   /* Noch nicht gebaut – springen in den Bereich */
   { id: 'beleg-bei-einnahmen', label: 'Beleg bei Einnahmen', bereich: 'belege', keywords: ['Quittung', 'Rechnung', 'Vorauswahl'] },
   { id: 'datensicherung', label: 'Datensicherung', bereich: 'datensicherung', keywords: ['Backup', 'Sicherung', 'Wiederherstellen', 'USB-Stick', 'iCloud'] },
-  { id: 'tectonic', label: 'Tectonic-Pfad', bereich: 'daten', keywords: ['LaTeX', 'PDF'] },
-  { id: 'demo-daten', label: 'Demo-Daten', bereich: 'daten', keywords: ['Beispieldaten', 'Daten'] },
 ];
