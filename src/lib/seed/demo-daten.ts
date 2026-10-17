@@ -97,6 +97,28 @@ export interface DemoBuchung {
   storno_von: number | null;
 }
 
+/** Wie PlanpostenEingabe in src-tauri/src/liquiditaet.rs. */
+export interface DemoPlanposten {
+  /** nach heute */
+  datum: string;
+  text: string;
+  /** negativ = Ausgabe */
+  betrag_cent: number;
+}
+
+/** Wie WiederkehrendEingabe in src-tauri/src/liquiditaet.rs. */
+export interface DemoWiederkehrend {
+  name: string;
+  betrag_cent: number;
+  typ: 'einnahme' | 'ausgabe';
+  kategorie_id: number | null;
+  rhythmus: 'monatlich' | 'vierteljaehrlich' | 'jaehrlich';
+  /** nächster Termin nach heute */
+  naechstes_datum: string;
+  tag: number;
+  aktiv: boolean;
+}
+
 export interface DemoDaten {
   heute: string;
   firma: Firma;
@@ -104,6 +126,10 @@ export interface DemoDaten {
   belege: DemoBeleg[];
   termine: DemoTermin[];
   buchungen: DemoBuchung[];
+  /** Liquidität: einmalige erwartete Zahlungen */
+  planposten: DemoPlanposten[];
+  /** Liquidität: die festen Kosten von oben als wiederkehrende Posten (die Demo-Buchungen sind bewusst nicht verknüpft) */
+  wiederkehrend: DemoWiederkehrend[];
 }
 
 /** Kategorien aus 0002_standarddaten.sql (feste IDs). */
@@ -748,5 +774,36 @@ export function demoDaten(heute: string, seed: number = DEMO_SEED): DemoDaten {
     };
   });
 
-  return { heute, firma: { ...DEMO_FIRMA }, kunden: kundenAus, belege: belegeAus, termine: termineAus, buchungen: buchungenAus };
+  // Liquidität: Planposten in den nächsten 90 Tagen, feste Kosten ab dem nächsten Termin nach heute
+  const planposten: DemoPlanposten[] = [
+    { datum: plusTage(heute, 19), text: 'Winterreifen Transporter', betrag_cent: -48000 },
+    { datum: plusTage(heute, 33), text: 'Neuer Aufsitzmäher', betrag_cent: -149000 },
+    { datum: plusTage(heute, 56), text: 'Winterdienst-Vertrag Hausverwaltung (Vorauszahlung)', betrag_cent: 60000 },
+  ];
+  const wiederkehrend: DemoWiederkehrend[] = WIEDERKEHREND.map((w) => {
+    const monate: readonly number[] = w.monate ?? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    let y = +heute.slice(0, 4);
+    let m = +heute.slice(5, 7);
+    let naechstes = '';
+    for (let i = 0; i < 24 && !naechstes; i++) {
+      const d = datumIn(y, m, w.tag);
+      if (monate.includes(m) && d > heute) naechstes = d;
+      if (++m > 12) {
+        m = 1;
+        y++;
+      }
+    }
+    return {
+      name: w.text,
+      betrag_cent: w.betrag,
+      typ: 'ausgabe',
+      kategorie_id: w.kat,
+      rhythmus: w.monate ? 'vierteljaehrlich' : 'monatlich',
+      naechstes_datum: naechstes,
+      tag: w.tag,
+      aktiv: true,
+    };
+  });
+
+  return { heute, firma: { ...DEMO_FIRMA }, kunden: kundenAus, belege: belegeAus, termine: termineAus, buchungen: buchungenAus, planposten, wiederkehrend };
 }

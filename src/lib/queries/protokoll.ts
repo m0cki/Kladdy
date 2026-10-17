@@ -7,7 +7,8 @@
  * in seiner Transaktion. Reine Funktionen sind mit Vitest getestet (protokoll.test.ts). */
 import { ausfuehren, zeitstempel, type SqlWert } from '../db';
 
-/** 'geloescht' (Migration 0006): Kunde ohne Bezüge gelöscht (§2.10), nur über Rust (kunden.rs), alt = ganze Zeile. */
+/** 'geloescht' (Migration 0006): Kunde ohne Bezüge gelöscht (§2.10) bzw. Planposten/wiederkehrender Posten gelöscht
+ *  (Planungsdaten, §6.9.2), nur über Rust (kunden.rs, liquiditaet.rs), alt = ganze Zeile. */
 export type ProtokollAktion = 'neu' | 'geaendert' | 'storniert' | 'geloescht_entwurf' | 'geloescht';
 
 /** Tabellen mit INTEGER-ID (protokoll.datensatz_id ist INTEGER NOT NULL). */
@@ -19,7 +20,9 @@ export type ProtokollTabelleId =
   | 'kunden'
   | 'termine'
   | 'kategorien'
-  | 'anlagen';
+  | 'anlagen'
+  | 'planposten'
+  | 'wiederkehrend';
 
 /** Stammdaten mit Textschlüssel (Migration 0003): datensatz_id = 0, Schlüssel in protokoll.schluessel,
  *  z. B. 'firma' (einstellungen), '2026' (steuer_parameter: Jahr), 'rechnung' (nummernkreise). */

@@ -31,6 +31,7 @@ use tauri_plugin_sql::{DbInstances, DbPool};
 
 use crate::buchungen::{datum_lesen, in_transaktion};
 use crate::datenbank::{self, MIGRATIONEN, MigrationsQuelle, db_fehler, url_zu};
+use crate::liquiditaet::{self, PlanpostenEingabe, WiederkehrendEingabe};
 use crate::nummern;
 
 /// Datei der Demo-Datenbank (im selben Ordner wie `DB_DATEI`).
@@ -184,6 +185,12 @@ pub struct DemoDaten {
     pub belege: Vec<DemoBeleg>,
     pub termine: Vec<DemoTermin>,
     pub buchungen: Vec<DemoBuchung>,
+    /// Planposten und wiederkehrende Kosten für die Liquidität (Phase 2), gleiche Form wie die Commands in
+    /// liquiditaet.rs und dort auch geprüft. Fehlen sie, keine.
+    #[serde(default)]
+    pub planposten: Vec<PlanpostenEingabe>,
+    #[serde(default)]
+    pub wiederkehrend: Vec<WiederkehrendEingabe>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -389,6 +396,12 @@ pub fn pruefen(d: &DemoDaten) -> Result<(), String> {
     {
         return Err(format!("Beleg {r} ist bezahlt, aber ohne Buchung."));
     }
+    for (i, p) in d.planposten.iter().enumerate() {
+        liquiditaet::planposten_pruefen(p, heute).map_err(|e| format!("Planposten {i}: {e}"))?;
+    }
+    for (i, w) in d.wiederkehrend.iter().enumerate() {
+        liquiditaet::wiederkehrend_pruefen(w).map_err(|e| format!("Wiederkehrend {i}: {e}"))?;
+    }
     Ok(())
 }
 
@@ -593,6 +606,31 @@ pub async fn fuellen(
             .map_err(db_fehler)?
             .last_insert_rowid();
             buchung_ids.push(id);
+        }
+
+        for p in &d.planposten {
+            let (datum, text, betrag) = liquiditaet::planposten_pruefen(p, heute)?;
+            sqlx::query("INSERT INTO planposten (datum, text, betrag_cent) VALUES (?, ?, ?)")
+                .bind(datum)
+                .bind(text)
+                .bind(betrag)
+                .execute(&mut *tx)
+                .await
+                .map_err(db_fehler)?;
+        }
+        for w in &d.wiederkehrend {
+            let g = liquiditaet::wiederkehrend_pruefen(w)?;
+            liquiditaet::kategorie_pruefen(tx, &g.vorlage).await?;
+            sqlx::query(
+                "INSERT INTO wiederkehrend (vorlage_json, rhythmus, naechstes_datum, aktiv) VALUES (?, ?, ?, ?)",
+            )
+            .bind(Value::Object(g.vorlage).to_string())
+            .bind(g.rhythmus)
+            .bind(g.naechstes_datum)
+            .bind(i64::from(g.aktiv))
+            .execute(&mut *tx)
+            .await
+            .map_err(db_fehler)?;
         }
 
         let mut werte = vec![("firma".to_string(), Value::Object(d.firma.clone()).to_string())];
@@ -919,6 +957,21 @@ mod tests {
                 buchung("2026-0001", "ausgabe", "2026-01-05", 6123),
                 storno,
             ],
+            planposten: vec![PlanpostenEingabe {
+                datum: "2026-11-14".into(),
+                text: "Aufsitzmäher".into(),
+                betrag_cent: -149_000,
+            }],
+            wiederkehrend: vec![WiederkehrendEingabe {
+                name: "Handyvertrag".into(),
+                betrag_cent: 2999,
+                typ: "ausgabe".into(),
+                kategorie_id: Some(4),
+                rhythmus: "monatlich".into(),
+                naechstes_datum: "2026-10-20".into(),
+                tag: None,
+                aktiv: true,
+            }],
         }
     }
 
@@ -998,6 +1051,18 @@ mod tests {
                 .connect()
                 .await
                 .unwrap();
+            // Planposten und wiederkehrende Kosten für die Liquidität
+            let plan: i64 =
+                sqlx::query_scalar("SELECT count(*) FROM planposten WHERE betrag_cent = -149000")
+                    .fetch_one(&mut c)
+                    .await
+                    .unwrap();
+            let wk: String = sqlx::query_scalar("SELECT vorlage_json FROM wiederkehrend")
+                .fetch_one(&mut c)
+                .await
+                .unwrap();
+            assert_eq!(plan, 1);
+            assert!(wk.contains("\"tag\":20"), "{wk}");
             // Nummernkreise zählen lückenlos weiter
             let kreise: Vec<(String, i64, i64)> =
                 sqlx::query_as("SELECT id, jahr, naechste FROM nummernkreise WHERE id IN ('buchung','kunde','quittung','rechnung') ORDER BY id")
@@ -1175,6 +1240,14 @@ mod tests {
             (
                 "Position",
                 Box::new(|d| d.belege[1].positionen[0].menge = f64::NAN),
+            ),
+            (
+                "Planposten 0",
+                Box::new(|d| d.planposten[0].datum = "2026-10-17".into()),
+            ),
+            (
+                "Wiederkehrend 0",
+                Box::new(|d| d.wiederkehrend[0].rhythmus = "woechentlich".into()),
             ),
         ];
         for (erwartet, aendern) in faelle {

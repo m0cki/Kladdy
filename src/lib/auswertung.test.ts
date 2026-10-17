@@ -41,6 +41,8 @@ function b(x: Partial<AuswertungBuchung> = {}): AuswertungBuchung {
     zahlungsart: 'bar',
     rechnung_id: null,
     storno_von_id: null,
+    wiederkehrend_id: null,
+    rechnung_art: null,
     belege_anzahl: 1,
     storniert: 0,
     ...x,
