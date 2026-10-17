@@ -902,8 +902,8 @@ Abschnitte: **Belege** (Beleg bei Einnahmen: Quittung | Rechnung, Standard Quitt
 Belege bei Terminen) · **Firma** (Name, Inhaber, Adresse, Kontakt, Steuernummer/USt-IdNr./KU-ID, Bankverbindung für Rechnungen/GiroCode,
 PayPal-Adresse, **Firmenlogo**, siehe unten) · **Steuern** (Modus KU/Regel, Kennwerte pro Jahr, Kategorien, EÜR-Zuordnung) · **Nummernkreise** (Muster
 mit Vorschau) · **Darstellung** (Hell/Dunkel, Theme-Presets, Akzentfarbe, Farbton, Radius, Schriftgröße, Dichte, Bewegung, Glas,
-Aurora, Plus/Minus-Farben, Monospace-Zahlen) · **Datensicherung** (siehe unten) · **Daten** (Tectonic-Pfad, Demo-Daten
-laden/entfernen) · **Über Kladdy** (Version, „Nach Updates suchen …“, Haftungs- und Datenhinweis, Lizenzen).
+Aurora, Plus/Minus-Farben, Monospace-Zahlen) · **Datensicherung** (siehe unten) · **Daten** (Tectonic-Pfad; Demo-Daten
+laden/entfernen nur in der Entwicklerversion `npm run tauri dev`, nie in der installierten App) · **Über Kladdy** (Version, „Nach Updates suchen …“, Haftungs- und Datenhinweis, Lizenzen).
 
 **Datensicherung** (im Prototyp umgesetzt, Ziel dort simuliert): Umschalter **„Sicherung speichern auf: Diesem Mac · USB-Stick ·
 iCloud Drive“** (in der App: Ordner wählen), darunter ein Statuskasten, dann „Jetzt sichern“ und „Wiederherstellen …“.
@@ -1651,7 +1651,7 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
      Belege in derselben Transaktion wie `buchung_anlegen`/`buchung_aendern`, Frist bis 31.12. (Zahlungsjahr + 8),
      Migration 0005 (Indizes, Trigger: nie löschen, nur Frist verlängern). Dubletten werden angezeigt, nicht blockiert.
      Anhängen geht auch an festgeschriebene Buchungen, nicht an Gegenbuchungen. Erkennung (Betrag/Datum) folgt in Phase 3
-  5. Kunden-Seite mit Verlauf (§6.8) – **umgesetzt** (Branch `phase-1-kunden`): Liste (zuletzt da zuerst, Suche, Alle ·
+  5. Kunden-Seite mit Verlauf (§6.8) – **umgesetzt** (PR #12, Branch `phase-1-kunden`): Liste (zuletzt da zuerst, Suche, Alle ·
      Stammkunden · mit Notiz, sortierbar nach Name/Besuche/Zuletzt) und Kunden-Schublade (Kontakt-Links über
      `link_oeffnen`, Kennzeile, Hinweise, Notiz speichert selbst, Stammdaten, Verlauf, „Neuen Auftrag erfassen“ öffnet die
      Erfassen-Schublade vorbelegt). Logik in `src/lib/kunden.ts` (Besuch = Quittung/Rechnung bis heute ohne Storno und
@@ -1660,7 +1660,18 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
      denselben Weg wie die Erfassen-Schublade). Löschen nur ohne Buchungen, Belege, Termine und Fahrten, sonst Schloss
      „Löschen ab JJJJ“ (letzte Buchung bzw. letzter Beleg + 10 Jahre); Anonymisieren folgt in Phase 5. Migration 0006
      (Indizes, Protokoll-Aktion `geloescht`). „Termin eintragen“ folgt mit Phase 3, Kunden in der Suche ⌘K später
-  6. Demo-Daten + Einstellungs-Bereich „Daten“ (Demo-Daten, Tectonic-Pfad)
+  6. Demo-Daten + Einstellungs-Bereich „Daten“ (Demo-Daten, Tectonic-Pfad) – **umgesetzt** (Branch `phase-1-demo-daten`):
+     Demo-Daten **nur in der Entwicklerversion** (Debug-Build: Rust-Modul `src-tauri/src/demo.rs` mit `demo_status`,
+     `demo_laden`, `demo_entfernen` nur dort übersetzt und registriert; Oberfläche nur bei `import.meta.env.DEV`, der
+     Generator wird dynamisch importiert und fehlt im Release-Bundle). Eigene Datenbankdatei `kladdy-dev-demo.db` neben
+     `kladdy-dev.db`, Belege im Demo-Modus in `belege-dev-demo/`, Umschalter = Markierungsdatei `demo-aktiv-dev`; die
+     echte Datei wird nie beschrieben, die Sicherung vor Migrationen gilt weiter nur ihr. Generator
+     `src/lib/seed/demo-daten.ts` (deterministisch, relativ zu heute: Vorjahr + laufendes Jahr, ca. 450 Buchungen und
+     220 Kunden, Quittungen/Rechnungen mit Schnappschuss, Termine, zwei Stornos, KU knapp unter der Grenze); Rust prüft
+     alles, vergibt die Nummern über die echten Nummernkreise und füllt die frisch migrierte Datei in einer Transaktion
+     (ohne Protokoll je Zeile, nichts festgeschrieben). Tectonic: `src-tauri/src/tectonic.rs` (`tectonic_finden` in der
+     Reihenfolge aus §3.1, für `compile_latex` wiederverwendbar; `tectonic_suchen`, `tectonic_pfad_pruefen`,
+     `tectonic_pruefen` mit `--version` und Zeitlimit), eigener Pfad in `einstellungen['tectonic_pfad']`
 - **Nächste Migration:** `0007` (ausgelieferte Migrationen nie ändern).
 - **Offen aus Phase 1 (Teil 1+2):** optionale Kategorien (AfA,
   Bewirtung, Geschenke, Homeoffice), Kategorien bearbeiten und EÜR-Zuordnung pro Jahr (braucht eigene Tabelle),

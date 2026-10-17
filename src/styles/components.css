@@ -463,6 +463,10 @@ input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 7px; }
 .tb-gear.active { background: var(--accent-soft); color: var(--accent); }
 .tb-dot { position: absolute; top: 8px; right: 8px; width: 8px; height: 8px; border-radius: 50%; background: var(--warn); box-shadow: 0 0 0 2px var(--bg); }
 .tb-dot[hidden] { display: none; }
+/* Hinweis „Demo“ in der Kopfzeile (nur Entwicklerversion, Demo-Datenbank offen) */
+.tb-demo { margin-right: 4px; text-decoration: none; transition: background .2s; }
+.tb-demo:hover { background: color-mix(in oklab, var(--warn) 28%, transparent); }
+.tb-demo:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .themes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 .theme-sw { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 6px; border-radius: 14px; border: 1px solid transparent; transition: border-color .2s, transform .25s var(--spring), background .2s; }
 .theme-sw:hover { transform: translateY(-2px); background: var(--hover); }
