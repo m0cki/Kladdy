@@ -16,6 +16,7 @@ import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { UpdateNotesDrawer } from './UpdateNotesDrawer';
 import { ErfassenSchublade } from '../erfassen/ErfassenSchublade';
+import { KundeSchublade } from '../kunden/KundeSchublade';
 import { BelegDropOverlay } from '../belege/BelegDropOverlay';
 
 export function AppShell() {
@@ -95,6 +96,7 @@ export function AppShell() {
       </div>
       <UpdateNotesDrawer />
       <ErfassenSchublade />
+      <KundeSchublade />
       <BelegDropOverlay />
       <Toasts />
     </>

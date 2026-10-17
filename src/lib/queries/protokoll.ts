@@ -7,7 +7,8 @@
  * in seiner Transaktion. Reine Funktionen sind mit Vitest getestet (protokoll.test.ts). */
 import { ausfuehren, zeitstempel, type SqlWert } from '../db';
 
-export type ProtokollAktion = 'neu' | 'geaendert' | 'storniert' | 'geloescht_entwurf';
+/** 'geloescht' (Migration 0006): Kunde ohne Bezüge gelöscht (§2.10), nur über Rust (kunden.rs), alt = ganze Zeile. */
+export type ProtokollAktion = 'neu' | 'geaendert' | 'storniert' | 'geloescht_entwurf' | 'geloescht';
 
 /** Tabellen mit INTEGER-ID (protokoll.datensatz_id ist INTEGER NOT NULL). */
 export type ProtokollTabelleId =
@@ -35,7 +36,7 @@ export type ProtokollEintrag = ProtokollZiel & {
   aktion: ProtokollAktion;
   /** Stand vorher (bei 'neu' leer) */
   alt?: Record<string, unknown> | null;
-  /** Stand nachher (bei 'geloescht_entwurf' leer) */
+  /** Stand nachher (bei 'geloescht_entwurf' und 'geloescht' leer) */
   neu?: Record<string, unknown> | null;
   /** Standard: jetzt (zeitstempel()) */
   zeitpunkt?: string;
@@ -61,7 +62,9 @@ export function protokollSql(e: ProtokollEintrag): { sql: string; werte: SqlWert
   if (e.aktion === 'neu' && (hatAlt || !hatNeu)) throw new Error('Protokoll „neu“: nur neu, kein alt');
   if (e.aktion === 'geaendert' && (!hatAlt || !hatNeu)) throw new Error('Protokoll „geaendert“: alt und neu angeben');
   if (e.aktion === 'storniert' && !hatAlt && !hatNeu) throw new Error('Protokoll „storniert“: alt oder neu angeben');
-  if (e.aktion === 'geloescht_entwurf' && (!hatAlt || hatNeu)) throw new Error('Protokoll „geloescht_entwurf“: nur alt, kein neu');
+  if ((e.aktion === 'geloescht_entwurf' || e.aktion === 'geloescht') && (!hatAlt || hatNeu)) {
+    throw new Error(`Protokoll „${e.aktion}“: nur alt, kein neu`);
+  }
   return {
     sql:
       'INSERT INTO protokoll (zeitpunkt, tabelle, datensatz_id, aktion, alt_json, neu_json, schluessel) VALUES ($1, $2, $3, $4, $5, $6, $7)',

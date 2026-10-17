@@ -65,6 +65,11 @@ pub const MIGRATIONEN: &[MigrationsDatei] = &[
         beschreibung: "belege",
         sql: include_str!("../migrations/0005_belege.sql"),
     },
+    MigrationsDatei {
+        version: 6,
+        beschreibung: "kunden",
+        sql: include_str!("../migrations/0006_kunden.sql"),
+    },
 ];
 
 /// Verbindungs-URL, wie sie das Plugin und `Database.load` erwarten.
@@ -671,6 +676,115 @@ mod tests {
                     .unwrap();
             assert_eq!((pfad.as_str(), bis.as_str()), ("2026/ab.pdf", "2035-12-31"));
         });
+    }
+
+    #[test]
+    fn migration_0006_behaelt_das_protokoll() {
+        let ordner = testordner("protokoll-0006");
+        let db = ordner.join("kladdy.db");
+        tauri::async_runtime::block_on(async {
+            // Stand vor 0006 mit zwei Protokolleinträgen (einer mit Textschlüssel aus 0003)
+            migrieren(&db, 5).await;
+            let mut c = verbinden(&db).await;
+            sqlx::query(
+                "INSERT INTO protokoll (id, zeitpunkt, tabelle, datensatz_id, aktion, alt_json, neu_json, schluessel) VALUES
+                   (7, '2026-10-13T20:15:00Z', 'kunden', 3, 'neu', NULL, '{\"name\":\"Anna\"}', NULL),
+                   (9, '2026-10-14T08:00:00Z', 'nummernkreise', 0, 'geaendert', '{\"a\":1}', '{\"a\":2}', 'rechnung')",
+            )
+            .execute(&mut c)
+            .await
+            .unwrap();
+            assert!(
+                sqlx::query("INSERT INTO protokoll (zeitpunkt, tabelle, datensatz_id, aktion) VALUES ('x', 'kunden', 3, 'geloescht')")
+                    .execute(&mut c)
+                    .await
+                    .is_err(),
+                "vor 0006 gibt es 'geloescht' noch nicht"
+            );
+            c.close().await.unwrap();
+
+            migrieren(&db, MIGRATIONEN.len()).await;
+            let mut c = verbinden(&db).await;
+            type Zeile = (
+                i64,
+                String,
+                String,
+                i64,
+                String,
+                Option<String>,
+                Option<String>,
+                Option<String>,
+            );
+            let zeilen: Vec<Zeile> = sqlx::query_as(
+                "SELECT id, zeitpunkt, tabelle, datensatz_id, aktion, alt_json, neu_json, schluessel FROM protokoll ORDER BY id",
+            )
+            .fetch_all(&mut c)
+            .await
+            .unwrap();
+            assert_eq!(
+                zeilen,
+                vec![
+                    (
+                        7,
+                        "2026-10-13T20:15:00Z".into(),
+                        "kunden".into(),
+                        3,
+                        "neu".into(),
+                        None,
+                        Some("{\"name\":\"Anna\"}".into()),
+                        None
+                    ),
+                    (
+                        9,
+                        "2026-10-14T08:00:00Z".into(),
+                        "nummernkreise".into(),
+                        0,
+                        "geaendert".into(),
+                        Some("{\"a\":1}".into()),
+                        Some("{\"a\":2}".into()),
+                        Some("rechnung".into())
+                    ),
+                ]
+            );
+            // neue Aktion erlaubt, Unbekanntes weiter abgelehnt; IDs laufen weiter
+            let id = sqlx::query("INSERT INTO protokoll (zeitpunkt, tabelle, datensatz_id, aktion, alt_json) VALUES ('x', 'kunden', 3, 'geloescht', '{}')")
+                .execute(&mut c)
+                .await
+                .unwrap()
+                .last_insert_rowid();
+            assert_eq!(id, 10);
+            assert!(
+                sqlx::query("INSERT INTO protokoll (zeitpunkt, tabelle, datensatz_id, aktion) VALUES ('x', 'kunden', 3, 'weg')")
+                    .execute(&mut c)
+                    .await
+                    .is_err()
+            );
+            let indizes: Vec<String> = sqlx::query_scalar(
+                "SELECT name FROM sqlite_master WHERE type = 'index' AND name IN
+                   ('rechnungen_kunde_id', 'termine_kunde_id', 'fahrten_kunde_id', 'buchungen_rechnung_id') ORDER BY name",
+            )
+            .fetch_all(&mut c)
+            .await
+            .unwrap();
+            assert_eq!(
+                indizes,
+                vec![
+                    "buchungen_rechnung_id",
+                    "fahrten_kunde_id",
+                    "rechnungen_kunde_id",
+                    "termine_kunde_id"
+                ]
+            );
+            let tabellen: i64 = sqlx::query_scalar(
+                "SELECT count(*) FROM sqlite_master WHERE name = 'protokoll_neu'",
+            )
+            .fetch_one(&mut c)
+            .await
+            .unwrap();
+            assert_eq!(tabellen, 0);
+            c.close().await.unwrap();
+        });
+        let _ = std::fs::remove_dir_all(&ordner);
     }
 
     #[test]

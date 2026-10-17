@@ -4,6 +4,7 @@
 mod belege;
 mod buchungen;
 mod datenbank;
+mod kunden;
 mod nummern;
 
 use tauri::menu::{Menu, MenuBuilder, MenuItemBuilder, SubmenuBuilder};
@@ -129,7 +130,12 @@ pub fn run() {
             belege::beleg_pruefen,
             belege::beleg_anhaengen,
             belege::beleg_oeffnen,
-            belege::beleg_zeigen
+            belege::beleg_zeigen,
+            kunden::kunde_anlegen,
+            kunden::kunde_aendern,
+            kunden::kunde_notiz,
+            kunden::kunde_loeschen,
+            kunden::link_oeffnen
         ])
         // Updates aus der App heraus (§3.2): Prüfen/Laden/Installieren und danach Neustart.
         .plugin(tauri_plugin_updater::Builder::new().build())
