@@ -1720,8 +1720,8 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
   im Dev nie installieren (Details §3.2 Punkt 5). v1.0.1 veröffentlicht (15.10.2026), Update von 1.0.0 aus getestet
   (noch mit dem alten Ablauf der 1.0.0); den neuen Ablauf zeigt erst das nächste Update ab 1.0.1.
 - **Installation per Terminal** statt Download-Seite (eigener kleiner PR): `README.md` mit Befehl,
-  `scripts/installieren.sh` (§3.2). Die Download-Seite (GitHub Pages) bleibt für Phase 6 offen, bis Impressum und
-  Datenschutz ausgefüllt sind.
+  `scripts/installieren.sh` (§3.2). Die Download-Seite (GitHub Pages) ist nach Phase 7 verschoben (optional,
+  vielleicht später).
 
 ### Phase 0 – Grundgerüst & Design
 > Setze Phase 0 aus `ANLEITUNG.md` um: `git init`; Tauri-2-Projekt mit React + TypeScript + Vite (`npm create tauri-app@latest`);
@@ -1804,14 +1804,14 @@ am ⚙, auf einem USB-Stick ⇒ keine Warnung · Kunde mit Buchung von 2014 läs
 > Tectonic als Sidecar bündeln; `tauri-plugin-updater` + `tauri-plugin-process` mit Update-Schlüssel, `createUpdaterArtifacts`,
 > Endpoint auf `latest.json`; Update-Prüfung beim Start (max. 1×/Tag) und im Menü „Nach Updates suchen …“, Toast mit
 > „Was ist neu“, Backup vor dem Update, Fortschritt, Neustart; GitHub-Action `tauri-action`, die bei einem Versions-Tag
-> `.dmg`, Update-Paket und `latest.json` als Release veröffentlicht; `minimumSystemVersion` 14.0; Download-Seite aus
-> `referenz/download-seite/` nach `docs/` übernehmen (GitHub Pages, §3.2); „Über Kladdy“ mit Lizenzen und
+> `.dmg`, Update-Paket und `latest.json` als Release veröffentlicht; `minimumSystemVersion` 14.0; Installationsbefehl im `README.md` (`scripts/installieren.sh`, §3.2, erledigt);
+> „Über Kladdy“ mit Lizenzen und
 > Willkommens-Dialog beim ersten Start (§6.10); `LICENSE` (MIT). Prüfe die Schritte gegen die aktuelle Tauri-Doku.
 
 **Abnahme:** `.dmg` auf einem zweiten Mac (oder neuem Benutzerkonto) installierbar und nach einmaliger Freigabe startbar ·
 PDF-Erzeugung funktioniert dort ohne Homebrew · Version 1.0.1 veröffentlicht ⇒ 1.0.0 meldet das Update, installiert es und
-startet neu · alle Daten sind nach dem Update noch da · ein manipuliertes Update-Paket wird abgelehnt · die Download-Seite
-zeigt die neue Version und verlinkt die `.dmg` direkt.
+startet neu · alle Daten sind nach dem Update noch da · ein manipuliertes Update-Paket wird abgelehnt · der
+Installationsbefehl aus dem `README.md` installiert die neue Version.
 
 ### Phase 7 – Komfort (optional, einzeln beauftragen)
 - **DATEV-Export** (§2.9) für den Steuerberater: Buchungsstapel-CSV + Belege als ZIP, Kontenzuordnung je Kategorie
@@ -1829,6 +1829,9 @@ zeigt die neue Version und verlinkt die `.dmg` direkt.
 - **Ziele:** Monatsumsatz-Ziel als Fortschrittsring im Überblick der Auswertung
 - **App-Sperre** mit Touch ID / Passwort, verschlüsselte Backups
 - **Notarisierung** mit Apple-Entwicklerkonto, damit die App ohne „Dennoch öffnen“ startet (§3.2)
+- **Download-Seite** (GitHub Pages, vielleicht später): `referenz/download-seite/` nach `docs/` übernehmen,
+  `KONFIG.github` auf `m0cki/Kladdy`, Impressum und Datenschutz ausfüllen, Settings → Pages (§3.2). Bis dahin
+  reicht der Installationsbefehl im `README.md`
 
 ---
 
