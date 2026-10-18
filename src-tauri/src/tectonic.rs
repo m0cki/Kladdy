@@ -161,7 +161,7 @@ pub fn version(pfad: &Path, zeitlimit: Duration) -> Result<String, String> {
 /* ---------- Commands ---------- */
 
 /// `tectonic_pfad` aus der aktiven Datenbank (JSON-Text: String oder null).
-async fn eingestellter_pfad(instanzen: &DbInstances) -> Result<Option<PathBuf>, String> {
+pub(crate) async fn eingestellter_pfad(instanzen: &DbInstances) -> Result<Option<PathBuf>, String> {
     let mut c = verbindung(instanzen).await?;
     let wert: Option<String> =
         sqlx::query_scalar("SELECT wert FROM einstellungen WHERE schluessel = 'tectonic_pfad'")

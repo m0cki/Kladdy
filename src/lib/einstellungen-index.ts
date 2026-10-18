@@ -118,6 +118,7 @@ export const EINSTELLUNGEN: readonly EinstellungsEintrag[] = [
   /* Daten (§3.1, §6.10); Demo-Daten nur in der Entwicklerversion (lib/demo.ts) */
   { id: 'tectonic', label: 'Tectonic-Pfad', bereich: 'daten', keywords: ['LaTeX', 'PDF', 'Homebrew', 'Programm'] },
   { id: 'tectonic-pruefen', label: 'Tectonic prüfen', bereich: 'daten', keywords: ['LaTeX', 'PDF', 'Version', 'testen'] },
+  { id: 'testbeleg', label: 'Testbeleg erzeugen', bereich: 'daten', keywords: ['PDF', 'LaTeX', 'Rechnung', 'Quittung', 'Vorschau', 'Probe'] },
   ...(import.meta.env.DEV
     ? [{ id: 'demo-daten', label: 'Demo-Daten', bereich: 'daten' as const, keywords: ['Beispieldaten', 'Testdaten', 'laden', 'entfernen'] }]
     : []),

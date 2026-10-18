@@ -1731,6 +1731,45 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
      `beleg: 'quittung' | 'rechnung'` vorbelegen. **Phase 4:** Kennzahlen-Seite wertet `?k=` aus, Wert rechts zeigen.
      Keine Migration nötig
 - **Phase 2 abgeschlossen.** Weiter mit **Phase 3** (Belege, Baukasten-Vorlagen, PDF, GiroCode, Termine).
+- **Phase 3 in Teilen (je ein PR):**
+  1. Vorlagen-Fundament + PDF (§7.0–7.6) – **erledigt (Branch `phase-3-vorlagen-fundament`)**: Belegdokument
+     `BelegDokument` in `src/lib/vorlagen/dokument.ts` (Art, Nummer oder null = Entwurf, Daten, Kunden-Schnappschuss
+     mit ID, Positionen mit Menge × Einzelpreis in Cent, kaufmännisch gerundet, Zahlungsweg, `quittiert`, Eigenbeleg-Grund,
+     Firmen-Schnappschuss, USt-Modus) mit Anzeige-Helfern und den 24 Platzhaltern. Bausteine-Katalog
+     `src/lib/vorlagen/bausteine.ts` (19 Typen, Felder und Standardwerte wie im Prototyp, `bausteineAusJson` für das
+     spätere `bloecke_json`). **Standardvorlagen liegen im Code** (`src/lib/vorlagen/standard.ts`): ein Update kann sie
+     verbessern, ohne Migration; die Tabelle `vorlagen` hält ab Teil 5 nur eigene Kopien, ausgestellte Belege frieren
+     ihre Bausteine im Schnappschuss ein. Format je Art: Rechnung/Angebot A4, Quittung/Eigenbeleg A5 quer.
+     Pflichtangaben-Check `src/lib/vorlagen/pflicht.ts` (§2.3; prüft Daten und gedruckte Bausteine, z. B. ohne
+     Baustein „Steuerhinweis (§ 19)“ rot; Quittung bis Kennwert `kleinbetragsrechnung_cent` ohne Kundenpflicht;
+     Regelbesteuerung meldet „Steuersatz und Steuerbetrag“ als fehlend, bis Belege mit USt gebaut sind). Betrag in
+     Worten `src/lib/latex/zahl-in-worten.ts`. HTML-Vorschau `src/components/belege/Blatt.tsx` (`Blatt`,
+     `BlattVorschau` skaliert auf die Breite) + `src/styles/blatt.css` (Papierfarben als Variablen auf `.sheet`, Akzent
+     aus dem App-Akzent, Wasserzeichen ENTWURF/STORNIERT, Falz- und Lochmarken auf A4, Fußzeile/Unterschrift unten).
+     LaTeX: `src/lib/latex/escape.ts` (alle Nutzerwerte, auch Texte aus Bausteinen; `"` wegen babel, Ligaturen
+     getrennt), `daten.ts` (daten.tex: alle Makros aus §7.4, immer definiert, dazu Hilfsmakros wie `\KundeAnzeige`,
+     `\AnzahlPositionen`, `\Quittiert`; `\Positionen` als `\Position{}{}{}{}{}{}`-Folge, Beträge `1.234,50\,€`),
+     `vorlage.ts` (main.tex aus den Bausteinen: Präambel A4 bzw. `a5paper, landscape`, nur geometry/fontspec/babel/
+     xcolor/graphicx/etoolbox/eso-pic, Helvetica Neue oder TeX Gyre Heros, keine Belegdaten in main.tex, Platzhalter ⇒
+     Makros, leere Bausteine per `\ifdefempty` weggelassen, Abstände wie blatt.css, Zeilenbereiche je Baustein für
+     Fehlermeldungen). Rust `src-tauri/src/latex.rs`: `compile_latex` (frischer Temp-Ordner 0700, Bildnamen nur
+     `[A-Za-z0-9_-]` + png/jpg/jpeg/pdf, `tectonic -X compile main.tex --untrusted --keep-logs` ohne Shell und mit
+     `TECTONIC_UNTRUSTED_MODE=1`, 60 s Zeitlimit, ein neuer Auftrag beendet den laufenden, PDF roh als ArrayBuffer,
+     Fehler mit Datei/Zeile/Meldung aus Ausgabe und main.log) und `pdf_oeffnen` (PDF aus `<App-Cache>/pdf/`);
+     Frontend `src/lib/latex/kompilieren.ts`. Einstellungen › Daten › „Testbeleg erzeugen“: Rechnung oder Quittung an
+     „Müller & Söhne 100%“ (Entwurf, keine Nummer, Sonderzeichen in den Positionen) setzen und öffnen, Hinweis auf den
+     ersten Paket-Download, lesbare Fehler mit Baustein und Zeile, HTML-Vorschau zum Vergleich. **Offen:** Logo im Kopf
+     (Makro `\LogoDatei` und Bild-Übergabe sind vorbereitet, es fehlt die Logo-Ablage aus Phase 1), GiroCode (Teil 6),
+     Bausteine bearbeiten (Teil 5), Beleg-Maske (Teil 2); ein echter Tectonic-Lauf war beim Bauen nicht möglich
+     (Tectonic nicht installiert) – beim ersten Testbeleg prüfen, ob PDF und HTML-Vorschau übereinstimmen.
+     Keine Migration nötig
+  2. Rechnungen & Quittungen (§6.6): Liste, Beleg-Maske, Finalisieren/Status/Storno als Rust-Transaktion, Eigenbeleg
+     buchen, Angebot, Badge „überfällig“
+  3. Erfassen-Schublade „Beleg zum Ertrag“ (§6.4) + Vorbelegung `beleg` (Befehlspalette, native Menüs, „Neu“-Menü)
+  4. Termine (§6.5)
+  5. Vorlagen-Seite als Baukasten (§7.0, Prototyp `#/vorlagen`)
+  6. GiroCode (EPC-QR, §6.6)
+  7. Beleg-Drop mit Erkennung (pdf.js, Regeln aus `prototyp/js/beleg.js`)
 - **Offen aus Phase 1 (Teil 1+2):** optionale Kategorien (AfA,
   Bewirtung, Geschenke, Homeoffice), Kategorien bearbeiten und EÜR-Zuordnung pro Jahr (braucht eigene Tabelle),
   Firmenlogo (nach der Dateiablage), sichtbare Fehlermeldung statt stillem Abbruch, wenn die Sicherung vor einer

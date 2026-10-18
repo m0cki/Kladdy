@@ -1,12 +1,34 @@
-/* Einstellungen › Daten (§6.10, §3.1): Tectonic-Pfad für den PDF-Satz und (nur Entwicklerversion) Demo-Daten.
+/* Einstellungen › Daten (§6.10, §3.1, §7.3): Tectonic-Pfad für den PDF-Satz, Testbeleg und (nur Entwicklerversion) Demo-Daten.
  * - Tectonic: Rust sucht in der Reihenfolge aus §3.1 (mitgeliefert, Homebrew, eigener Pfad) und prüft mit `--version`.
  *   Ein eigener Pfad wird vor dem Speichern geprüft (vorhandene, ausführbare Datei); „Automatisch“ löscht ihn wieder.
+ * - Testbeleg (§7.3, Abnahme Phase 3): Rechnung oder Quittung an „Müller & Söhne 100%“ aus der Standardvorlage über
+ *   compile_latex setzen und in der Vorschau-App öffnen; daneben dieselbe HTML-Vorschau zum Vergleich. Entwurf ohne
+ *   Nummer, es wird nichts gespeichert.
  * - Demo-Daten: nur bei `import.meta.env.DEV` (lib/demo.ts). Laden und Entfernen fragen per Warn-Toast nach und laden
  *   danach die Oberfläche neu, weil die App dann eine andere Datenbankdatei öffnet. */
-import { useState } from 'react';
-import { CircleCheck, Database, FlaskConical, FolderOpen, LoaderCircle, PackageSearch, RotateCcw, Stethoscope, Trash2, TriangleAlert } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  CircleCheck,
+  Database,
+  Eye,
+  EyeOff,
+  FileText,
+  FlaskConical,
+  FolderOpen,
+  LoaderCircle,
+  PackageSearch,
+  RotateCcw,
+  Stethoscope,
+  Trash2,
+  TriangleAlert,
+} from 'lucide-react';
+import { BlattVorschau } from '../../components/belege/Blatt';
+import { Seg } from '../../components/ui/Seg';
 import { DEMO_MOEGLICH, demoEntfernen, demoLaden, neuStarten, useDemo } from '../../lib/demo';
+import type { Firma } from '../../lib/firma';
+import { KompilierFehler, belegTex, fehlerZeilen, kompiliere, pdfOeffnen } from '../../lib/latex/kompilieren';
 import { inTauri } from '../../lib/menu';
+import { ladeFirma, ladeUstModus, type UstModus } from '../../lib/queries/einstellungen';
 import {
   QUELLE_TEXT,
   tectonicAutomatisch,
@@ -17,6 +39,9 @@ import {
   type TectonicPruefung,
   type TectonicStand,
 } from '../../lib/tectonic';
+import { BEISPIEL_FIRMA, firmaOderBeispiel, testbeleg } from '../../lib/vorlagen/beispiel';
+import { standardVorlage } from '../../lib/vorlagen/standard';
+import { heute } from '../../lib/zeitraum';
 import { useUi } from '../../store/ui';
 import { Ladeansicht, fehlerText, useLaden } from './Laden';
 import { SetCard, SetRow } from './SetRow';
@@ -150,7 +175,137 @@ function TectonicKarte({ stand, neuLaden }: { stand: TectonicStand; neuLaden: ()
           <p className="hint">Startet Tectonic einmal mit „--version“, ohne etwas zu setzen.</p>
         )}
       </SetRow>
+
+      <Testbeleg gefunden={!!fund} />
     </SetCard>
+  );
+}
+
+/* ---------- Testbeleg ---------- */
+
+type TestArt = 'rechnung' | 'quittung';
+const TEST_ARTEN = [
+  { value: 'rechnung', label: 'Rechnung (A4)' },
+  { value: 'quittung', label: 'Quittung (A5 quer)' },
+] as const;
+
+type Lauf =
+  | { status: 'laeuft' }
+  | { status: 'ok'; sekunden: number; kb: number; oeffnenFehler: string | null }
+  | { status: 'fehler'; meldung: string; zeilen: string[]; log: string }
+  | null;
+
+const ZAHL = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 1 });
+
+function Testbeleg({ gefunden }: { gefunden: boolean }) {
+  const accent = useUi((s) => s.settings.accent);
+  const [art, setArt] = useState<TestArt>('rechnung');
+  const [basis, setBasis] = useState<{ firma: Firma; ust: UstModus; eigen: boolean } | null>(null);
+  const [lauf, setLauf] = useState<Lauf>(null);
+  const [vorschau, setVorschau] = useState(false);
+
+  useEffect(() => {
+    let weg = false;
+    Promise.all([ladeFirma(), ladeUstModus()]).then(
+      ([f, ust]) => {
+        const firma = firmaOderBeispiel(f);
+        if (!weg) setBasis({ firma, ust, eigen: firma !== BEISPIEL_FIRMA });
+      },
+      () => {
+        if (!weg) setBasis({ firma: BEISPIEL_FIRMA, ust: 'klein', eigen: false });
+      },
+    );
+    return () => {
+      weg = true;
+    };
+  }, []);
+
+  const doc = useMemo(() => (basis ? testbeleg(art, basis.firma, basis.ust, heute()) : null), [art, basis]);
+  const bausteine = useMemo(() => standardVorlage(art), [art]);
+
+  const erzeugen = async () => {
+    if (!doc) return;
+    setLauf({ status: 'laeuft' });
+    const start = performance.now();
+    const tex = belegTex(doc, bausteine, accent);
+    const name = `Kladdy-Testbeleg-${art === 'rechnung' ? 'Rechnung' : 'Quittung'}.pdf`;
+    let pdf: Uint8Array;
+    try {
+      pdf = await kompiliere({ main: tex.main.tex, daten: tex.daten }, name);
+    } catch (e) {
+      if (e instanceof KompilierFehler) {
+        if (e.abgebrochen) return;
+        setLauf({ status: 'fehler', meldung: e.message, zeilen: fehlerZeilen(e, tex.main), log: e.log });
+      } else setLauf({ status: 'fehler', meldung: fehlerText(e), zeilen: [], log: '' });
+      return;
+    }
+    const sekunden = (performance.now() - start) / 1000;
+    const kb = Math.max(1, Math.round(pdf.length / 1024));
+    let oeffnenFehler: string | null = null;
+    try {
+      await pdfOeffnen(name);
+    } catch (e) {
+      oeffnenFehler = fehlerText(e);
+    }
+    setLauf({ status: 'ok', sekunden, kb, oeffnenFehler });
+  };
+
+  const laeuft = lauf?.status === 'laeuft';
+  return (
+    <SetRow id="testbeleg" label="Testbeleg erzeugen">
+      <div className="row wrap">
+        <Seg options={TEST_ARTEN} value={art} onChange={(v) => setArt(v)} ariaLabel="Belegart des Testbelegs" />
+        <button type="button" className="btn subtle" disabled={laeuft || !doc || !gefunden || !inTauri()} onClick={() => void erzeugen()}>
+          {laeuft ? <LoaderCircle className="ic spin" /> : <FileText />}
+          {laeuft ? 'Setze PDF …' : 'PDF erzeugen und öffnen'}
+        </button>
+        <button type="button" className="btn ghost" disabled={!doc} onClick={() => setVorschau((v) => !v)}>
+          {vorschau ? <EyeOff /> : <Eye />}
+          {vorschau ? 'Vorschau ausblenden' : 'HTML-Vorschau zum Vergleich'}
+        </button>
+      </div>
+      {lauf?.status === 'ok' ? (
+        <div className={`set-note ${lauf.oeffnenFehler ? 'warn' : 'ok'}`} role="status">
+          {lauf.oeffnenFehler ? <TriangleAlert /> : <CircleCheck />}
+          <span>
+            <b>PDF erzeugt</b> in {ZAHL.format(lauf.sekunden)} s ({ZAHL.format(lauf.kb)} KB)
+            {lauf.oeffnenFehler ? ` · Öffnen ging nicht: ${lauf.oeffnenFehler}` : ' · in der Vorschau-App geöffnet.'}
+          </span>
+        </div>
+      ) : lauf?.status === 'fehler' ? (
+        <div className="set-note warn" role="alert">
+          <TriangleAlert />
+          <span>
+            <b>{lauf.meldung}</b>
+            {lauf.zeilen.length > 0 && (
+              <ul className="tb-fehler">
+                {lauf.zeilen.map((z, i) => (
+                  <li key={i}>{z}</li>
+                ))}
+              </ul>
+            )}
+            {lauf.log && (
+              <details className="tb-log">
+                <summary>Protokoll von Tectonic</summary>
+                <pre className="mono">{lauf.log}</pre>
+              </details>
+            )}
+          </span>
+        </div>
+      ) : (
+        <p className="hint">
+          {laeuft
+            ? 'Beim ersten Mal lädt Tectonic die nötigen TeX-Pakete aus dem Netz. Das dauert einmalig etwas, danach geht es ohne Netz.'
+            : 'Beim ersten PDF lädt Tectonic einmalig die TeX-Pakete aus dem Netz (kann einige Minuten dauern). Danach arbeitet es ohne Netz.'}
+        </p>
+      )}
+      <p className="hint">
+        Entwurf ohne Nummer an „Müller &amp; Söhne 100%“ mit Sonderzeichen in den Positionen, aus der Standardvorlage.
+        {basis && !basis.eigen ? ' Solange keine Firmendaten eingetragen sind, mit Beispielfirma.' : ''} Es wird nichts gespeichert und keine
+        Nummer verbraucht.
+      </p>
+      {vorschau && doc && <BlattVorschau doc={doc} bausteine={bausteine} maxScale={1} className="tb-vorschau" />}
+    </SetRow>
   );
 }
 
