@@ -139,6 +139,10 @@
 .sd-sub { font-size: .76rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
 .sd mark { background: color-mix(in oklab, var(--accent) 30%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
 .sd-right { font-family: var(--num-font); font-variant-numeric: tabular-nums; font-size: .82rem; white-space: nowrap; }
+.sd-right.pos { color: var(--pos); }
+.sd-right.neg { color: color-mix(in oklab, var(--neg) 78%, var(--text)); }
+.sd-item.is-storno .sd-name, .sd-item.is-storno .sd-right { text-decoration: line-through; text-decoration-color: var(--muted); }
+.sd-item.is-storno .sd-right { color: var(--muted); }
 .sd-empty { display: flex; gap: 10px; align-items: center; padding: 18px 14px; color: var(--muted); }
 .sd-foot { display: flex; gap: 14px; padding: 8px 10px 4px; font-size: .7rem; color: var(--muted); border-top: 1px solid var(--border); margin-top: 4px; }
 

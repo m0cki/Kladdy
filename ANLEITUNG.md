@@ -1659,7 +1659,8 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
      (`kunde_anlegen`, `kunde_aendern`, `kunde_notiz`, `kunde_loeschen`; je eine Transaktion mit Protokoll, Nummer über
      denselben Weg wie die Erfassen-Schublade). Löschen nur ohne Buchungen, Belege, Termine und Fahrten, sonst Schloss
      „Löschen ab JJJJ“ (letzte Buchung bzw. letzter Beleg + 10 Jahre); Anonymisieren folgt in Phase 5. Migration 0006
-     (Indizes, Protokoll-Aktion `geloescht`). „Termin eintragen“ folgt mit Phase 3, Kunden in der Suche ⌘K später
+     (Indizes, Protokoll-Aktion `geloescht`). „Termin eintragen“ folgt mit Phase 3; Kunden in der Suche ⌘K: erledigt mit
+     Phase 2 Teil 4
   6. Demo-Daten + Einstellungs-Bereich „Daten“ (Demo-Daten, Tectonic-Pfad) – **erledigt** (PR #13, nachgereicht in PR #14):
      Demo-Daten **nur in der Entwicklerversion** (Debug-Build: Rust-Modul `src-tauri/src/demo.rs` mit `demo_status`,
      `demo_laden`, `demo_entfernen` nur dort übersetzt und registriert; Oberfläche nur bei `import.meta.env.DEV`, der
@@ -1692,7 +1693,7 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
      aus der Adresse (`listenVorgabe` in `lib/buchungen.ts`). „Meine Kennzahlen“ folgen mit Phase 4; die Pillen
      Kleinunternehmer und offene Rechnungen zeigen bis Phase 5 bzw. 3 auf die Platzhalter von Steuer & Export bzw.
      Rechnungen & Quittungen
-  3. Auswertung › Liquidität (§6.9.2) – **umgesetzt (Branch `phase-2-liquiditaet`)**: Modell `src/lib/liquiditaet.ts`
+  3. Auswertung › Liquidität (§6.9.2) – **erledigt (PR #16)**: Modell `src/lib/liquiditaet.ts`
      (Port von `prognose()` aus dem Prototyp, Start heute bei 0 €: offene Rechnungen zur Fälligkeit + Ø Zahlungsverzug
      aus bezahlten Rechnungen, überfällige frühestens heute + 3; wiederkehrende Kosten ab `naechstes_datum` alle
      1/3/12 Monate, Tag am Monatsende gekappt; Planposten; Ø übrige Ein-/Ausgänge je Woche aus den letzten 90 Tagen
@@ -1707,6 +1708,24 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
      Posten erzeugen keine Buchungen, Löschen nur ohne verknüpfte Buchungen – das kommt mit Phase 7). `vorlage_json`
      Version 1 ist in `lib/liquiditaet.ts` beschrieben. Überblick: Pille „Nächste 90 Tage“ (erwarteter Überschuss mit
      ▲/▼, führt zur Liquidität). Demo-Daten mit drei Planposten und den drei festen Kosten. Keine Migration nötig
+  4. Suche/Befehlspalette ⌘K (§6.2) – **erledigt (Branch `phase-2-suche`)**: Daten-Quellen Ein- & Ausgänge (ohne
+     Gegenbuchungen, Stornos durchgestrichen + „storniert“), Belege (alle Arten, Entwürfe ohne Nummer als „Entwurf“,
+     offene nach Fälligkeit „überfällig“), Termine (ohne abgesagte), Kunden (Monogramm, „K-0012 · Adresse“), Kennzahlen
+     (nur Name + Formel, den Wert rechnet erst Phase 4). Je Quelle eine schlanke Abfrage in `src/lib/queries/suche.ts`,
+     geladen beim Öffnen, solange offen wiederverwendet, beim nächsten Öffnen frisch; eine fehlgeschlagene Quelle bleibt
+     leer. Zeilen ⇒ Einträge in `src/lib/suche-daten.ts` (Untertitel „Beleg-Nr · Datum · Kategorie“, rechts Betrag mit
+     + bzw. −, Betrags-Stichwörter „1.234,56“/„1234,56“/„1234.56“, Kunde per ID mit Namen, je Gruppe 6/6/4/5/4, neueste
+     zuerst bei gleicher Bewertung). `lib/suche.ts`: Betrag mit Dezimalkomma bleibt ein Suchwort, normalisierte Texte je
+     Eintrag gemerkt (WeakMap), `begrenze`, `markiere` (auch Untertitel markiert). Ohne Eingabe „Befehle“ (erste vier) +
+     „Springen zu“ (fünf Menüpunkte), `>` = alle Befehle nach §6.2. Sprungziele: Buchung ⇒ `bearbeiten(id)` wie ein Klick
+     auf die Zeile (Schublade öffnet auf der aktuellen Seite; stornierte nur zum Ansehen), Kunde ⇒ `kundeOeffnen(id)`,
+     Beleg ⇒ Beleg-Maske `/belege/<id>` (wie der Beleg-Nr.-Link in Ein- & Ausgänge; die zugehörige Zahlung ist ein eigener
+     Treffer), Termin ⇒ `/termine?t=<id>`, Kennzahl ⇒ `/auswertung/kennzahlen?k=<id>`. **Phase 3:** Termine-Seite wertet
+     `?t=` und `?neu=1` aus, Beleg-Maske `/belege/neu?art=angebot|eigenbeleg`; „Quittung/Rechnung schreiben“ öffnen bis
+     dahin die Erfassen-Schublade als Einnahme (`Vorbelegung` kennt noch keinen `beleg`) – mit der Belegwahl dort
+     `beleg: 'quittung' | 'rechnung'` vorbelegen. **Phase 4:** Kennzahlen-Seite wertet `?k=` aus, Wert rechts zeigen.
+     Keine Migration nötig
+- **Phase 2 abgeschlossen.** Weiter mit **Phase 3** (Belege, Baukasten-Vorlagen, PDF, GiroCode, Termine).
 - **Offen aus Phase 1 (Teil 1+2):** optionale Kategorien (AfA,
   Bewirtung, Geschenke, Homeoffice), Kategorien bearbeiten und EÜR-Zuordnung pro Jahr (braucht eigene Tabelle),
   Firmenlogo (nach der Dateiablage), sichtbare Fehlermeldung statt stillem Abbruch, wenn die Sicherung vor einer
