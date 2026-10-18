@@ -429,6 +429,11 @@ fehlt); `seite.js` liest Version, Größe, `.dmg`-Link und Release-Notizen über
 sie im Beispielmodus). Keine externen Schriften, kein Tracking, keine Cookies. Veröffentlichen mit **GitHub Pages**
 (Ordner als `docs/` ins Repository, Settings → Pages); vorher in `seite.js` `KONFIG.github` eintragen und die Platzhalter
 in Impressum (§ 5 DDG) und Datenschutz ausfüllen. Details: `download-seite/LIESMICH.md`.
+**Vorerst ohne Download-Seite** (Impressum-Angaben fehlen noch): Installation per Terminal-Befehl aus dem `README.md`
+(`scripts/installieren.sh`: neuestes Release über die Weiterleitung von `/releases/latest`, `.dmg` per `curl` laden,
+`codesign --verify`, `ditto` nach `/Applications`). Per `curl` geladene Dateien haben keine Quarantäne-Markierung,
+darum entfällt „Dennoch öffnen“, ohne dass `xattr` nötig ist. Das Skript erwartet den Dateinamen
+`Kladdy_<Version>_aarch64.dmg`; wer Ziel oder Namensschema der Release-Action ändert, passt es mit an.
 
 **Lizenz des Repositorys:** **MIT** (Datei `LICENSE` mit „Copyright (c) 2026 <Name>“) – einfach, mit allen Abhängigkeiten
 verträglich (Tauri MIT/Apache-2.0, Tectonic MIT, pdf.js Apache-2.0) und mit Gewährleistungsausschluss. Wer verhindern
@@ -1714,6 +1719,9 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
 - **Updater überarbeitet** (eigener kleiner PR): Laden und Neustart getrennt, „Später“ ⇒ beim nächsten Start aktiv,
   im Dev nie installieren (Details §3.2 Punkt 5). v1.0.1 veröffentlicht (15.10.2026), Update von 1.0.0 aus getestet
   (noch mit dem alten Ablauf der 1.0.0); den neuen Ablauf zeigt erst das nächste Update ab 1.0.1.
+- **Installation per Terminal** statt Download-Seite (eigener kleiner PR): `README.md` mit Befehl,
+  `scripts/installieren.sh` (§3.2). Die Download-Seite (GitHub Pages) bleibt für Phase 6 offen, bis Impressum und
+  Datenschutz ausgefüllt sind.
 
 ### Phase 0 – Grundgerüst & Design
 > Setze Phase 0 aus `ANLEITUNG.md` um: `git init`; Tauri-2-Projekt mit React + TypeScript + Vite (`npm create tauri-app@latest`);
