@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { gruppiere, normalize, normalizeWithMap, parseAnfrage, suche, teile, type SuchEintrag } from './suche';
+import { begrenze, gruppiere, markiere, normalize, normalizeWithMap, parseAnfrage, suche, teile, type SuchEintrag } from './suche';
 
 const E = (id: string, label: string, extra: Partial<SuchEintrag> = {}): SuchEintrag => ({
   id,
@@ -38,6 +38,12 @@ describe('parseAnfrage', () => {
   it('erkennt „>“ für Befehle und zerlegt in Wörter', () => {
     expect(parseAnfrage('> Nach  Updates')).toEqual({ nurBefehle: true, woerter: ['nach', 'updates'] });
     expect(parseAnfrage('  Größe')).toEqual({ nurBefehle: false, woerter: ['grosse'] });
+  });
+  it('hält Beträge mit Dezimalkomma zusammen, sonst trennt das Komma', () => {
+    expect(parseAnfrage('49,90').woerter).toEqual(['49,90']);
+    expect(parseAnfrage('1.234,5 Müller').woerter).toEqual(['1.234,5', 'muller']);
+    expect(parseAnfrage('Müller,Hans').woerter).toEqual(['muller', 'hans']);
+    expect(parseAnfrage('49, Laub').woerter).toEqual(['49', 'laub']);
   });
 });
 
@@ -83,5 +89,32 @@ describe('gruppiere', () => {
   it('bündelt nach Gruppe in Reihenfolge des besten Treffers', () => {
     const g = gruppiere(suche(LISTE, 'updates'));
     expect(g.map((x) => x.gruppe)).toEqual(['Befehle', 'Einstellungen']);
+  });
+});
+
+describe('begrenze', () => {
+  it('höchstens n je Gruppe, Reihenfolge bleibt, insgesamt begrenzt', () => {
+    const t = suche(LISTE, '');
+    const b = begrenze(t, { Einstellungen: 2 });
+    expect(b.map((x) => x.eintrag.id)).toEqual(['schrift', 'akzent', 'suchen', 'ein', 'liq']);
+    expect(begrenze(t, {}, 3)).toHaveLength(3);
+  });
+});
+
+describe('markiere', () => {
+  it('markiert die Wörter in einem beliebigen Text (z. B. Untertitel)', () => {
+    const text = 'QU-2026-012 · 12.10.2026 · Dienstleistung';
+    expect(teile(text, markiere(text, 'dienst')).filter((p) => p.mark)).toEqual([{ text: 'Dienst', mark: true }]);
+    expect(markiere(text, '')).toEqual([]);
+  });
+});
+
+describe('Daten-Einträge', () => {
+  it('behalten bei gleicher Bewertung die Reihenfolge der Quelle (neueste zuerst), unabhängig von der Labellänge', () => {
+    const D: SuchEintrag[] = [
+      E('neu', 'Rasen mähen am Hang', { art: 'daten', gruppe: 'Ein- & Ausgänge', keywords: ['Müller'] }),
+      E('alt', 'Rasen', { art: 'daten', gruppe: 'Ein- & Ausgänge', keywords: ['Müller'] }),
+    ];
+    expect(suche(D, 'muller').map((t) => t.eintrag.id)).toEqual(['neu', 'alt']);
   });
 });

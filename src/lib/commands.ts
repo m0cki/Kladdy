@@ -1,4 +1,4 @@
-/* Globale Befehle – aus dem nativen Menü, aus Tastenkürzeln (Browser) und aus der Suche (später Befehlspalette, §6.2).
+/* Globale Befehle – aus dem nativen Menü, aus Tastenkürzeln (Browser) und aus der Befehlspalette (§6.2).
  * Echt: Erfassen (⌘N, die eine Erfassen-Schublade), Beleg importieren (⌘O, wie ein Datei-Drop), Hell/Dunkel, Seitenleiste, Nach Updates suchen, Über Kladdy.
  * Der Rest meldet, in welcher Phase er kommt. */
 import { toggleMode, useUi } from '../store/ui';

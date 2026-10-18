@@ -1,7 +1,8 @@
-/* Suche/Befehlspalette (§6.2) – reine Logik: Normalisieren, Treffer bewerten, sortieren, markieren.
- * Phase 0.5: Seiten, Einstellungen und ein paar Befehle. Phase 2 hängt weitere Quellen an (Einträge, Belege,
- * Termine, Kunden, Kennzahlen): einfach weitere SuchEintraege mit eigener `gruppe` liefern. Mit `>` am Anfang
- * zählen nur Einträge der Art 'befehl'. Mit Vitest getestet (suche.test.ts). */
+/* Suche/Befehlspalette (§6.2) – reine Logik: Normalisieren, Treffer bewerten, sortieren, begrenzen, markieren.
+ * Quellen: Seiten, Einstellungen, Befehle (components/shell/Suche.tsx) und Daten (Ein- & Ausgänge, Belege, Termine,
+ * Kunden, Kennzahlen aus lib/suche-daten.ts) – alles SuchEintraege mit eigener `gruppe`. Mit `>` am Anfang zählen nur
+ * Einträge der Art 'befehl'. Einträge gelten als unveränderlich: ihre normalisierten Texte werden je Objekt gemerkt
+ * (WeakMap), damit Tippen bei ~1000 Einträgen nichts neu rechnet. Mit Vitest getestet (suche.test.ts). */
 
 export type SuchArt = 'seite' | 'einstellung' | 'befehl' | 'daten';
 
@@ -31,6 +32,8 @@ export interface Anfrage {
 
 /** Ein Zeichen vereinfachen: klein, ohne Akzente (ä→a, é→e), ß→ss. */
 function foldChar(ch: string): string {
+  const c = ch.charCodeAt(0);
+  if (c < 128) return c >= 65 && c <= 90 ? String.fromCharCode(c + 32) : ch; // ASCII: schneller Weg
   if (ch === 'ß' || ch === 'ẞ') return 'ss';
   return ch
     .normalize('NFD')
@@ -56,14 +59,36 @@ export function normalizeWithMap(s: string): { text: string; map: number[] } {
 /** Groß/klein und Akzente egal: „Schriftgröße“ → „schriftgrosse“. */
 export const normalize = (s: string): string => normalizeWithMap(s).text;
 
+/** Ein Betrag mit Dezimalkomma („49,90“, „1.234,5“) bleibt ein Wort; sonst trennt das Komma. */
+const BETRAG_WORT = /^\d[\d.]*,\d{1,2}$/;
+
 export function parseAnfrage(raw: string): Anfrage {
   const t = raw.trimStart();
   const nurBefehle = t.startsWith('>');
   const rest = nurBefehle ? t.slice(1) : t;
   const woerter = normalize(rest)
-    .split(/[\s·,/]+/)
+    .split(/[\s·/]+/)
+    .flatMap((w) => (BETRAG_WORT.test(w) ? [w] : w.split(',')))
     .filter(Boolean);
   return { nurBefehle, woerter };
+}
+
+interface Vorbereitet {
+  label: { text: string; map: number[] };
+  sub: string;
+  keywords: string[];
+}
+
+const vorbereitetCache = new WeakMap<SuchEintrag, Vorbereitet>();
+
+/** Normalisierte Texte eines Eintrags (einmal je Objekt). */
+function vorbereitet(e: SuchEintrag): Vorbereitet {
+  let v = vorbereitetCache.get(e);
+  if (!v) {
+    v = { label: normalizeWithMap(e.label), sub: e.sub ? normalize(e.sub) : '', keywords: (e.keywords ?? []).map(normalize) };
+    vorbereitetCache.set(e, v);
+  }
+  return v;
 }
 
 const isWordStart = (text: string, at: number) => at === 0 || /[^a-z0-9]/.test(text[at - 1]);
@@ -84,10 +109,8 @@ function bestIn(text: string, wort: string): [number, number] | null {
 /** Bewertung eines Eintrags; null = passt nicht (jedes Wort muss im Label, Untertitel oder in den Stichwörtern vorkommen). */
 export function bewerte<T extends SuchEintrag>(eintrag: T, anfrage: Anfrage): Treffer<T> | null {
   if (anfrage.nurBefehle && eintrag.art !== 'befehl') return null;
-  const label = normalizeWithMap(eintrag.label);
   if (anfrage.woerter.length === 0) return { eintrag, score: 0, marks: [] };
-  const keywords = (eintrag.keywords ?? []).map(normalize);
-  const sub = eintrag.sub ? normalize(eintrag.sub) : '';
+  const { label, keywords, sub } = vorbereitet(eintrag);
   let score = 0;
   const marks: [number, number][] = [];
   for (const w of anfrage.woerter) {
@@ -123,7 +146,8 @@ function mergeMarks(marks: [number, number][]): [number, number][] {
   return out;
 }
 
-/** Alle passenden Einträge, beste zuerst (bei Gleichstand: kürzeres Label, dann ursprüngliche Reihenfolge). */
+/** Alle passenden Einträge, beste zuerst. Bei Gleichstand: kürzeres Label, dann ursprüngliche Reihenfolge – zwischen
+ *  zwei Daten-Einträgen (art 'daten') nur die ursprüngliche Reihenfolge, die Quellen liefern neueste zuerst. */
 export function suche<T extends SuchEintrag>(eintraege: readonly T[], raw: string, limit = 30): Treffer<T>[] {
   const anfrage = parseAnfrage(raw);
   const treffer: { t: Treffer<T>; i: number }[] = [];
@@ -132,9 +156,43 @@ export function suche<T extends SuchEintrag>(eintraege: readonly T[], raw: strin
     if (t) treffer.push({ t, i });
   });
   if (anfrage.woerter.length > 0) {
-    treffer.sort((a, b) => b.t.score - a.t.score || a.t.eintrag.label.length - b.t.eintrag.label.length || a.i - b.i);
+    const laenge = (a: T, b: T) => (a.art === 'daten' && b.art === 'daten' ? 0 : a.label.length - b.label.length);
+    treffer.sort((a, b) => b.t.score - a.t.score || laenge(a.t.eintrag, b.t.eintrag) || a.i - b.i);
   }
   return treffer.slice(0, limit).map((x) => x.t);
+}
+
+/** Höchstens `limits[gruppe]` Treffer je Gruppe (Gruppen ohne Eintrag unbegrenzt), insgesamt höchstens `gesamt`.
+ *  Die Reihenfolge bleibt erhalten. */
+export function begrenze<T extends SuchEintrag>(
+  treffer: readonly Treffer<T>[],
+  limits: Readonly<Record<string, number>>,
+  gesamt = Infinity,
+): Treffer<T>[] {
+  const zaehler = new Map<string, number>();
+  const out: Treffer<T>[] = [];
+  for (const t of treffer) {
+    if (out.length >= gesamt) break;
+    const g = t.eintrag.gruppe;
+    const n = zaehler.get(g) ?? 0;
+    if (n >= (limits[g] ?? Infinity)) continue;
+    zaehler.set(g, n + 1);
+    out.push(t);
+  }
+  return out;
+}
+
+/** Markierte Bereiche eines beliebigen Textes (z. B. Untertitel) für die Wörter einer Eingabe. */
+export function markiere(text: string, raw: string): [number, number][] {
+  const { woerter } = parseAnfrage(raw);
+  if (!woerter.length || !text) return [];
+  const n = normalizeWithMap(text);
+  const marks: [number, number][] = [];
+  for (const w of woerter) {
+    const hit = bestIn(n.text, w);
+    if (hit) marks.push([n.map[hit[1]], n.map[hit[1] + w.length]]);
+  }
+  return mergeMarks(marks);
 }
 
 /** Treffer nach Gruppe bündeln; Gruppen in der Reihenfolge ihres besten Treffers. */
