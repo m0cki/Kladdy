@@ -5,12 +5,24 @@
  * Ungültige Dateien ⇒ ein Warn-Toast mit dem Text aus Rust. Doppelte Dateien zeigt die Schublade als Hinweis.
  * Danach läuft im Hintergrund die Belegerkennung für die erste PDF (sonst die erste Datei, dann nur der Dateiname):
  * lib/erkennung/erkennen.ts; das Ergebnis geht an useErfassen.erkennung, die Schublade füllt damit leere Felder.
+ * Eine Seite kann eine eigene Dropzone anmelden (Firmenlogo-Kachel): Drops über ihr gehen dorthin, alle anderen wie
+ * üblich; solange die Datei über ihr schwebt, leuchtet sie (.over) und das Overlay bleibt weg.
  * Nur in der Mac-App; im Browser passiert beim Ziehen nichts. */
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { open } from '@tauri-apps/plugin-dialog';
 import { create } from 'zustand';
 import { useUi } from '../store/ui';
-import { DIALOG_FILTER, abgelehntText, angehaengtText, dateiArt, doppeltText, pruefungAuswerten, type VorgemerkterBeleg } from './belege';
+import {
+  DIALOG_FILTER,
+  abgelehntText,
+  angehaengtText,
+  dateiArt,
+  doppeltText,
+  dropPunkt,
+  pruefungAuswerten,
+  type Punkt,
+  type VorgemerkterBeleg,
+} from './belege';
 import { typName, type BuchungTyp } from './buchungen';
 import { belegeLeeren, belegeVormerken, erfassen, erkennungBeginnen, erkennungFertig, useErfassen } from './erfassen';
 import { belegErkennen } from './erkennung/erkennen';
@@ -18,8 +30,9 @@ import { fehlerText } from './fehler';
 import { inTauri } from './menu';
 import { belegAnhaengen, belegPruefen } from './queries/belege';
 
-/** Wird gerade eine Datei über das Fenster gezogen? (Overlay bzw. Dropzone „.over“) */
-export const useBelegZiehen = create<{ ziehen: boolean }>(() => ({ ziehen: false }));
+/** Wird gerade eine Datei über das Fenster gezogen? (Overlay bzw. Dropzone „.over“) `zone`: über der eigenen
+ * Dropzone der Seite (setzeDropZone). */
+export const useBelegZiehen = create<{ ziehen: boolean; zone: boolean }>(() => ({ ziehen: false, zone: false }));
 
 const warn = (text: string) => useUi.getState().showToast({ text, icon: 'warn', sticky: true });
 
@@ -124,23 +137,49 @@ export function setzeDropZiel(ziel: ((pfade: string[]) => void) | null): void {
   dropZiel = ziel;
 }
 
+/** Eigene Dropzone einer Seite (Firmenlogo-Kachel): nur Drops über `element` gehen an `nimmt`. */
+export interface DropZone {
+  element: () => Element | null;
+  nimmt: (pfade: string[]) => void;
+}
+let dropZone: DropZone | null = null;
+export function setzeDropZone(zone: DropZone | null): void {
+  dropZone = zone;
+}
+
+const istMac = () => typeof navigator !== 'undefined' && /Mac/i.test(navigator.userAgent);
+
+/** Die angemeldete Dropzone, wenn die Position (Tauri-Ereignis) über ihr liegt und nichts sie verdeckt (z. B. eine
+ * Schublade; das Overlay lässt Zeiger durch und zählt nicht). */
+function zoneBei(position: Punkt): DropZone | null {
+  const el = dropZone?.element();
+  if (!dropZone || !el) return null;
+  const { x, y } = dropPunkt(position, window.devicePixelRatio, istMac());
+  const oben = document.elementFromPoint(x, y);
+  return oben && el.contains(oben) ? dropZone : null;
+}
+
 /** Drag & Drop aufs Fenster beobachten (Tauri-Webview-Ereignisse). Gibt eine Abmelde-Funktion zurück. */
 export function watchBelegDrop(): () => void {
   if (!inTauri()) return () => {};
   let cancelled = false;
   let unlisten: (() => void) | null = null;
-  const setZiehen = (ziehen: boolean) => {
-    if (useBelegZiehen.getState().ziehen !== ziehen) useBelegZiehen.setState({ ziehen });
+  const setZiehen = (ziehen: boolean, zone = false) => {
+    const s = useBelegZiehen.getState();
+    if (s.ziehen !== ziehen || s.zone !== zone) useBelegZiehen.setState({ ziehen, zone });
   };
   getCurrentWebview()
     .onDragDropEvent((e) => {
       const p = e.payload;
-      if (p.type === 'enter') setZiehen(p.paths.length > 0);
+      if (p.type === 'enter') setZiehen(p.paths.length > 0, !!zoneBei(p.position));
+      else if (p.type === 'over') setZiehen(useBelegZiehen.getState().ziehen, !!zoneBei(p.position));
       else if (p.type === 'leave') setZiehen(false);
       else if (p.type === 'drop') {
+        const zone = zoneBei(p.position);
         setZiehen(false);
         if (!p.paths.length) return;
-        if (dropZiel) dropZiel(p.paths);
+        if (zone) zone.nimmt(p.paths);
+        else if (dropZiel) dropZiel(p.paths);
         else void belegeUebernehmen(p.paths);
       }
     })

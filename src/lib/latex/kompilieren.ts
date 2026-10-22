@@ -2,10 +2,14 @@
  * Rust schreibt alles in einen frischen Temp-Ordner, ruft `tectonic -X compile main.tex --untrusted` ohne Shell auf
  * (60 s Zeitlimit) und liefert das PDF als ArrayBuffer. Ein neuer Auftrag bricht einen laufenden ab (Live-Vorschau).
  * Fehler kommen als Objekt mit Zeilen aus dem Log; `KompilierFehler` macht daraus eine lesbare Meldung und ordnet
- * Zeilen von main.tex dem Baustein zu. Bilder eines Belegs (girocode.png) liefert `belegAssets` bzw. `belegTex` mit –
- * wer einen Beleg setzt, gibt `assets` immer mit, sonst fehlt der GiroCode und Tectonic bricht ab. */
+ * Zeilen von main.tex dem Baustein zu. Bilder eines Belegs (girocode.png, logo.png) liefert `belegAssets` bzw. `belegTex`
+ * mit – wer einen Beleg setzt, gibt `assets` immer mit, sonst fehlen GiroCode bzw. Logo und Tectonic bricht ab. Die
+ * Bytes des Logos lädt vorher `belegLogo(doc)` (Datei aus `doc.logo`). */
 import { invoke } from '@tauri-apps/api/core';
+import { fehlerText } from '../fehler';
+import { LOGO_TEX_DATEI, vorlageZeigtLogo } from '../firmenlogo';
 import { GIROCODE_DATEI, girocodePng, vorlageZeigtGirocode } from '../girocode/girocode';
+import { logoBytes } from '../queries/firmenlogo';
 import type { Baustein } from '../vorlagen/bausteine';
 import type { BelegDokument } from '../vorlagen/dokument';
 import { datenTex } from './daten';
@@ -78,21 +82,38 @@ export async function kompiliere(auftrag: TexAuftrag, ablage?: string): Promise<
 export const pdfOeffnen = (name: string): Promise<void> => invoke<void>('pdf_oeffnen', { name });
 
 /** Bilder für den Satz eines Belegs: girocode.png, wenn ein sichtbarer Baustein „Zahlung“ den GiroCode zeigt und
- * \GiroCode in daten.tex gesetzt ist (offene Rechnung mit gültigen Daten). Das Logo folgt mit der Logo-Ablage. */
-export function belegAssets(doc: BelegDokument, bausteine: readonly Baustein[]): TexAsset[] {
+ * \GiroCode in daten.tex gesetzt ist (offene Rechnung mit gültigen Daten); logo.png, wenn der Beleg ein Logo hat
+ * (`doc.logo`, Bytes in `logo`) und ein sichtbarer Baustein „Kopf“ es zeigt. */
+export function belegAssets(doc: BelegDokument, bausteine: readonly Baustein[], logo: Uint8Array | null = null): TexAsset[] {
   const assets: TexAsset[] = [];
   const png = vorlageZeigtGirocode(bausteine) ? girocodePng(doc) : null;
   if (png) assets.push({ name: GIROCODE_DATEI, daten: png });
+  if (doc.logo && logo && vorlageZeigtLogo(bausteine)) assets.push({ name: LOGO_TEX_DATEI, daten: logo });
   return assets;
 }
 
-/** Beide Dateien für einen Beleg und die Bilder dazu (`kompiliere({ main: main.tex, daten, assets })`). */
+/** Beide Dateien für einen Beleg und die Bilder dazu (`kompiliere({ main: main.tex, daten, assets })`). `logo`: Bytes
+ * des Firmenlogos (`belegLogo(doc)`); ohne sie bleibt \LogoDatei leer, damit nie eine fehlende Datei eingebunden wird. */
 export function belegTex(
   doc: BelegDokument,
   bausteine: readonly Baustein[],
   akzent: string,
+  logo: Uint8Array | null = null,
 ): { main: MainTex; daten: string; assets: TexAsset[] } {
-  return { main: mainTex(doc.art, bausteine, akzent), daten: datenTex(doc), assets: belegAssets(doc, bausteine) };
+  const d = doc.logo && !logo ? { ...doc, logo: null } : doc;
+  return { main: mainTex(d.art, bausteine, akzent), daten: datenTex(d), assets: belegAssets(d, bausteine, logo) };
+}
+
+/** Bytes des Firmenlogos eines Belegs für den PDF-Satz (null = keins). Fehlt die Datei, scheitert das bei einem
+ * ausgestellten Beleg (sein PDF muss aussehen wie ausgestellt); Entwürfe und Vorschauen setzen dann ohne Logo. */
+export async function belegLogo(doc: BelegDokument): Promise<Uint8Array | null> {
+  if (!doc.logo) return null;
+  try {
+    return await logoBytes(doc.logo);
+  } catch (e) {
+    if (doc.nummer) throw new Error(`Das Firmenlogo des Belegs (${doc.logo}) fehlt: ${fehlerText(e)}`);
+    return null;
+  }
 }
 
 /** Lesbare Zeilen für die Fehleranzeige: „Baustein „Positionen“ (main.tex Zeile 88): Undefined control sequence“. */

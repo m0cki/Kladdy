@@ -5,10 +5,12 @@
  * - pdfErzeugenUndAblegen: Tectonic setzt das PDF aus dem Schnappschuss, Rust legt es genau einmal unverändert ab
  *   (beleg_pdf_ablegen). Ein Fehler hier macht den Beleg nicht ungültig: Er ist ausgestellt, das PDF lässt sich
  *   jederzeit aus demselben Schnappschuss nachholen.
- * - Entwürfe werden nur zum Ansehen/Drucken in den Cache gesetzt (mit Wasserzeichen ENTWURF), nie abgelegt. */
+ * - Entwürfe werden nur zum Ansehen/Drucken in den Cache gesetzt (mit Wasserzeichen ENTWURF), nie abgelegt.
+ * - Firmenlogo: das aus dem Schnappschuss (`dokument.logo`), nie das aktuelle – ein ausgestellter Beleg behält sein Logo. */
 import { istZahlungsart, type Zahlungsart } from './buchungen';
 import { firmaAusJson, type Firma } from './firma';
-import { KompilierFehler, belegTex, fehlerZeilen, kompiliere, pdfOeffnen } from './latex/kompilieren';
+import { logoAusWert } from './firmenlogo';
+import { KompilierFehler, belegLogo, belegTex, fehlerZeilen, kompiliere, pdfOeffnen } from './latex/kompilieren';
 import { formatBetrag } from './money';
 import type { UstModus } from './queries/einstellungen';
 import { belegOeffnen } from './queries/belege';
@@ -92,6 +94,8 @@ export function dokumentAusJson(v: unknown): BelegDokument | null {
     eigenbeleg: istObjekt(e) ? { grund: istGrund(e.grund) ? e.grund : 'sonstiges', grund_text: str(e.grund_text), gebucht } : null,
     ausgestellt_am: strOderNull(v.ausgestellt_am),
     firma: firmaAusJson(v.firma),
+    // Logo von damals (Name aus dem Schnappschuss); ältere Schnappschüsse haben keins
+    logo: logoAusWert(v.logo) || null,
     ust_modus: v.ust_modus === 'regel' ? 'regel' : 'klein',
     storno_von: istObjekt(s) ? { nummer: str(s.nummer), datum: str(s.datum) } : null,
   };
@@ -115,7 +119,7 @@ export function schnappschussLesen(json: string | null | undefined): Schnappschu
 }
 
 /** Beleg ohne Schnappschuss (Demo-Daten, ältere Stände) aus den Spalten nachbauen. Texte wie damals: ohne eigenen
- * Schlusstext keiner (Prototyp SCHLUSS_ALT), Firmendaten von heute. */
+ * Schlusstext keiner (Prototyp SCHLUSS_ALT), Firmendaten von heute, ohne Firmenlogo (das gab es damals nicht). */
 export function dokumentAusZeile(b: BelegVoll, positionen: readonly PositionZeile[], firma: Firma, ustModus: UstModus): Schnappschuss {
   const storno = b.art === 'storno';
   const artRoh = storno ? b.storno_von_art : b.art;
@@ -189,7 +193,7 @@ export async function pdfErzeugenUndAblegen(id: number, s: Schnappschuss, akzent
   const bausteine = bausteineFuer(s.dokument, s.bausteine);
   // Das abgelegte PDF zeigt den Beleg, wie er ausgestellt wurde – nie mit Wasserzeichen
   const dokument = { ...s.dokument, storniert: false };
-  const tex = belegTex(dokument, bausteine, s.akzent ?? akzent);
+  const tex = belegTex(dokument, bausteine, s.akzent ?? akzent, await belegLogo(dokument));
   let pdf: Uint8Array;
   try {
     pdf = await kompiliere({ main: tex.main.tex, daten: tex.daten, assets: tex.assets });
@@ -208,7 +212,7 @@ export async function belegPdfOeffnen(b: Pick<BelegVoll, 'id' | 'pdf_beleg_id'>,
 
 /** Entwurf ansehen/drucken: in den Cache setzen (Wasserzeichen ENTWURF) und in der Vorschau-App öffnen. */
 export async function entwurfOeffnen(doc: BelegDokument, bausteine: readonly Baustein[], akzent: string): Promise<void> {
-  const tex = belegTex(doc, bausteineFuer(doc, bausteine), akzent);
+  const tex = belegTex(doc, bausteineFuer(doc, bausteine), akzent, await belegLogo(doc));
   const name = `Kladdy-Entwurf-${ARTEN[doc.art].label}.pdf`;
   try {
     await kompiliere({ main: tex.main.tex, daten: tex.daten, assets: tex.assets }, name);

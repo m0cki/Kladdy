@@ -10,6 +10,7 @@ import {
   dateiArt,
   dateiName,
   doppeltText,
+  dropPunkt,
   endung,
   erlaubteEndung,
   groesseText,
@@ -130,5 +131,14 @@ describe('Texte', () => {
   it('zeitpunktDatum', () => {
     expect(zeitpunktDatum('2026-09-03T12:00:00Z')).toBe('03.09.2026');
     expect(zeitpunktDatum('kaputt')).toBe('');
+  });
+});
+
+describe('Dropzone einer Seite', () => {
+  it('Position: Mac in Punkten, sonst Pixel durch die Skalierung', () => {
+    expect(dropPunkt({ x: 300, y: 120 }, 2, true)).toEqual({ x: 300, y: 120 });
+    expect(dropPunkt({ x: 600, y: 240 }, 2, false)).toEqual({ x: 300, y: 120 });
+    expect(dropPunkt({ x: 300, y: 120 }, 0, false)).toEqual({ x: 300, y: 120 });
+    expect(dropPunkt({ x: 300, y: 120 }, Number.NaN, false)).toEqual({ x: 300, y: 120 });
   });
 });

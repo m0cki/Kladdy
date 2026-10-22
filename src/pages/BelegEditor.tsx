@@ -67,6 +67,7 @@ import {
   type BelegEinstellungen,
   type UstModus,
 } from '../lib/queries/einstellungen';
+import { ladeFirmenlogo } from '../lib/queries/firmenlogo';
 import { linkOeffnen } from '../lib/queries/kunden';
 import { ladeNummernkreise } from '../lib/queries/nummernkreise';
 import {
@@ -135,6 +136,8 @@ interface Stamm {
   kunden: KundeAnschrift[];
   firma: Firma;
   ustModus: UstModus;
+  /** aktuelles Firmenlogo (Dateiname oder ''); ausgestellte Belege zeigen das aus ihrem Schnappschuss */
+  logo: string;
   kategorien: KategorieWahl[];
   kreise: Nummernkreis[];
   kennwerte: Map<number, KennwerteJahr>;
@@ -145,7 +148,7 @@ interface Stamm {
 }
 
 async function ladeStamm(): Promise<Stamm> {
-  const [[kunden, firma, ustModus, kategorien, kreise, kennwerte, einstellungen, vorschlaege, geschaefte], vorlagen] = await Promise.all([
+  const [[kunden, firma, ustModus, kategorien, kreise, kennwerte, einstellungen, vorschlaege, geschaefte, logo], vorlagen] = await Promise.all([
     Promise.all([
       ladeKundenAnschrift(),
       ladeFirma(),
@@ -156,6 +159,7 @@ async function ladeStamm(): Promise<Stamm> {
       ladeBelegEinstellungen(),
       ladePositionsVorschlaege(),
       ladeGeschaeftsnamen(),
+      ladeFirmenlogo(),
     ]),
     Promise.all(BELEGARTEN.map((a) => ladeVorlagenFuerArt(a))),
   ]);
@@ -163,6 +167,7 @@ async function ladeStamm(): Promise<Stamm> {
     kunden,
     firma,
     ustModus,
+    logo,
     kategorien,
     kreise,
     kennwerte,
@@ -323,7 +328,7 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
   const set = <K extends keyof BelegFormular>(k: K, v: BelegFormular[K]) => setForm((f) => ({ ...f, [k]: v }));
 
   /* ---------- abgeleitet ---------- */
-  const doc: BelegDokument = ausgestellt ? ausgestellt.dokument : formularZuDokument(form, { kunden: stamm.kunden, firma: stamm.firma, ustModus: stamm.ustModus });
+  const doc: BelegDokument = ausgestellt ? ausgestellt.dokument : formularZuDokument(form, { kunden: stamm.kunden, firma: stamm.firma, ustModus: stamm.ustModus, logo: stamm.logo });
   const vorlagen = stamm.vorlagen[art];
   const gewaehlt = vorlagen.find((v) => v.id === form.vorlageId) ?? vorlagen.find((v) => v.aktiv) ?? vorlagen[0];
   const bausteine: Baustein[] = ausgestellt ? ausgestellt.bausteine : (gewaehlt?.bausteine ?? standardVorlage(art));

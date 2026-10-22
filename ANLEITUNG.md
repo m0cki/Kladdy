@@ -938,7 +938,7 @@ Beleg steht) und erscheint im Baustein **„Kopf mit Logo“** (Standard bei Rec
 Vorlagen hinzufügbar). **„Zurücksetzen“** ⇒ wieder das App-Symbol; beides mit „Rückgängig“ im Toast. Ein Drop auf die Kachel
 öffnet **nicht** die Erfassen-Schublade (Kachel ist eine `.dropzone`).
 GoBD: Ausgestellte Belege behalten ihr Logo. In der App steckt es im archivierten PDF; zusätzlich merkt sich der Schnappschuss
-(`snapshot_json.logo`) den Dateinamen, alte Logo-Dateien werden nie gelöscht, solange ein Beleg darauf verweist. (Prototyp:
+(`snapshot_json.dokument.logo`) den Dateinamen, alte Logo-Dateien werden nie gelöscht, solange ein Beleg darauf verweist. (Prototyp:
 `r.logoId` + `FIRMA.logoArchiv`, vor jedem Logowechsel werden alle ausgestellten Belege eingefroren.)
 
 ---
@@ -1759,7 +1759,7 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
      Frontend `src/lib/latex/kompilieren.ts`. Einstellungen › Daten › „Testbeleg erzeugen“: Rechnung oder Quittung an
      „Müller & Söhne 100%“ (Entwurf, keine Nummer, Sonderzeichen in den Positionen) setzen und öffnen, Hinweis auf den
      ersten Paket-Download, lesbare Fehler mit Baustein und Zeile, HTML-Vorschau zum Vergleich. **Offen:** Logo im Kopf
-     (Makro `\LogoDatei` und Bild-Übergabe sind vorbereitet, es fehlt die Logo-Ablage aus Phase 1), GiroCode (erledigt
+     (erledigt mit dem Firmenlogo, siehe unten), GiroCode (erledigt
      mit Teil 6), Bausteine bearbeiten (erledigt mit Teil 5), Beleg-Maske (erledigt mit Teil 2); ein echter Tectonic-Lauf war beim Bauen nicht möglich
      (Tectonic nicht installiert) – beim ersten Testbeleg prüfen, ob PDF und HTML-Vorschau übereinstimmen.
      Keine Migration nötig
@@ -1904,9 +1904,37 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
      „Rechnungsdatum 05.10.2026 · abgebucht am 20.10.2026“, nach dem Speichern `belegdatum` 2026-10-05. Außerdem: Marken
      verschwinden beim Ändern, ein getippter Betrag bleibt beim Drop auf die offene Schublade stehen, ein Foto bringt
      nur Werte aus dem Dateinamen, und im Release-Build lädt der pdf.js-Worker.
+- **Firmenlogo** (offen aus Phase 1, §6.10, §9.7) – **erledigt (Branch `firmenlogo`, auf Phase 3 Teil 4)**: Rust
+  `src-tauri/src/firmenlogo.rs`: `firmenlogo_quelle_lesen` (nur PNG/JPG/SVG/WebP bis 10 MB, nur lesen),
+  `firmenlogo_ablegen` (PNG prüfen – Signatur, erster Block IHDR mit höchstens 720 × 240 px, IEND, bis 2 MB – und als
+  `<appDataDir>/assets/logo-<sha256>.png` ablegen; im Dev `assets-dev/`, im Demo-Modus `assets-dev-demo/`, das mit den
+  Demo-Daten entfernt wird; schreibgeschützt, nie überschrieben, nie gelöscht), `firmenlogo_lesen` (nur über den
+  Dateinamen, der Inhalt muss zur Prüfsumme passen). Frontend: `src/lib/firmenlogo.ts` (Bildtypen, Zielgröße,
+  Dateiname), `src/lib/logoablage.ts` (Dialog, Drop, Canvas verkleinert auf höchstens 720 × 240 px mit Transparenz,
+  „Rückgängig“, Blob-URL je Datei), `src/lib/queries/firmenlogo.ts` (Einstellung `firmenlogo` mit Protokoll, Bytes je
+  Name gemerkt). Einstellungen › Firma: Kachel mit Vorschau (Klick = Dialog, Bild daraufziehen), „Logo hochladen …“ bzw.
+  „Anderes Logo …“, „Zurücksetzen“, beides mit „Rückgängig“. Die Kachel ist eine eigene Dropzone (`setzeDropZone` in
+  `lib/belegablage.ts`): nur Drops über ihr gehen ans Logo (Position aus dem Tauri-Ereignis, auf dem Mac schon in
+  Punkten), alle anderen öffnen wie bisher die Erfassen-Schublade; über der Kachel leuchtet sie und das Overlay bleibt
+  weg. Seitenleiste: Logo auf weißer Kachel (`components/ui/Firmenlogo.tsx`). Belege: `BelegDokument.logo` (Dateiname)
+  kommt in Maske und Erfassen-Schublade aus der Einstellung und wird beim Ausstellen mit eingefroren
+  (`snapshot_json.dokument.logo`, Rust reicht es unverändert durch, Stornobelege übernehmen es). Das Blatt zeigt es im
+  Baustein „Kopf“, im PDF ist `\LogoDatei` = `logo.png` und die Bytes gehen als Asset mit (`belegLogo` +
+  `belegTex(…, logo)` beim Ausstellen/Nachholen, Entwurf drucken, Vorlagen-Seite und Testbeleg). Ausgestellte Belege
+  nehmen immer das Logo aus ihrem Schnappschuss; fehlt die Datei, scheitert ihr PDF mit Meldung, statt ohne Logo
+  abgelegt zu werden. Belege ohne Schnappschuss bzw. ohne Logo-Feld bleiben ohne Logo. Im Browser: App-Symbol, kein
+  Fehler. Keine Migration.
+  **Auf dem Mac prüfen:** PNG, JPG, SVG und WebP über „Logo hochladen …“ und per Drop auf die Kachel ⇒ Logo oben links
+  auf weißer Kachel (Hell und Dunkel), Toast „Logo übernommen“ mit „Rückgängig“; eine PDF auf die Kachel ⇒ Meldung, keine
+  Schublade; Datei neben die Kachel ⇒ Erfassen-Schublade wie bisher; während des Ziehens über der Kachel leuchtet sie und
+  das Overlay verschwindet (trifft die Position nicht, liegt es an der Umrechnung in `dropPunkt`); großes Foto ⇒ Datei in
+  `assets-dev/` mit höchstens 720 × 240 px; Vorschau in Beleg-Maske und Vorlagen und das Testbeleg-PDF zeigen das Logo
+  (scharf, wie in der Vorschau); Rechnung ausstellen, danach Logo wechseln bzw. zurücksetzen ⇒ die ausgestellte Rechnung
+  zeigt in der Maske weiter das alte Logo, neue Belege das neue; „Zurücksetzen“ ⇒ App-Symbol, „Rückgängig“ holt das Logo
+  zurück; Einträge `firmenlogo` im Protokoll; im Demo-Modus eigenes Logo, „Demo-Daten entfernen“ räumt es weg.
 - **Offen aus Phase 1 (Teil 1+2):** optionale Kategorien (AfA,
   Bewirtung, Geschenke, Homeoffice), Kategorien bearbeiten und EÜR-Zuordnung pro Jahr (braucht eigene Tabelle),
-  Firmenlogo (nach der Dateiablage), sichtbare Fehlermeldung statt stillem Abbruch, wenn die Sicherung vor einer
+  sichtbare Fehlermeldung statt stillem Abbruch, wenn die Sicherung vor einer
   Migration fehlschlägt, Regelbesteuerung wirkt noch nicht auf Buchungen/Belege.
 - **Updater überarbeitet** (eigener kleiner PR): Laden und Neustart getrennt, „Später“ ⇒ beim nächsten Start aktiv,
   im Dev nie installieren (Details §3.2 Punkt 5). v1.0.1 veröffentlicht (15.10.2026), Update von 1.0.0 aus getestet

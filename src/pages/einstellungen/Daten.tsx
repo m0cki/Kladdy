@@ -4,7 +4,7 @@
  * - Testbeleg (§7.3, Abnahme Phase 3): Rechnung oder Quittung an „Müller & Söhne 100%“ aus der Standardvorlage über
  *   compile_latex setzen und in der Vorschau-App öffnen; daneben dieselbe HTML-Vorschau zum Vergleich. Entwurf ohne
  *   Nummer, es wird nichts gespeichert. Die Rechnung trägt den GiroCode (girocode.png über belegTex → assets); fehlt er
- *   wegen ungültiger Firmendaten, steht der Grund unter dem Knopf (nie auf dem Blatt).
+ *   wegen ungültiger Firmendaten, steht der Grund unter dem Knopf (nie auf dem Blatt). Mit Firmenlogo (logo.png).
  * - Demo-Daten: nur bei `import.meta.env.DEV` (lib/demo.ts). Laden und Entfernen fragen per Warn-Toast nach und laden
  *   danach die Oberfläche neu, weil die App dann eine andere Datenbankdatei öffnet. */
 import { useEffect, useMemo, useState } from 'react';
@@ -28,7 +28,8 @@ import { Seg } from '../../components/ui/Seg';
 import { DEMO_MOEGLICH, demoEntfernen, demoLaden, neuStarten, useDemo } from '../../lib/demo';
 import type { Firma } from '../../lib/firma';
 import { girocodeFuer, girocodeMoeglich } from '../../lib/girocode/girocode';
-import { KompilierFehler, belegTex, fehlerZeilen, kompiliere, pdfOeffnen } from '../../lib/latex/kompilieren';
+import { KompilierFehler, belegLogo, belegTex, fehlerZeilen, kompiliere, pdfOeffnen } from '../../lib/latex/kompilieren';
+import { useFirmenlogo } from '../../lib/logoablage';
 import { inTauri } from '../../lib/menu';
 import { ladeFirma, ladeUstModus, type UstModus } from '../../lib/queries/einstellungen';
 import {
@@ -222,7 +223,8 @@ function Testbeleg({ gefunden }: { gefunden: boolean }) {
     };
   }, []);
 
-  const doc = useMemo(() => (basis ? testbeleg(art, basis.firma, basis.ust, heute()) : null), [art, basis]);
+  const logo = useFirmenlogo((s) => s.name);
+  const doc = useMemo(() => (basis ? { ...testbeleg(art, basis.firma, basis.ust, heute()), logo: logo || null } : null), [art, basis, logo]);
   const bausteine = useMemo(() => standardVorlage(art), [art]);
   const giro = useMemo(() => (doc && girocodeMoeglich(doc) ? girocodeFuer(doc) : null), [doc]);
 
@@ -230,7 +232,7 @@ function Testbeleg({ gefunden }: { gefunden: boolean }) {
     if (!doc) return;
     setLauf({ status: 'laeuft' });
     const start = performance.now();
-    const tex = belegTex(doc, bausteine, accent);
+    const tex = belegTex(doc, bausteine, accent, await belegLogo(doc));
     const name = `Kladdy-Testbeleg-${art === 'rechnung' ? 'Rechnung' : 'Quittung'}.pdf`;
     let pdf: Uint8Array;
     try {

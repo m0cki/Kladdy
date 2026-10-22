@@ -270,6 +270,31 @@ describe('Bilder für den Satz', () => {
     expect(t.main.tex).toContain(String.raw`{\GiroCode}`);
     expect(belegTex(quittung(), standardVorlage('quittung'), '#6366f1').assets).toEqual([]);
   });
+
+  it('Firmenlogo: LogoDatei = logo.png und die Bytes nur mit Logo, Bytes und sichtbarem Kopf mit Logo', () => {
+    const logo = `logo-${'ab'.repeat(32)}.png`;
+    const bytes = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 1, 2, 3]);
+    const mit = { ...rechnung(), logo };
+    expect(makroWerte(mit).LogoDatei).toBe('logo.png');
+    const t = belegTex(mit, standardVorlage('rechnung'), '#6366f1', bytes);
+    expect(makro(t.daten, 'LogoDatei')).toBe('logo.png');
+    expect(t.assets.map((a) => a.name)).toEqual(['girocode.png', 'logo.png']);
+    expect(t.assets[1].daten).toBe(bytes);
+    expect(t.main.tex).toContain(String.raw`\ifdefempty{\LogoDatei}{}{\includegraphics[height=16mm,width=60mm,keepaspectratio]{\LogoDatei}}`);
+    // Bytes fehlen (Datei nicht lesbar, Browser): kein \LogoDatei, also nie eine fehlende Datei im Satz
+    const ohneBytes = belegTex(mit, standardVorlage('rechnung'), '#6366f1');
+    expect(makro(ohneBytes.daten, 'LogoDatei')).toBe('');
+    expect(ohneBytes.assets.map((a) => a.name)).toEqual(['girocode.png']);
+    // kein Logo am Beleg: Bytes werden nicht mitgeschickt
+    expect(belegTex(rechnung(), standardVorlage('rechnung'), '#6366f1', bytes).assets.map((a) => a.name)).toEqual(['girocode.png']);
+    // Kopf ohne Logo, ausgeblendet oder gar nicht in der Vorlage (Standard-Quittung)
+    expect(belegAssets(mit, [{ typ: 'kopf', logo: false }], bytes)).toEqual([]);
+    expect(belegAssets(mit, [{ typ: 'kopf', aus: true }], bytes)).toEqual([]);
+    expect(belegAssets({ ...quittung(), logo }, standardVorlage('quittung'), bytes)).toEqual([]);
+    expect(belegAssets({ ...quittung(), logo }, [{ typ: 'kopf' }, ...standardVorlage('quittung')], bytes).map((a) => a.name)).toEqual(['logo.png']);
+    // A5 quer: 10 mm hoch
+    expect(belegTex({ ...quittung(), logo }, [{ typ: 'kopf' }], '#6366f1', bytes).main.tex).toContain('height=10mm,width=60mm');
+  });
 });
 
 describe('Kompilierfehler lesbar', () => {

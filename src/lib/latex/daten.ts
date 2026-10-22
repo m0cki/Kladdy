@@ -6,9 +6,11 @@
  * \KundeAdresseEinzeilig, \FirmaPLZ, \FirmaStadt, \LeistungsdatumLabel, \Zahlungsziel, \AnzahlPositionen,
  * \QuittungFuer, \Quittiert, \EigenbelegGrund, \GebuchtAls, \UnterschriftDatum, \Storniert (1 oder leer),
  * \GiroCode (`girocode.png` bei offener Rechnung mit gültigen EPC-Daten, sonst leer; die Datei liefert belegAssets).
+ * \LogoDatei ist `logo.png`, wenn der Beleg ein Firmenlogo hat (`doc.logo`), sonst leer (§7.4).
  * Tests: latex.test.ts */
 import { formatBetrag } from '../money';
 import { ibanFormat } from '../firma';
+import { LOGO_TEX_DATEI } from '../firmenlogo';
 import { girocodeDatei } from '../girocode/girocode';
 import {
   ARTEN,
@@ -88,8 +90,8 @@ export function makroWerte(doc: BelegDokument): Record<MakroName, string> {
     Bank: e1(F.bank),
     IBAN: e1(F.iban ? ibanFormat(F.iban) : ''),
     BIC: e1(F.bic),
-    // Firmenlogo folgt mit der Logo-Ablage (offen aus Phase 1); der Baustein „Kopf“ bindet es ein, sobald es hier steht
-    LogoDatei: '',
+    // fester Dateiname (kein Nutzerwert); belegTex setzt ihn nur mit den Bytes des Logos, belegAssets liefert die Datei
+    LogoDatei: doc.logo ? LOGO_TEX_DATEI : '',
     KundeName: e1(k?.name),
     KundeZusatz: e1(k?.zusatz),
     KundeStrasse: e1(k?.strasse),
