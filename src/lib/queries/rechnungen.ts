@@ -1,6 +1,6 @@
 /* Rechnungen & Quittungen (§6.6): Lesen per SQL, Schreiben NUR über die Rust-Commands in src-tauri/src/rechnungen.rs
  * (eine Transaktion je Vorgang: Nummer, Kunde, Schnappschuss, Buchung, Protokoll, GoBD-Prüfungen).
- * - ladeBelege: alle Belege in einer Abfrage (die Liste filtert selbst, Prototyp genauso).
+ * - ladeBelege: alle Belege in einer Abfrage (die Liste filtert selbst, Prototyp genauso); ladeOffeneRechnungen.
  * - ladeBeleg: ein Beleg für die Maske, samt Positionen, Termin, Zahlung, Storno und Herkunft.
  * - ladeUeberfaelligAnzahl: roter Zähler in der Seitenleiste (§6.1).
  * Fehler kommen als deutscher Text. */
@@ -23,6 +23,10 @@ const ZEILE_SQL = `
 
 /** Alle Belege (die Liste filtert und sortiert in lib/rechnungen.ts). */
 export const ladeBelege = (): Promise<BelegZeile[]> => abfrage<BelegZeile>(`${ZEILE_SQL} ORDER BY r.id DESC`);
+
+/** Offene Rechnungen (ausgestellt, noch nicht bezahlt) – „Offene Rechnung zuordnen“ in der Erfassen-Schublade. */
+export const ladeOffeneRechnungen = (): Promise<BelegZeile[]> =>
+  abfrage<BelegZeile>(`${ZEILE_SQL} WHERE r.art = 'rechnung' AND r.status = 'offen' AND r.nummer IS NOT NULL ORDER BY r.id DESC`);
 
 /** Anzahl der überfälligen Rechnungen (offen, Fälligkeit vor heute). */
 export async function ladeUeberfaelligAnzahl(heute: string): Promise<number> {
