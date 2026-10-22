@@ -103,12 +103,12 @@ const befehl = (id: string, label: string, sub: string, icon: LucideIcon, run: (
 const BEFEHLE: Ziel[] = [
   befehl('ausgabe', 'Ausgabe erfassen', 'Kosten eintragen · ⌘N', Minus, () => erfassen({ typ: 'ausgabe' }), ['Erfassen', 'Neu', 'Buchung']),
   befehl('einnahme', 'Einnahme erfassen', 'Geld von Kunden eintragen', Plus, () => erfassen({ typ: 'einnahme' }), ['Erfassen', 'Neu', 'Buchung', 'Umsatz']),
-  // Bis Phase 3 kennt die Erfassen-Schublade keine Belegwahl: Einnahme vorbelegen, Quittung/Rechnung folgt dort.
-  befehl('quittung', 'Quittung schreiben', 'Einnahme erfassen · die Quittung mit laufender Nummer kommt mit Phase 3', Receipt, () => erfassen({ typ: 'einnahme' }), ['Beleg', 'Neu']),
-  befehl('rechnung', 'Rechnung schreiben', 'Einnahme erfassen · die Rechnung (auch offen) kommt mit Phase 3', ReceiptText, () => erfassen({ typ: 'einnahme' }), ['Beleg', 'Neu']),
+  // Quittung und Rechnung: dieselbe Erfassen-Schublade, Beleg vorgewählt (Beleg und Einnahme in einem Schritt)
+  befehl('quittung', 'Quittung schreiben', 'Einnahme mit Quittung erfassen · nächste Nummer', Receipt, () => erfassen({ typ: 'einnahme', beleg: 'quittung' }), ['Beleg', 'Neu']),
+  befehl('rechnung', 'Rechnung schreiben', 'Einnahme mit Rechnung – bezahlt oder offen', ReceiptText, () => erfassen({ typ: 'einnahme', beleg: 'rechnung' }), ['Beleg', 'Neu']),
   befehl('termin', 'Termin eintragen', 'Kundentermin, auf Wunsch mit vorbereiteter Quittung · kommt mit Phase 3', CalendarPlus, go('/termine?neu=1'), ['Neu', 'Kalender']),
-  befehl('angebot', 'Angebot schreiben', 'Angebot an einen Kunden · kommt mit Phase 3', FileText, go('/belege/neu?art=angebot'), ['Beleg', 'Neu']),
-  befehl('eigenbeleg', 'Eigenbeleg erstellen', 'Wenn der Originalbeleg einer Ausgabe fehlt · kommt mit Phase 3', Stamp, go('/belege/neu?art=eigenbeleg'), ['Beleg', 'Neu']),
+  befehl('angebot', 'Angebot schreiben', 'Angebot an einen Kunden – noch keine Einnahme', FileText, go('/belege/neu?art=angebot'), ['Beleg', 'Neu']),
+  befehl('eigenbeleg', 'Eigenbeleg erstellen', 'Wenn der Originalbeleg einer Ausgabe fehlt', Stamp, go('/belege/neu?art=eigenbeleg'), ['Beleg', 'Neu']),
   befehl('vorlagen', 'Vorlagen bearbeiten', 'Quittung & Rechnung aus Bausteinen gestalten', Blocks, go('/belege/vorlagen'), ['Baukasten', 'Layout']),
   befehl('kunde', 'Kunde anlegen', 'Neuen Kunden mit Adresse und Notiz anlegen', UserPlus, () => kundeNeu(), ['Neu', 'Kontakt']),
   befehl('hell-dunkel', 'Hell/Dunkel umschalten', '⇧⌘L', Moon, () => toggleMode(), ['Modus', 'Dark Mode']),

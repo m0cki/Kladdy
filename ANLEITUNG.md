@@ -1788,7 +1788,25 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
      GiroCode mit echter Nummer scannen; „Bezahlt“ ⇒ genau eine Einnahme in Ein- & Ausgänge, „doch offen“ ⇒ Gegenbuchung;
      Quittung „Finalisieren & buchen“; Eigenbeleg „Buchen“ (Ausgabe); Angebot ⇒ Rechnung; Storno ⇒ Stornobeleg mit
      Gegenbuchung; ausgestellter Beleg nicht mehr änderbar; überfällige Rechnung ⇒ roter Zähler; Einträge im Protokoll.
-  3. Erfassen-Schublade „Beleg zum Ertrag“ (§6.4) + Vorbelegung `beleg` (Befehlspalette, native Menüs, „Neu“-Menü)
+  3. Erfassen-Schublade „Beleg zum Ertrag“ (§6.4) – **erledigt (Branch `phase-3-beleg-zum-ertrag`, auf Teil 2)**: neue
+     Einnahme mit drei Wegen (`src/components/erfassen/BelegZumErtrag.tsx`, Logik `src/lib/ertrag.ts` + Tests, Daten
+     `lib/queries/ertrag.ts`). **Beleg erstellen** (Standard): Art Quittung | Rechnung (Vorauswahl Einstellungen › Belege),
+     „erhält Nr. …“, Vorlage, bei Rechnung „bereits bezahlt | noch offen“ (offen ⇒ Rechnungsdatum statt Zahlungsdatum,
+     kein „Bezahlt per“), Anschrift (nur wenn nicht in der Kundenkartei), Leistung, Hinweis zu § 35a bei Bar, Schritt 2
+     „Unterschriebenes Exemplar anhängen“ (eine Datei, danach `beleg_scan_anhaengen`). Speichern baut daraus dasselbe
+     Formular wie die Maske (`neuesFormular` ⇒ Pflichtangaben-Check) und ruft `beleg_ausstellen` mit `id` null: Beleg,
+     Nummer, Kunde und Einnahme in EINER Transaktion, danach das PDF; fehlen Pflichtangaben, nennt ein Toast sie mit „In
+     der Maske ergänzen“ (`/belege/neu?…` mit den Eingaben). **Offene Rechnung zuordnen**: Liste der offenen Rechnungen
+     (überfällige zuerst), Betrag/Text/Kunde aus der Rechnung, Speichern = `beleg_bezahlt` (Dateien hängen an der
+     Einnahme). **Ohne eigenen Beleg**: wie bisher `buchung_anlegen`. Toasts mit „Beleg öffnen“ und „Rückgängig“ (Storno
+     bzw. „doch offen“ über die Rückfrage). Vorbelegung `beleg: 'quittung' | 'rechnung'`: „Neu“-Menü der Belegliste
+     (Quittung/Rechnung ⇒ Schublade, Angebot/Eigenbeleg ⇒ Maske), Befehlspalette, Menü Ablage „Quittung/Rechnung
+     schreiben …“. Ausgabe ohne Beleg: „Kein Beleg? Eigenbeleg erstellen“ öffnet die Maske mit den Eingaben. Keine
+     Migration. **Folgt mit Teil 4:** Vorbelegung `entwurf`/`termin` (vorbereiteten Beleg ausstellen, Termin abhaken).
+     **Auf dem Mac prüfen:** Einnahme 60 € bar mit Quittung ⇒ Toast mit QU-Nummer, Einnahme in Ein- & Ausgänge mit dem
+     Beleg verknüpft, PDF abgelegt; Rechnung „noch offen“ ⇒ unter Offen, keine Einnahme; dann neue Einnahme „Offene
+     Rechnung zuordnen“ ⇒ bezahlt, genau eine Einnahme; Firmendaten ohne Steuernummer ⇒ Toast nennt sie; neuer Kunde
+     ⇒ unter Kunden angelegt; „Rückgängig“ ⇒ Stornobeleg; „Speichern & neu“ zeigt die nächste Nummer.
   4. Termine (§6.5)
   5. Vorlagen-Seite als Baukasten (§7.0, Prototyp `#/vorlagen`) – **erledigt (Branch `phase-3-vorlagen-baukasten`)**:
      `src/pages/Vorlagen.tsx` (+ `src/styles/vorlagen.css`), Art auch aus der Adresse

@@ -5,9 +5,12 @@
  * Bezahlt per · Beleg. Speichern ⌘↩, „Speichern & neu“ ⇧⌘↩. Geschrieben wird nur über Rust (buchung_anlegen/_aendern).
  * Ungespeicherte Eingaben setzen useUi.ungespeichert (Neustart nach Update fragt dann nach; Schließen auch).
  * Belege: vorgemerkte Dateien (Drop aufs Fenster, ⌘O, Klick auf die Dropzone) stehen in useErfassen.belege und gehen
- * beim Speichern als `belege` mit; bei gesperrten Einträgen (festgeschrieben) nur über „Beleg anhängen“ (beleg_anhaengen). */
+ * beim Speichern als `belege` mit; bei gesperrten Einträgen (festgeschrieben) nur über „Beleg anhängen“ (beleg_anhaengen).
+ * Neue Einnahme: „Beleg zum Ertrag“ (BelegZumErtrag.tsx, lib/ertrag.ts) – Beleg erstellen stellt Quittung bzw. Rechnung
+ * samt Einnahme in EINER Transaktion aus (beleg_ausstellen), „Offene Rechnung zuordnen“ bucht deren Zahlung
+ * (beleg_bezahlt), „Ohne eigenen Beleg“ ist die einfache Einnahme (buchung_anlegen). */
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowLeftRight,
   Ban,
@@ -22,10 +25,8 @@ import {
   Paperclip,
   Pencil,
   Plus,
-  Receipt,
   Sparkles,
   TriangleAlert,
-  Upload,
   User,
   Users,
 } from 'lucide-react';
@@ -55,10 +56,22 @@ import {
   type KundeKurz,
   type Sperre,
 } from '../../lib/buchungen';
-import { vorgemerkteAnhaengen } from '../../lib/belegablage';
+import { anhaengen, vorgemerkteAnhaengen } from '../../lib/belegablage';
+import { pdfNachholen } from '../../lib/belegaktionen';
 import { belegZusatz, belegeAnzahl, type VorgemerkterBeleg } from '../../lib/belege';
 import { datenbankVerfuegbar } from '../../lib/db';
 import { belegeLeeren, erfassenFertig, erfassenSchliessen, useErfassen, type Vorbelegung } from '../../lib/erfassen';
+import {
+  belegVorbereiten,
+  ertragPruefen,
+  ertragSchluessel,
+  ertragStart,
+  maskenPfad,
+  rechnungOffen,
+  type Ertrag,
+  type ErtragsArt,
+  type Ertragsweg,
+} from '../../lib/ertrag';
 import { fehlerText } from '../../lib/fehler';
 import { betragAlsEingabe, formatBetrag, parseBetrag } from '../../lib/money';
 import {
@@ -70,14 +83,19 @@ import {
   ladeKundenKurz,
   ladeLieferanten,
 } from '../../lib/queries/buchungen';
+import { ladeErtragStamm, type ErtragStamm } from '../../lib/queries/ertrag';
+import { belegAusstellen, belegBezahlt, belegScanAnhaengen } from '../../lib/queries/rechnungen';
+import type { BelegZeile as RechnungsZeile } from '../../lib/rechnungen';
 import { storniere, storniereMitNachfrage } from '../../lib/storno';
-import { heute, imZeitraum, zeitraum } from '../../lib/zeitraum';
-import { useUi } from '../../store/ui';
+import { heute, imZeitraum, istDatum, zeitraum } from '../../lib/zeitraum';
+import { useUi, type Toast, type ToastAction } from '../../store/ui';
 import { Drawer } from '../ui/Drawer';
 import { EmptyState } from '../ui/EmptyState';
 import { Seg } from '../ui/Seg';
 import { KategorieIcon, ZAHLUNGSWEG_ICON } from '../buchungen/Symbole';
 import { BelegDropzone, VorgemerkteBelege, VorhandeneBelege, useBelegeZuBuchung } from '../belege/BelegDateien';
+import { belegDialog } from '../belege/BelegDialog';
+import { BelegZumErtrag } from './BelegZumErtrag';
 
 interface Stamm {
   kategorien: KategorieWahl[];
@@ -93,8 +111,32 @@ async function ladeStamm(): Promise<Stamm> {
 
 const standardKategorie = (kats: readonly KategorieWahl[], typ: BuchungTyp): number | null => kats.find((k) => k.typ === typ)?.id ?? null;
 
+/** Toast, dessen Knöpfe ihn auch schließen. */
+function toastMit(t: Omit<Toast, 'id' | 'actions'>, aktionen: ToastAction[]): void {
+  let id = 0;
+  id = useUi.getState().showToast({
+    ...t,
+    actions: aktionen.map((a) => ({
+      label: a.label,
+      run: () => {
+        useUi.getState().dismissToast(id);
+        a.run();
+      },
+    })),
+  });
+}
+
+/** Feld bzw. Kasten kurz wackeln lassen und in Sicht holen. */
+function wackeln(el: Element | null): void {
+  if (!(el instanceof HTMLElement)) return;
+  el.scrollIntoView({ block: 'nearest' });
+  el.classList.remove('bu-shake');
+  void el.offsetWidth;
+  el.classList.add('bu-shake');
+}
+
 function leeresFormular(stamm: Stamm, v: Vorbelegung): Formular {
-  const typ: BuchungTyp = v.typ ?? (v.kunde != null ? 'einnahme' : 'ausgabe');
+  const typ: BuchungTyp = v.typ ?? (v.kunde != null || v.beleg ? 'einnahme' : 'ausgabe');
   const kunde = v.kunde != null ? stamm.kunden.find((k) => k.id === v.kunde) : undefined;
   return {
     typ,
@@ -128,10 +170,21 @@ function formularAus(b: BuchungZeile): Formular {
 type Ladezustand = { status: 'laden' } | { status: 'ohne-db' } | { status: 'fehler'; fehler: string } | { status: 'ok' };
 
 export function ErfassenSchublade() {
+  const navigate = useNavigate();
   const open = useUi((s) => s.drawer === 'erfassen');
   const auftrag = useErfassen((s) => s.auftrag);
   const belege = useErfassen((s) => s.belege);
   const [laden, setLaden] = useState<Ladezustand>({ status: 'laden' });
+  // Beleg zum Ertrag (nur neue Einnahmen)
+  const [ertrag, setErtragWert] = useState<Ertrag>(() => ertragStart({}, 'quittung'));
+  const [ertragStartWert, setErtragStartWert] = useState('');
+  const [ertragStamm, setErtragStamm] = useState<ErtragStamm | null>(null);
+  const [ertragLadeFehler, setErtragLadeFehler] = useState<string | null>(null);
+  const [ertragFehler, setErtragFehler] = useState<string | undefined>(undefined);
+  const setErtrag = useCallback((teil: Partial<Ertrag>) => {
+    setErtragWert((e) => ({ ...e, ...teil }));
+    setErtragFehler(undefined);
+  }, []);
   const [stamm, setStamm] = useState<Stamm | null>(null);
   const [zeile, setZeile] = useState<BuchungZeile | null>(null);
   const [form, setForm] = useState<Formular | null>(null);
@@ -157,7 +210,12 @@ export function ErfassenSchublade() {
     setKatVorschlag(false);
     setKatGewaehlt(false);
     (async () => {
-      const s = await ladeStamm();
+      const neu = auftrag.art === 'neu';
+      // Belege zum Ertrag nur für neue Einträge; scheitert das Laden, bleibt „Ohne eigenen Beleg“
+      const [s, es] = await Promise.all([
+        ladeStamm(),
+        neu ? ladeErtragStamm().then((x): ErtragStamm | string => x, (e: unknown) => fehlerText(e)) : Promise.resolve(null),
+      ]);
       let f: Formular;
       let z: BuchungZeile | null = null;
       if (auftrag.art === 'bearbeiten') {
@@ -166,10 +224,18 @@ export function ErfassenSchublade() {
         f = formularAus(z);
       } else f = leeresFormular(s, auftrag.vorbelegung);
       if (!aktiv) return;
+      const esOk = es && typeof es !== 'string' ? es : null;
+      const e0 = ertragStart(auftrag.art === 'neu' ? auftrag.vorbelegung : {}, esOk?.belegArt ?? 'quittung');
+      const e: Ertrag = esOk ? e0 : { ...e0, weg: 'ohne' };
       setStamm(s);
       setZeile(z);
       setForm(f);
       setStart(formularSchluessel(f));
+      setErtragStamm(esOk);
+      setErtragLadeFehler(typeof es === 'string' ? es : null);
+      setErtragWert(e);
+      setErtragStartWert(ertragSchluessel(e));
+      setErtragFehler(undefined);
       setGeladenN(auftrag.n);
       setLaden({ status: 'ok' });
     })().catch((e: unknown) => {
@@ -188,7 +254,13 @@ export function ErfassenSchublade() {
   const gegenbuchung = zeile?.storno_von_id != null;
   const aktuell = laden.status === 'ok' && geladenN === auftragN;
   const nimmtBelege = aktuell ? !gegenbuchung && sp !== 'storniert' : laden.status === 'laden' || laden.status === 'ok';
-  const dirty = laden.status === 'ok' && !!form && ((!nurLesen && formularSchluessel(form) !== start) || (nimmtBelege && belege.length > 0));
+  // Beleg zum Ertrag: nur bei neuen Einnahmen, sonst wie „Ohne eigenen Beleg“
+  const ertragAktiv = !bearbeitung && form?.typ === 'einnahme';
+  const weg: Ertragsweg = ertragAktiv ? ertrag.weg : 'ohne';
+  const dirty =
+    laden.status === 'ok' &&
+    !!form &&
+    ((!nurLesen && formularSchluessel(form) !== start) || (nimmtBelege && belege.length > 0) || (ertragAktiv && ertragSchluessel(ertrag) !== ertragStartWert));
 
   useEffect(() => {
     if (!open) return;
@@ -221,24 +293,171 @@ export function ErfassenSchublade() {
   const speichern = useCallback(
     async (undNeu: boolean) => {
       if (!form || !stamm || nurLesen || speichert) return;
-      const r = pruefeFormular(form, { kategorien: stamm.kategorien, kunden: stamm.kunden, heute: heute(), festBis: stamm.festBis, belegdatum: zeile?.belegdatum ?? null });
-      if (!r.ok) {
-        setFehler(r.fehler);
-        const erstes = (['betrag', 'kategorie', 'zahlungsdatum', 'beschreibung', 'wer', 'privat'] as const).find((k) => r.fehler[k]);
+      const h = heute();
+      const ui = useUi.getState();
+
+      /** Nach dem Speichern: schließen bzw. („Speichern & neu“) Typ, Datum, Zahlungsweg und Beleg-Art stehen lassen. */
+      const danach = async () => {
+        if (!undNeu) {
+          erfassenFertig();
+          return;
+        }
+        const [s, es] = await Promise.all([
+          ladeStamm().catch(() => stamm),
+          ertragAktiv ? ladeErtragStamm().catch(() => ertragStamm) : Promise.resolve(ertragStamm),
+        ]);
+        const f = leeresFormular(s, { typ: form.typ, datum: form.zahlungsdatum, zahlungsart: form.zahlungsart });
+        const e: Ertrag = { ...ertrag, adresse: '', leistung: '', offenId: null };
+        setStamm(s);
+        setForm(f);
+        setStart(formularSchluessel(f));
+        setErtragStamm(es);
+        setErtragWert(e);
+        setErtragStartWert(ertragSchluessel(e));
+        setErtragFehler(undefined);
+        belegeLeeren();
+        setFehler({});
+        setKatVorschlag(false);
+        setKatGewaehlt(false);
+        document.querySelector('.bu-drawer .drawer-body')?.scrollTo({ top: 0 });
+        setTimeout(() => document.getElementById('bf-betrag')?.focus({ preventScroll: true }), 30);
+      };
+
+      /* Offene Rechnung zuordnen: Betrag, Text und Kunde kommen aus der Rechnung – hier zählt nur das Zahlungsdatum */
+      if (weg === 'offen') {
+        const re = ertragStamm?.offene.find((x) => x.id === ertrag.offenId);
+        if (!re) {
+          setErtragFehler(ertragPruefen(form, ertrag, belege.length)?.text ?? 'Bitte eine offene Rechnung auswählen.');
+          wackeln(document.querySelector('.bu-drawer .bu-offen, .bu-drawer .bu-offen-empty'));
+          return;
+        }
+        const datumFehler = !istDatum(form.zahlungsdatum)
+          ? 'Bitte das Zahlungsdatum wählen.'
+          : stamm.festBis && form.zahlungsdatum <= stamm.festBis
+            ? `Bis ${datumKurz(stamm.festBis)} ist festgeschrieben – bitte ein späteres Datum.`
+            : null;
+        if (datumFehler) {
+          setFehler({ zahlungsdatum: datumFehler });
+          wackeln(document.getElementById('bf-zahlungsdatum')?.closest('.field') ?? null);
+          return;
+        }
+        setSpeichert(true);
+        try {
+          const res = await belegBezahlt(re.id, form.zahlungsdatum, form.zahlungsart, h);
+          ui.datenGeaendert();
+          if (belege.length && res.buchung_id != null && res.buchung_nummer) {
+            await anhaengen({ id: res.buchung_id, nummer: res.buchung_nummer, typ: 'einnahme' }, belege);
+          }
+          const ziel = { ...re, status: 'bezahlt' as const, bezahlt_am: form.zahlungsdatum, zahlungsart: form.zahlungsart };
+          toastMit({ text: `${re.nummer} bezahlt · Einnahme ${res.buchung_nummer ?? ''} gespeichert`, icon: 'check' }, [
+            { label: 'Beleg öffnen', run: () => navigate(`/belege/${re.id}`) },
+            { label: 'Rückgängig', run: () => belegDialog('doch-offen', ziel) },
+          ]);
+          await danach();
+        } catch (e) {
+          ui.showToast({ text: fehlerText(e), icon: 'warn', sticky: true });
+        } finally {
+          setSpeichert(false);
+        }
+        return;
+      }
+
+      const offenRechnung = weg === 'beleg' && rechnungOffen(ertrag);
+      // eine noch offene Rechnung trägt das Rechnungsdatum, keine Zahlung – die Festschreibung betrifft sie nicht
+      const r = pruefeFormular(form, {
+        kategorien: stamm.kategorien,
+        kunden: stamm.kunden,
+        heute: h,
+        festBis: offenRechnung ? null : stamm.festBis,
+        belegdatum: zeile?.belegdatum ?? null,
+      });
+      const ef = weg === 'beleg' ? ertragPruefen(form, ertrag, belege.length) : null;
+      if (!r.ok || ef) {
+        const alle: Partial<Record<FormFeld, string>> = { ...(ef?.feld === 'wer' ? { wer: ef.text } : {}), ...(r.ok ? {} : r.fehler) };
+        setFehler(alle);
+        if (ef && ef.feld !== 'wer') setErtragFehler(ef.text);
+        const erstes = (['betrag', 'kategorie', 'zahlungsdatum', 'beschreibung', 'wer', 'privat'] as const).find((k) => alle[k]);
         if (erstes) {
           const el = document.getElementById(`bf-${erstes}`);
           if (erstes === 'privat') (el?.closest('details') as HTMLDetailsElement | null)?.setAttribute('open', '');
           (el?.matches('input') ? el : el?.querySelector<HTMLElement>('button'))?.focus();
-          const feld = el?.closest('.field');
-          if (feld) {
-            feld.classList.remove('bu-shake');
-            void (feld as HTMLElement).offsetWidth;
-            feld.classList.add('bu-shake');
+          wackeln(el?.closest('.field') ?? null);
+        } else wackeln(document.querySelector('.bu-drawer .bu-scan'));
+        return;
+      }
+
+      /* Beleg erstellen: Quittung bzw. Rechnung samt Einnahme (außer bei offener Rechnung) in einer Transaktion */
+      if (weg === 'beleg') {
+        if (!ertragStamm) return;
+        const v = belegVorbereiten(form, ertrag, r.daten.betrag_cent, { ...ertragStamm, heute: h });
+        if (v.fehlt.length || !v.daten) {
+          const pfad = maskenPfad(ertrag.art, {
+            betrag: r.daten.betrag_cent,
+            datum: form.zahlungsdatum,
+            text: form.beschreibung,
+            kundeId: r.daten.kunde_id,
+            name: r.daten.neuer_kunde ?? undefined,
+            zahlungsart: form.zahlungsart,
+            bezahlt: ertrag.art === 'rechnung' && ertrag.bezahlt,
+            kategorieId: r.daten.kategorie_id,
+          });
+          const was = ertrag.art === 'rechnung' ? 'Rechnung' : 'Quittung';
+          toastMit({ key: 'ertrag-pflicht', text: `Für die ${was} fehlt noch: ${v.fehlt.join(' · ')}`, icon: 'warn', sticky: true }, [
+            {
+              label: 'In der Maske ergänzen',
+              run: () => {
+                erfassenFertig();
+                navigate(pfad);
+              },
+            },
+          ]);
+          return;
+        }
+        setSpeichert(true);
+        try {
+          const res = await belegAusstellen(null, v.daten, {
+            dokument: { ...v.dokument, akzent: ui.settings.accent },
+            bausteine: v.gedruckt,
+            kategorie_id: r.daten.kategorie_id,
+            heute: h,
+          });
+          ui.datenGeaendert();
+          const teile = [offenRechnung ? `${res.nummer} ausgestellt · noch offen` : `Einnahme gespeichert · ${res.nummer} erstellt`];
+          if (res.kunde_neu && res.kunde_nummer) teile.push(`neuer Kunde ${res.kunde_nummer}`);
+          // Schritt 2: unterschriebenes Exemplar (ergänzt den Beleg, ersetzt ihn nicht)
+          const scan = belege[0];
+          if (scan) {
+            try {
+              await belegScanAnhaengen(res.id, scan.pfad);
+              teile.push('unterschriebenes Exemplar abgelegt');
+            } catch (e) {
+              ui.showToast({ text: `Das unterschriebene Exemplar ließ sich nicht anhängen: ${fehlerText(e)} – in der Maske erneut versuchen.`, icon: 'warn', sticky: true });
+            }
           }
+          const ziel = {
+            id: res.id,
+            nummer: res.nummer,
+            art: ertrag.art,
+            status: offenRechnung ? ('offen' as const) : ('bezahlt' as const),
+            summe_cent: r.daten.betrag_cent,
+            zahlungsart: offenRechnung ? null : form.zahlungsart,
+            bezahlt_am: offenRechnung ? null : form.zahlungsdatum,
+            termin_id: null,
+          };
+          toastMit({ text: teile.join(' · '), icon: 'check' }, [
+            { label: 'Beleg öffnen', run: () => navigate(`/belege/${res.id}`) },
+            { label: 'Rückgängig', run: () => belegDialog('stornieren', ziel) },
+          ]);
+          void pdfNachholen(res.id);
+          await danach();
+        } catch (e) {
+          ui.showToast({ text: `Ausstellen ging nicht: ${fehlerText(e)}`, icon: 'warn', sticky: true });
+        } finally {
+          setSpeichert(false);
         }
         return;
       }
-      const ui = useUi.getState();
+
       const daten = belege.length ? { ...r.daten, belege: belege.map((b) => b.pfad) } : r.daten;
       setSpeichert(true);
       try {
@@ -255,41 +474,17 @@ export function ErfassenSchublade() {
         const z = zeitraum(modus, anker);
         const extra = `${res.kunde_neu && res.kunde_nummer ? ` · neuer Kunde ${res.kunde_nummer}` : ''}${imZeitraum(z, r.daten.zahlungsdatum) ? '' : ` · liegt außerhalb von ${z.label}`}`;
         const ziel = { id: res.id, nummer: res.nummer, typ: r.daten.typ };
-        ui.showToast({
-          text: `${typName(r.daten.typ)} gespeichert · ${res.nummer}${belegZusatz(res.belege_neu)}${extra}`,
-          icon: 'check',
-          actions: [
-            {
-              label: 'Rückgängig',
-              run: () => {
-                const t = useUi.getState().toasts.find((x) => x.text.startsWith(`${typName(r.daten.typ)} gespeichert · ${res.nummer}`));
-                if (t) useUi.getState().dismissToast(t.id);
-                void storniere(ziel, undefined, `${typName(r.daten.typ)} ${res.nummer} zurückgenommen · storniert (im Protokoll)`);
-              },
-            },
-          ],
-        });
-        if (undNeu) {
-          // Typ, Datum und Zahlungsweg bleiben stehen, der Rest wird geleert
-          const s = await ladeStamm().catch(() => stamm);
-          const f: Formular = { ...leeresFormular(s, { typ: form.typ, datum: form.zahlungsdatum, zahlungsart: form.zahlungsart }) };
-          setStamm(s);
-          setForm(f);
-          setStart(formularSchluessel(f));
-          belegeLeeren();
-          setFehler({});
-          setKatVorschlag(false);
-          setKatGewaehlt(false);
-          document.querySelector('.bu-drawer .drawer-body')?.scrollTo({ top: 0 });
-          setTimeout(() => document.getElementById('bf-betrag')?.focus({ preventScroll: true }), 30);
-        } else erfassenFertig();
+        toastMit({ text: `${typName(r.daten.typ)} gespeichert · ${res.nummer}${belegZusatz(res.belege_neu)}${extra}`, icon: 'check' }, [
+          { label: 'Rückgängig', run: () => void storniere(ziel, undefined, `${typName(r.daten.typ)} ${res.nummer} zurückgenommen · storniert (im Protokoll)`) },
+        ]);
+        await danach();
       } catch (e) {
         ui.showToast({ text: fehlerText(e), icon: 'warn', sticky: true });
       } finally {
         setSpeichert(false);
       }
     },
-    [form, stamm, zeile, nurLesen, speichert, belege],
+    [form, stamm, zeile, nurLesen, speichert, belege, weg, ertrag, ertragStamm, ertragAktiv, navigate],
   );
 
   // ⌘↩ speichern, ⇧⌘↩ speichern & neu
@@ -331,6 +526,47 @@ export function ErfassenSchublade() {
         Stornieren
       </button>
     ) : null;
+
+  /* ---------- Beleg zum Ertrag ---------- */
+  const onWeg = (w: Ertragsweg) => {
+    if (w === ertrag.weg) return;
+    // „Offene Rechnung zuordnen“ verlassen: deren Nummer gehört nicht an eine andere Einnahme (die Rechnung bleibt offen)
+    const re = ertrag.weg === 'offen' ? ertragStamm?.offene.find((x) => x.id === ertrag.offenId) : undefined;
+    if (re) setForm((f) => (f && f.belegnummer.trim() === re.nummer ? { ...f, belegnummer: '' } : f));
+    setErtrag({ weg: w, offenId: null });
+    setFehler({});
+  };
+  const onOffen = (z: RechnungsZeile) => {
+    const k = stamm?.kunden.find((x) => x.id === z.kunde_id);
+    setErtrag({ offenId: z.id });
+    setForm((f) =>
+      f
+        ? {
+            ...f,
+            betrag: betragAlsEingabe(z.summe_cent),
+            beschreibung: z.betreff ?? f.beschreibung,
+            wer: k ? kundenLabel(k) : (z.kunde_name ?? ''),
+            kundeBewusstNeu: null,
+            belegnummer: z.nummer ?? '',
+          }
+        : f,
+    );
+    setFehler({});
+  };
+  // Ausgabe ohne Beleg ⇒ Eigenbeleg in der Maske, mit den Eingaben (dort bucht „Buchen“ die Ausgabe mit)
+  const eigenbeleg = () => {
+    if (!form) return;
+    const pfad = maskenPfad('eigenbeleg', {
+      betrag: parseBetrag(form.betrag),
+      datum: form.zahlungsdatum,
+      text: form.beschreibung,
+      name: form.wer,
+      zahlungsart: form.zahlungsart,
+      kategorieId: form.kategorieId,
+    });
+    erfassenFertig();
+    navigate(pfad);
+  };
 
   const fuss = (
     <>
@@ -405,6 +641,26 @@ export function ErfassenSchublade() {
             katVorschlag={katVorschlag}
             set={set}
             fehlerWeg={fehlerWeg}
+            weg={weg}
+            belegArt={weg === 'beleg' ? ertrag.art : null}
+            offenRechnung={weg === 'beleg' && rechnungOffen(ertrag)}
+            ertragBereich={
+              ertragAktiv ? (
+                <BelegZumErtrag
+                  form={form}
+                  ertrag={ertrag}
+                  setErtrag={setErtrag}
+                  stamm={ertragStamm}
+                  ladeFehler={ertragLadeFehler}
+                  belege={belege}
+                  nimmtBelege={nimmtBelege}
+                  fehler={ertragFehler}
+                  onWeg={onWeg}
+                  onOffen={onOffen}
+                />
+              ) : null
+            }
+            onEigenbeleg={eigenbeleg}
             onTyp={(t) => {
               setForm((f) => {
                 if (!f || f.typ === t) return f;
@@ -453,6 +709,14 @@ interface InhaltProps {
   onKategorie: (id: number) => void;
   /** Kategorie als Vorschlag setzen (nur solange nicht selbst gewählt) */
   vorschlagen: (id: number | null) => void;
+  /** Beleg zum Ertrag (neue Einnahme), sonst 'ohne' */
+  weg: Ertragsweg;
+  /** Art des Belegs, der beim Speichern ausgestellt wird */
+  belegArt: ErtragsArt | null;
+  /** Rechnung „noch offen“: das Datum ist das Rechnungsdatum, gezahlt wird später */
+  offenRechnung: boolean;
+  ertragBereich: ReactNode;
+  onEigenbeleg: () => void;
 }
 
 const Fehler = ({ text }: { text?: string }) =>
@@ -463,14 +727,21 @@ const Fehler = ({ text }: { text?: string }) =>
   ) : null;
 
 const TIP_DATUM = 'Für die EÜR zählt der Tag, an dem das Geld geflossen ist (Zufluss-/Abflussprinzip, § 11 EStG) – nicht das Rechnungsdatum.';
+const TIP_RECHNUNGSDATUM = 'Datum der Rechnung. Die Einnahme wird erst erfasst, wenn das Geld eingeht – dann zählt der Zahlungstag (§ 11 EStG).';
 const TIP_NR = 'Bei Ausgaben die Rechnungs- oder Bonnummer des Geschäfts. Eigene Quittungen und Rechnungen (QU-/RE-…) bekommen ihre Nummer beim Ausstellen.';
 
-function FormularInhalt({ form, stamm, zeile, sp, belege, nimmtBelege, fehler, katVorschlag, set, fehlerWeg, onTyp, onKategorie, vorschlagen }: InhaltProps) {
+function FormularInhalt(props: InhaltProps) {
+  const { form, stamm, zeile, sp, belege, nimmtBelege, fehler, katVorschlag, set, fehlerWeg, onTyp, onKategorie, vorschlagen } = props;
+  const { weg, belegArt, offenRechnung, ertragBereich, onEigenbeleg } = props;
   const { pathname } = useLocation();
   const seiteZeitraum = useUi((s) => s.zeitraum);
   const ro = sp !== null;
   const typ = form.typ;
   const ausgabe = typ === 'ausgabe';
+  // „Offene Rechnung zuordnen“: Betrag, Text und Kunde kommen aus der Rechnung
+  const zuordnen = weg === 'offen';
+  // Beleg-Nr. nur ohne eigenen Beleg (sonst vergibt der Beleg die Nummer)
+  const mitNr = weg === 'ohne';
   const kats = stamm.kategorien.filter((k) => k.typ === typ);
   const kat = stamm.kategorien.find((k) => k.id === form.kategorieId);
   const cent = parseBetrag(form.betrag);
@@ -495,15 +766,16 @@ function FormularInhalt({ form, stamm, zeile, sp, belege, nimmtBelege, fehler, k
 
   const h = heute();
   const z = zeitraum(seiteZeitraum.modus, seiteZeitraum.anker);
+  // eine offene Rechnung trägt das Rechnungsdatum – Zahlungshinweise passen dort nicht
   let datumHint: ReactNode = null;
-  if (form.zahlungsdatum && form.zahlungsdatum > h)
+  if (!offenRechnung && form.zahlungsdatum && form.zahlungsdatum > h)
     datumHint = (
       <>
         <Clock />
         Liegt in der Zukunft – erfasst wird, wenn das Geld tatsächlich fließt.
       </>
     );
-  else if (form.zahlungsdatum && pathname === '/ein-ausgaenge' && !imZeitraum(z, form.zahlungsdatum))
+  else if (!offenRechnung && form.zahlungsdatum && pathname === '/ein-ausgaenge' && !imZeitraum(z, form.zahlungsdatum))
     datumHint = (
       <>
         <CalendarDays />
@@ -579,7 +851,7 @@ function FormularInhalt({ form, stamm, zeile, sp, belege, nimmtBelege, fehler, k
               spellCheck={false}
               placeholder="0,00"
               value={form.betrag}
-              readOnly={ro}
+              readOnly={ro || zuordnen}
               onChange={(e) => {
                 set('betrag', e.target.value);
                 fehlerWeg('betrag');
@@ -593,8 +865,9 @@ function FormularInhalt({ form, stamm, zeile, sp, belege, nimmtBelege, fehler, k
           </div>
           <Fehler text={fehler.betrag} />
           {betragHint && !fehler.betrag ? <p className="hint">{betragHint}</p> : null}
+          {zuordnen && !ro ? <p className="hint">Betrag der gewählten Rechnung – gebucht wird die Rechnungssumme.</p> : null}
         </div>
-        {kats.length > 1 || (kat && kat.typ !== typ) ? (
+        {!zuordnen && (kats.length > 1 || (kat && kat.typ !== typ)) ? (
           <div className="field">
             <span className="field-label">
               Kategorie
@@ -636,9 +909,9 @@ function FormularInhalt({ form, stamm, zeile, sp, belege, nimmtBelege, fehler, k
       <section>
         <h3>Angaben</h3>
         <div className="form-grid">
-          <div className="field">
-            <label className="field-label" htmlFor="bf-zahlungsdatum" title={TIP_DATUM}>
-              Zahlungsdatum
+          <div className={mitNr ? 'field' : 'field full'}>
+            <label className="field-label" htmlFor="bf-zahlungsdatum" title={offenRechnung ? TIP_RECHNUNGSDATUM : TIP_DATUM}>
+              {offenRechnung ? 'Rechnungsdatum' : 'Zahlungsdatum'}
               <span className="q" aria-hidden="true">
                 ?
               </span>
@@ -656,24 +929,26 @@ function FormularInhalt({ form, stamm, zeile, sp, belege, nimmtBelege, fehler, k
               }}
             />
           </div>
-          <div className="field">
-            <label className="field-label" htmlFor="bf-belegnummer" title={TIP_NR}>
-              Beleg-Nr.
-              <span className="q" aria-hidden="true">
-                ?
-              </span>
-            </label>
-            <input
-              id="bf-belegnummer"
-              className="input bu-nr-in"
-              autoComplete="off"
-              spellCheck={false}
-              placeholder="z. B. Bon 4711"
-              value={form.belegnummer}
-              readOnly={ro}
-              onChange={(e) => set('belegnummer', e.target.value)}
-            />
-          </div>
+          {mitNr ? (
+            <div className="field">
+              <label className="field-label" htmlFor="bf-belegnummer" title={TIP_NR}>
+                Beleg-Nr.
+                <span className="q" aria-hidden="true">
+                  ?
+                </span>
+              </label>
+              <input
+                id="bf-belegnummer"
+                className="input bu-nr-in"
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="z. B. Bon 4711"
+                value={form.belegnummer}
+                readOnly={ro}
+                onChange={(e) => set('belegnummer', e.target.value)}
+              />
+            </div>
+          ) : null}
           {fehler.zahlungsdatum ? (
             <div className="full">
               <Fehler text={fehler.zahlungsdatum} />
@@ -691,7 +966,7 @@ function FormularInhalt({ form, stamm, zeile, sp, belege, nimmtBelege, fehler, k
               autoComplete="off"
               placeholder={ausgabe ? 'Wofür? z. B. Diesel für den Transporter' : 'Wofür? z. B. Rasen mähen, Hecke schneiden'}
               value={form.beschreibung}
-              readOnly={ro}
+              readOnly={ro || zuordnen}
               onChange={(e) => {
                 set('beschreibung', e.target.value);
                 fehlerWeg('beschreibung');
@@ -700,46 +975,48 @@ function FormularInhalt({ form, stamm, zeile, sp, belege, nimmtBelege, fehler, k
             />
             <Fehler text={fehler.beschreibung} />
           </div>
-          <div className="field full">
-            <label className="field-label" htmlFor="bf-wer">
-              {ausgabe ? 'Geschäft' : 'Kunde'}
-              <small className="muted">optional</small>
-            </label>
-            <input
-              id="bf-wer"
-              className={`input ${fehler.wer ? 'invalid' : ''}`}
-              list={ro ? undefined : ausgabe ? 'bf-wer-geschaefte' : 'bf-wer-kunden'}
-              autoComplete="off"
-              placeholder={ausgabe ? 'z. B. Aral Tankstelle, Bauhaus …' : 'Name – aus deinen Kunden oder neu'}
-              value={form.wer}
-              readOnly={ro}
-              onChange={(e) => {
-                const v = e.target.value;
-                set('wer', v);
-                fehlerWeg('wer');
-                if (ausgabe) vorschlagen(geschaeftZu(v, stamm.geschaefte)?.kategorie_id ?? kategorieAusText(v, stamm.kategorien, typ));
-              }}
-            />
-            {ausgabe ? (
-              <datalist id="bf-wer-geschaefte">
-                {stamm.geschaefte.map((g) => (
-                  <option key={g.name} value={g.name}>
-                    {`${g.anzahl}× · ${g.kategorie_id != null ? (katName.get(g.kategorie_id) ?? '') : ''}`}
-                  </option>
-                ))}
-              </datalist>
-            ) : (
-              <datalist id="bf-wer-kunden">
-                {kundenOptionen.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </datalist>
-            )}
-            {!ausgabe && !ro ? <KundenHinweis form={form} kunden={stamm.kunden} set={set} fehlerWeg={fehlerWeg} /> : null}
-            <Fehler text={fehler.wer} />
-          </div>
+          {zuordnen ? null : (
+            <div className="field full">
+              <label className="field-label" htmlFor="bf-wer">
+                {ausgabe ? 'Geschäft' : 'Kunde'}
+                <small className="muted">{belegArt === 'rechnung' ? 'für die Rechnung nötig' : 'optional'}</small>
+              </label>
+              <input
+                id="bf-wer"
+                className={`input ${fehler.wer ? 'invalid' : ''}`}
+                list={ro ? undefined : ausgabe ? 'bf-wer-geschaefte' : 'bf-wer-kunden'}
+                autoComplete="off"
+                placeholder={ausgabe ? 'z. B. Aral Tankstelle, Bauhaus …' : 'Name – aus deinen Kunden oder neu'}
+                value={form.wer}
+                readOnly={ro}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  set('wer', v);
+                  fehlerWeg('wer');
+                  if (ausgabe) vorschlagen(geschaeftZu(v, stamm.geschaefte)?.kategorie_id ?? kategorieAusText(v, stamm.kategorien, typ));
+                }}
+              />
+              {ausgabe ? (
+                <datalist id="bf-wer-geschaefte">
+                  {stamm.geschaefte.map((g) => (
+                    <option key={g.name} value={g.name}>
+                      {`${g.anzahl}× · ${g.kategorie_id != null ? (katName.get(g.kategorie_id) ?? '') : ''}`}
+                    </option>
+                  ))}
+                </datalist>
+              ) : (
+                <datalist id="bf-wer-kunden">
+                  {kundenOptionen.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </datalist>
+              )}
+              {!ausgabe && !ro ? <KundenHinweis form={form} kunden={stamm.kunden} set={set} fehlerWeg={fehlerWeg} /> : null}
+              <Fehler text={fehler.wer} />
+            </div>
+          )}
         </div>
         {ausgabe ? (
           <details className="bu-more" open={Boolean(privatProzent(form.privat)) || Boolean(fehler.privat)}>
@@ -778,48 +1055,34 @@ function FormularInhalt({ form, stamm, zeile, sp, belege, nimmtBelege, fehler, k
         ) : null}
       </section>
 
-      <section>
-        <h3>Bezahlt per</h3>
-        <div className="bu-zw" role="radiogroup" aria-label="Bezahlt per">
-          {ZAHLUNGSWEGE.map((zw) => {
-            const Icon = ZAHLUNGSWEG_ICON[zw.id];
-            const an = form.zahlungsart === zw.id;
-            return (
-              <button key={zw.id} type="button" className={`bu-zw-opt ${an ? 'on' : ''}`} role="radio" aria-checked={an} disabled={ro} onClick={() => set('zahlungsart', zw.id)}>
-                <Icon />
-                <b>{zw.name}</b>
-                <small>{zw.text}</small>
-              </button>
-            );
-          })}
-        </div>
-        {form.zahlungsart === 'bar' && !ro ? <p className="hint">Bargeld einzeln und zeitnah festhalten (§ 146 AO) – Bon bzw. Quittung aufheben.</p> : null}
-      </section>
+      {offenRechnung ? null : (
+        <section>
+          <h3>Bezahlt per</h3>
+          <div className="bu-zw" role="radiogroup" aria-label="Bezahlt per">
+            {ZAHLUNGSWEGE.map((zw) => {
+              const Icon = ZAHLUNGSWEG_ICON[zw.id];
+              const an = form.zahlungsart === zw.id;
+              return (
+                <button key={zw.id} type="button" className={`bu-zw-opt ${an ? 'on' : ''}`} role="radio" aria-checked={an} disabled={ro} onClick={() => set('zahlungsart', zw.id)}>
+                  <Icon />
+                  <b>{zw.name}</b>
+                  <small>{zw.text}</small>
+                </button>
+              );
+            })}
+          </div>
+          {form.zahlungsart === 'bar' && !ro && weg !== 'beleg' ? (
+            <p className="hint">Bargeld einzeln und zeitnah festhalten (§ 146 AO) – Bon bzw. Quittung aufheben.</p>
+          ) : null}
+        </section>
+      )}
 
       <section>
         <h3>{ausgabe ? 'Beleg' : 'Beleg zum Ertrag'}</h3>
-        {ausgabe ? null : (
-          <div className="bu-ew" role="radiogroup" aria-label="Beleg zum Ertrag">
-            <button type="button" className="bu-zw-opt" role="radio" aria-checked={false} disabled title="kommt in Phase 3">
-              <Receipt />
-              <b>Beleg erstellen</b>
-              <small>kommt in Phase 3</small>
-            </button>
-            <button type="button" className="bu-zw-opt" role="radio" aria-checked={false} disabled title="kommt in Phase 3">
-              <Clock />
-              <b>Offene Rechnung zuordnen</b>
-              <small>kommt in Phase 3</small>
-            </button>
-            <button type="button" className="bu-zw-opt on" role="radio" aria-checked>
-              <Upload />
-              <b>Ohne eigenen Beleg</b>
-              <small>z. B. Plattform-Auszahlung</small>
-            </button>
-          </div>
-        )}
+        {ausgabe ? null : ertragBereich}
         <VorhandeneBelege liste={abgelegt} />
-        {nimmtBelege ? <VorgemerkteBelege belege={belege} wann={wann} /> : null}
-        {nimmtBelege ? (
+        {nimmtBelege && weg !== 'beleg' ? <VorgemerkteBelege belege={belege} wann={wann} /> : null}
+        {nimmtBelege && weg !== 'beleg' ? (
           hatDateien ? (
             <BelegDropzone kompakt titel="Weiteren Beleg hierher ziehen oder klicken" text="" />
           ) : (
@@ -836,9 +1099,9 @@ function FormularInhalt({ form, stamm, zeile, sp, belege, nimmtBelege, fehler, k
               Ohne Beleg fehlt der Nachweis fürs Finanzamt. Rechnung oder Kassenbon hierher ziehen.
             </p>
             <div className="bu-nobeleg-links">
-              <button type="button" className="link" disabled title="kommt in Phase 3">
+              <button type="button" className="link" title="Eigenbeleg mit diesen Angaben in der Beleg-Maske erstellen – „Buchen“ bucht die Ausgabe mit" onClick={onEigenbeleg}>
                 <FilePlus />
-                Kein Beleg? Eigenbeleg erstellen · kommt in Phase 3
+                Kein Beleg? Eigenbeleg erstellen
               </button>
             </div>
           </div>

@@ -6,6 +6,7 @@ import { create } from 'zustand';
 import { useUi } from '../store/ui';
 import { belegeZusammenfuehren, type VorgemerkterBeleg } from './belege';
 import type { BuchungTyp, Zahlungsart } from './buchungen';
+import type { ErtragsArt } from './ertrag';
 
 export interface Vorbelegung {
   typ?: BuchungTyp;
@@ -23,6 +24,8 @@ export interface Vorbelegung {
   belegnummer?: string;
   /** schon geprüfte Belegdateien (Datei-Drop, ⌘O) */
   belege?: VorgemerkterBeleg[];
+  /** Einnahme mit eigenem Beleg, Art vorgewählt (Neu-Menü, Befehlspalette, Menü „Quittung/Rechnung schreiben …“) */
+  beleg?: ErtragsArt;
 }
 
 export type Auftrag = { art: 'neu'; vorbelegung: Vorbelegung; n: number } | { art: 'bearbeiten'; id: number; n: number };

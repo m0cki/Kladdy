@@ -151,9 +151,11 @@ function NeuMenue({ naechste }: { naechste: Partial<Record<Belegart, string>> })
     };
   }, [offen]);
 
+  // Quittung und Rechnung über die eine Erfassen-Schublade (Beleg und Einnahme zusammen), Angebot und Eigenbeleg in der Maske
   const waehle = (art: Belegart) => {
     setOffen(false);
-    navigate(`/belege/neu?art=${art}`);
+    if (art === 'quittung' || art === 'rechnung') erfassen({ typ: 'einnahme', beleg: art });
+    else navigate(`/belege/neu?art=${art}`);
   };
 
   const tasten = (e: KeyboardEvent<HTMLDivElement>) => {
