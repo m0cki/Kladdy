@@ -1,13 +1,15 @@
 /* Einstellungen › Steuern (§6.10, §2.6, §2.8): Kleinunternehmer oder Regelbesteuerung, Steuer-Kennwerte pro Jahr
  * (Anzeige in €, gespeichert in Cent bzw. ganzen Prozent), „Jahr anlegen“ mit den Werten des Vorjahres,
- * Kategorien mit EÜR-Bereich (vorerst nur lesend). Speichern über lib/queries (jede Änderung ins Protokoll). */
+ * Kategorien und EÜR-Zuordnung pro Jahr (Kategorien.tsx). Speichern über lib/queries (jede Änderung ins Protokoll). */
 import { useEffect, useState, type KeyboardEvent } from 'react';
-import { CalendarPlus, Info, Landmark, TriangleAlert } from 'lucide-react';
-import { ladeKategorien, type KategorieZeile } from '../../lib/queries/kategorien';
+import { CalendarPlus, Landmark, TriangleAlert } from 'lucide-react';
+import type { EuerZeile, Kategorie } from '../../lib/kategorien';
+import { ladeEuerZeilen, ladeKategorien } from '../../lib/queries/kategorien';
 import { ladeUstModus, speichereUstModus, type UstModus } from '../../lib/queries/einstellungen';
 import { ladeKennwerte, legeJahrAn, speichereKennwert } from '../../lib/queries/steuer';
 import {
   KENNWERTE,
+  anzeigeJahr,
   jahrFehler,
   jahrVorschlag,
   kennwertAlsEingabe,
@@ -18,25 +20,24 @@ import {
 } from '../../lib/steuer-kennwerte';
 import { useUi } from '../../store/ui';
 import { Seg } from '../../components/ui/Seg';
+import { EuerZuordnungKarte, KategorienKarte } from './Kategorien';
 import { Ladeansicht, fehlerText, useLaden } from './Laden';
 import { SetCard, SetRow } from './SetRow';
 
 interface SteuerDaten {
   modus: UstModus;
   kennwerte: Map<number, KennwerteJahr>;
-  kategorien: KategorieZeile[];
+  /** alle, auch ausgeblendete */
+  kategorien: Kategorie[];
+  euer: EuerZeile[];
 }
 
 const ladeSteuern = async (): Promise<SteuerDaten> => {
-  const [modus, kennwerte, kategorien] = await Promise.all([ladeUstModus(), ladeKennwerte(), ladeKategorien()]);
-  return { modus, kennwerte, kategorien };
+  const [modus, kennwerte, kategorien, euer] = await Promise.all([ladeUstModus(), ladeKennwerte(), ladeKategorien(), ladeEuerZeilen()]);
+  return { modus, kennwerte, kategorien, euer };
 };
 
 const diesesJahr = () => new Date().getFullYear();
-
-/** Angezeigtes Jahr: das laufende, wenn es Werte hat, sonst das neueste. */
-const startJahr = (jahre: readonly number[]): number | null =>
-  jahre.includes(diesesJahr()) ? diesesJahr() : jahre.length ? Math.max(...jahre) : null;
 
 export default function Steuern() {
   const { zustand, neuLaden, erneut } = useLaden(ladeSteuern);
@@ -45,7 +46,8 @@ export default function Steuern() {
     <>
       <Steuermodus modus={zustand.daten.modus} neuLaden={neuLaden} />
       <Kennwerte kennwerte={zustand.daten.kennwerte} neuLaden={neuLaden} />
-      <Kategorien kategorien={zustand.daten.kategorien} />
+      <KategorienKarte kategorien={zustand.daten.kategorien} neuLaden={neuLaden} i={3} />
+      <EuerZuordnungKarte kategorien={zustand.daten.kategorien} zeilen={zustand.daten.euer} neuLaden={neuLaden} i={4} />
     </>
   );
 }
@@ -105,7 +107,7 @@ function Steuermodus({ modus, neuLaden }: { modus: UstModus; neuLaden: () => Pro
 function Kennwerte({ kennwerte, neuLaden }: { kennwerte: Map<number, KennwerteJahr>; neuLaden: () => Promise<void> }) {
   const toast = useUi((s) => s.toast);
   const jahre = [...kennwerte.keys()].sort((a, b) => a - b);
-  const [jahr, setJahr] = useState<number | null>(() => startJahr(jahre));
+  const [jahr, setJahr] = useState<number | null>(() => anzeigeJahr(jahre, diesesJahr()));
   const [entwurf, setEntwurf] = useState<Partial<Record<string, string>>>({});
   const [fehler, setFehler] = useState<Partial<Record<string, string>>>({});
   const [neuesJahr, setNeuesJahr] = useState(() => String(jahrVorschlag(jahre, diesesJahr())));
@@ -291,44 +293,6 @@ function Kennwerte({ kennwerte, neuLaden }: { kennwerte: Map<number, KennwerteJa
               : 'Neue Jahre übernehmen die Werte des Vorjahres.'}
           </p>
         )}
-      </div>
-    </SetCard>
-  );
-}
-
-/* ---------- Kategorien & EÜR-Zuordnung (lesend) ---------- */
-
-function Kategorien({ kategorien }: { kategorien: KategorieZeile[] }) {
-  return (
-    <SetCard title="Kategorien & EÜR-Zuordnung" i={3}>
-      <div className="table-wrap" data-setting="kategorien">
-        <table className="fin-table">
-          <thead>
-            <tr>
-              <th className="l">Kategorie</th>
-              <th className="l">Art</th>
-              <th className="l">EÜR-Bereich</th>
-              <th>abziehbar</th>
-            </tr>
-          </thead>
-          <tbody>
-            {kategorien.map((k) => (
-              <tr key={k.id}>
-                <td className="l">{k.name}</td>
-                <td className="l">{k.typ === 'einnahme' ? 'Einnahme' : 'Ausgabe'}</td>
-                <td className="l wrap">{k.euer_bereich ?? '—'}</td>
-                <td className="num">{k.abziehbar_prozent} %</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="set-note">
-        <Info />
-        <span>
-          Kategorien hinzufügen, umbenennen oder archivieren und die Zuordnung zu den Zeilen der Anlage EÜR pro Jahr kommen
-          später. Bis dahin gelten die Standardkategorien.
-        </span>
       </div>
     </SetCard>
   );

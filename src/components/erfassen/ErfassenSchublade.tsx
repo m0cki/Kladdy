@@ -112,8 +112,14 @@ interface Stamm {
   festBis: string | null;
 }
 
-async function ladeStamm(): Promise<Stamm> {
-  const [kategorien, kunden, lieferanten, festBis] = await Promise.all([ladeKategorienWahl(), ladeKundenKurz(), ladeLieferanten(), ladeFestBis()]);
+/** `behalten`: Kategorie der bearbeiteten Buchung – bleibt als Kachel wählbar, auch wenn sie inzwischen ausgeblendet ist. */
+async function ladeStamm(behalten: number | null = null): Promise<Stamm> {
+  const [kategorien, kunden, lieferanten, festBis] = await Promise.all([
+    ladeKategorienWahl({ auch: behalten }),
+    ladeKundenKurz(),
+    ladeLieferanten(),
+    ladeFestBis(),
+  ]);
   return { kategorien, kunden, geschaefte: geschaefte(lieferanten), festBis };
 }
 
@@ -246,21 +252,21 @@ export function ErfassenSchublade() {
     setKatGewaehlt(false);
     (async () => {
       const neu = auftrag.art === 'neu';
+      // Beim Bearbeiten zuerst die Buchung: ihre Kategorie bleibt wählbar, auch wenn sie inzwischen ausgeblendet ist
+      let z: BuchungZeile | null = null;
+      if (auftrag.art === 'bearbeiten') {
+        z = await ladeBuchung(auftrag.id);
+        if (!z) throw new Error('Diesen Eintrag gibt es nicht (mehr).');
+      }
       // Belege zum Ertrag nur für neue Einträge; scheitert das Laden, bleibt „Ohne eigenen Beleg“
       const [s, es, b] = await Promise.all([
-        ladeStamm(),
+        ladeStamm(z?.kategorie_id ?? null),
         neu ? ladeErtragStamm().then((x): ErtragStamm | string => x, (e: unknown) => fehlerText(e)) : Promise.resolve(null),
         neu ? ladeBezug(auftrag.vorbelegung, heute()) : Promise.resolve(null),
       ]);
       // was der Aufrufer nicht vorgibt, kommt aus Termin bzw. Entwurf (Kunde, Betrag, Leistung, Art)
       const v: Vorbelegung = auftrag.art === 'neu' ? vorbelegungMitBezug(auftrag.vorbelegung, b) : {};
-      let f: Formular;
-      let z: BuchungZeile | null = null;
-      if (auftrag.art === 'bearbeiten') {
-        z = await ladeBuchung(auftrag.id);
-        if (!z) throw new Error('Diesen Eintrag gibt es nicht (mehr).');
-        f = formularAus(z);
-      } else f = leeresFormular(s, v);
+      const f: Formular = z ? formularAus(z) : leeresFormular(s, v);
       if (!aktiv) return;
       const esOk = es && typeof es !== 'string' ? es : null;
       const e0: Ertrag = { ...ertragStart(v, esOk?.belegArt ?? 'quittung'), ...(b?.entwurf ? ertragAusEntwurf(b.entwurf) : {}) };

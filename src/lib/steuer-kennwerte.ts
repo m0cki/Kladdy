@@ -82,12 +82,16 @@ export function jahrVorschlag(jahre: readonly number[], aktuell: number): number
   return Math.max(...jahre) + 1;
 }
 
-/** Fehler beim Anlegen eines Jahres oder null. */
-export function jahrFehler(jahr: number, jahre: readonly number[]): string | null {
+/** Fehler beim Anlegen eines Jahres oder null. `was` = was es je Jahr gibt (auch für die EÜR-Zuordnung, lib/kategorien.ts). */
+export function jahrFehler(jahr: number, jahre: readonly number[], was = 'Kennwerte'): string | null {
   if (!Number.isInteger(jahr) || jahr < JAHR_MIN || jahr > JAHR_MAX) return `Bitte ein Jahr zwischen ${JAHR_MIN} und ${JAHR_MAX} eintragen.`;
-  if (jahre.includes(jahr)) return `Für ${jahr} gibt es schon Kennwerte.`;
+  if (jahre.includes(jahr)) return `Für ${jahr} gibt es schon ${was}.`;
   return null;
 }
+
+/** Angezeigtes Jahr einer Tabelle pro Jahr: das laufende, wenn es dafür Werte gibt, sonst das neueste (null = noch keins). */
+export const anzeigeJahr = (jahre: readonly number[], aktuell: number): number | null =>
+  jahre.includes(aktuell) ? aktuell : jahre.length ? Math.max(...jahre) : null;
 
 /**
  * Aus welchem Jahr ein neues Jahr seine Werte übernimmt: das nächstältere vorhandene Jahr,

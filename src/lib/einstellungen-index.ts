@@ -106,7 +106,21 @@ export const EINSTELLUNGEN: readonly EinstellungsEintrag[] = [
   { id: 'kennwerte', label: 'Steuer-Kennwerte pro Jahr', bereich: 'steuern', keywords: ['Kennwerte', 'Grenzen', 'Pauschalen', 'Parameter'] },
   { id: 'kennwerte-jahr', label: 'Steuer-Kennwerte: Jahr anlegen', bereich: 'steuern', keywords: ['neues Jahr', 'Kennwerte', 'kopieren'] },
   ...KENNWERTE.map((k) => ({ id: `kw-${k.schluessel}`, label: k.label, bereich: 'steuern' as const, keywords: ['Kennwert', ...(k.hinweis ? [k.hinweis] : [])] })),
-  { id: 'kategorien', label: 'Kategorien & EÜR-Zuordnung', bereich: 'steuern', keywords: ['EÜR', 'Kategorie', 'abziehbar'] },
+  {
+    id: 'kategorien',
+    label: 'Kategorien',
+    bereich: 'steuern',
+    keywords: ['Kategorie', 'umbenennen', 'bearbeiten', 'Stichworte', 'abziehbar', 'Wareneingangsbuch', 'Kleinunternehmer-Umsatz', 'EÜR-Bereich'],
+  },
+  { id: 'kategorie-neu', label: 'Kategorie hinzufügen', bereich: 'steuern', keywords: ['neue Kategorie', 'anlegen'] },
+  {
+    id: 'kategorien-ausgeblendet',
+    label: 'Ausgeblendete Kategorien',
+    bereich: 'steuern',
+    keywords: ['archivieren', 'archiviert', 'einblenden', 'ausblenden', 'optional', 'AfA', 'Abschreibung', 'Bewirtung', 'Geschenke', 'Homeoffice'],
+  },
+  { id: 'euer-zuordnung', label: 'EÜR-Zuordnung pro Jahr', bereich: 'steuern', keywords: ['EÜR', 'Anlage EÜR', 'Zeile', 'Zeilennummer', 'ELSTER'] },
+  { id: 'euer-jahr', label: 'EÜR-Zuordnung: Jahr anlegen', bereich: 'steuern', keywords: ['neues Jahr', 'EÜR', 'kopieren'] },
   /* Nummernkreise (§5, §6.10) */
   { id: 'nummernkreise', label: 'Nummernkreise', bereich: 'nummernkreise', keywords: ['Muster', 'Nummer', 'Platzhalter', 'fortlaufend'] },
   ...KREIS_REIHENFOLGE.map((id) => ({

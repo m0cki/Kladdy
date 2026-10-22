@@ -96,7 +96,8 @@ export default function EinAusgaenge() {
   const laden = useCallback(
     async (): Promise<Daten> => {
       void datenStand; // nach jedem Schreibvorgang neu laden
-      const [zeilen, kategorien] = await Promise.all([ladeBuchungen(z.von, z.bis), ladeKategorienWahl()]);
+      // Filter: auch ausgeblendete Kategorien, die Buchungen haben (Einstellungen › Steuern)
+      const [zeilen, kategorien] = await Promise.all([ladeBuchungen(z.von, z.bis), ladeKategorienWahl({ benutzte: true })]);
       return { zeilen, kategorien };
     },
     [z.von, z.bis, datenStand],

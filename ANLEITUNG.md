@@ -1678,7 +1678,7 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
      (ohne Protokoll je Zeile, nichts festgeschrieben). Tectonic: `src-tauri/src/tectonic.rs` (`tectonic_finden` in der
      Reihenfolge aus §3.1, für `compile_latex` wiederverwendbar; `tectonic_suchen`, `tectonic_pfad_pruefen`,
      `tectonic_pruefen` mit `--version` und Zeitlimit), eigener Pfad in `einstellungen['tectonic_pfad']`
-- **Nächste Migration:** `0007` (ausgelieferte Migrationen nie ändern).
+- **Nächste Migration:** `0009` (`0007` und `0008` sind vergeben; ausgelieferte Migrationen nie ändern).
 - **Phase 1 abgeschlossen.** Weiter mit **Phase 2** in Teilen (je ein PR): 1. Diagramm-Komponenten (§9.6, §9.5) ·
   2. Auswertung mit großem Umschalter + Überblick (§6.9.1) · 3. Liquidität (§6.9.2) · 4. Suche/Befehlspalette ⌘K (§6.2)
 - **Phase 2 in Teilen:**
@@ -1932,10 +1932,26 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
   (scharf, wie in der Vorschau); Rechnung ausstellen, danach Logo wechseln bzw. zurücksetzen ⇒ die ausgestellte Rechnung
   zeigt in der Maske weiter das alte Logo, neue Belege das neue; „Zurücksetzen“ ⇒ App-Symbol, „Rückgängig“ holt das Logo
   zurück; Einträge `firmenlogo` im Protokoll; im Demo-Modus eigenes Logo, „Demo-Daten entfernen“ räumt es weg.
-- **Offen aus Phase 1 (Teil 1+2):** optionale Kategorien (AfA,
-  Bewirtung, Geschenke, Homeoffice), Kategorien bearbeiten und EÜR-Zuordnung pro Jahr (braucht eigene Tabelle),
-  sichtbare Fehlermeldung statt stillem Abbruch, wenn die Sicherung vor einer
+- **Offen aus Phase 1 (Teil 1+2):** sichtbare Fehlermeldung statt stillem Abbruch, wenn die Sicherung vor einer
   Migration fehlschlägt, Regelbesteuerung wirkt noch nicht auf Buchungen/Belege.
+- **Aus Phase 1 nachgeholt:** Kategorien bearbeiten, optionale Kategorien und EÜR-Zuordnung pro Jahr – **erledigt (Branch
+  `kategorien-euer`, auf dem Ende der Phase-3-Kette)**: Migration `0008_kategorien` (Katalog Abschreibungen (AfA), Bewirtung 70 %, Geschenke, Homeoffice,
+  ausgeblendet = `archiviert = 1` wie vom Nutzer Ausgeblendetes, kein eigenes Katalog-Kennzeichen; Tabelle
+  `euer_zuordnung (jahr, kategorie_id, euer_bereich, euer_zeile)` mit Startwerten 2026: Bereich NULL = wie die Kategorie,
+  Zeilen leer, bis sie im Formular des Jahres geprüft sind; Trigger: je Art bleibt eine Kategorie sichtbar, die Art einer
+  benutzten Kategorie steht fest; Index `buchungen_kategorie_id`). Einstellungen › Steuern
+  (`src/pages/einstellungen/Kategorien.tsx`): Kategorien je Art mit Symbol, Stichworten, EÜR-Bereich, abziehbar %,
+  KU-Umsatz und Wareneingangsbuch; hinzufügen, bearbeiten (die Art steht nach dem Anlegen fest), aus- und einblenden mit
+  Rückgängig, nie löschen. EÜR-Zuordnung je Jahr (Zeile der Anlage EÜR, bei Bedarf eigener Bereich; Speichern beim
+  Verlassen wie die Kennwerte; „Jahr anlegen“ kopiert das Vorjahr; ein Jahr ohne Zuordnung nimmt die des nächstälteren).
+  Geschrieben wird wie bei den übrigen Einstellungen (je Änderung ein SQL-Befehl plus Protokoll in der Schreib-Warteschlange,
+  Regeln über mehrere Zeilen im Befehl selbst, Trigger als letzte Sicherung) in `src/lib/queries/kategorien.ts`, Logik in
+  `src/lib/kategorien.ts`. Erfassen-Schublade: beim Bearbeiten bleibt eine inzwischen ausgeblendete Kategorie wählbar;
+  der Filter in Ein- & Ausgänge bietet auch ausgeblendete Kategorien mit Buchungen an. **Phase 5:** Die EÜR liest
+  `ladeEuerZuordnung(jahr)` (alle Kategorien, auch ausgeblendete); beim Festschreiben eines Jahres dessen Zuordnung
+  einfrieren (Bereich NULL ⇒ Bereich der Kategorie eintragen), sonst wirkt eine spätere Änderung am EÜR-Bereich einer
+  Kategorie auch auf alte Jahre. AfA und Homeoffice sind für das Anlagen- bzw. Pauschalen-Modul gedacht (`art` 'afa' bzw.
+  'pauschale'); eingeblendet lassen sie sich bis dahin auch für normale Zahlungen wählen.
 - **Updater überarbeitet** (eigener kleiner PR): Laden und Neustart getrennt, „Später“ ⇒ beim nächsten Start aktiv,
   im Dev nie installieren (Details §3.2 Punkt 5). v1.0.1 veröffentlicht (15.10.2026), Update von 1.0.0 aus getestet
   (noch mit dem alten Ablauf der 1.0.0); den neuen Ablauf zeigt erst das nächste Update ab 1.0.1.
