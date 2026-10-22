@@ -206,8 +206,35 @@ static ZWISCHEN: AtomicU64 = AtomicU64::new(0);
 pub fn ablegen(ablage: &Path, datei: &Datei, jahr: i64) -> Result<Abgelegt, String> {
     let (sha256, groesse) = sha256_datei(&datei.quelle)?;
     groesse_pruefen(groesse)?;
+    let quelle = File::open(&datei.quelle)
+        .map_err(|e| format!("Die Datei konnte nicht abgelegt werden: {e}"))?;
+    ablegen_als(ablage, jahr, sha256, groesse, &datei.endung, quelle)
+}
+
+/// Legt Bytes ohne Quelldatei unverändert ab, z. B. das PDF eines ausgestellten Belegs (rechnungen.rs).
+pub fn bytes_ablegen(
+    ablage: &Path,
+    daten: &[u8],
+    endung: &str,
+    jahr: i64,
+) -> Result<Abgelegt, String> {
+    groesse_pruefen(daten.len() as u64)?;
+    let (sha256, groesse) =
+        sha256_lesen(daten).map_err(|e| format!("Prüfsumme nicht berechenbar: {e}"))?;
+    ablegen_als(ablage, jahr, sha256, groesse, endung, daten)
+}
+
+/// Gemeinsamer Teil: Zielname aus der Prüfsumme, nie überschreiben, über eine Zwischendatei schreiben und verknüpfen.
+fn ablegen_als(
+    ablage: &Path,
+    jahr: i64,
+    sha256: String,
+    groesse: u64,
+    endung: &str,
+    quelle: impl Read,
+) -> Result<Abgelegt, String> {
     let jahr_ordner = format!("{jahr:04}");
-    let pfad = format!("{jahr_ordner}/{sha256}.{}", datei.endung);
+    let pfad = format!("{jahr_ordner}/{sha256}.{endung}");
     let ziel = ablage.join(&pfad);
     let ergebnis = |neu| Abgelegt {
         pfad: pfad.clone(),
@@ -226,7 +253,7 @@ pub fn ablegen(ablage: &Path, datei: &Datei, jahr: i64) -> Result<Abgelegt, Stri
         std::process::id(),
         ZWISCHEN.fetch_add(1, Ordering::Relaxed)
     ));
-    let gelinkt = kopieren_und_verknuepfen(&datei.quelle, &zwischen, &ziel, &sha256);
+    let gelinkt = kopieren_und_verknuepfen(quelle, &zwischen, &ziel, &sha256);
     let _ = fs::remove_file(&zwischen);
     match gelinkt {
         Ok(()) => Ok(ergebnis(true)),
@@ -242,7 +269,7 @@ enum Fehler {
 }
 
 fn kopieren_und_verknuepfen(
-    quelle: &Path,
+    mut quelle: impl Read,
     zwischen: &Path,
     ziel: &Path,
     sha256: &str,
@@ -250,13 +277,12 @@ fn kopieren_und_verknuepfen(
     let kopierfehler =
         |e: io::Error| Fehler::Text(format!("Die Datei konnte nicht abgelegt werden: {e}"));
     {
-        let mut ein = File::open(quelle).map_err(kopierfehler)?;
         let mut aus = OpenOptions::new()
             .write(true)
             .create_new(true)
             .open(zwischen)
             .map_err(kopierfehler)?;
-        io::copy(&mut ein, &mut aus).map_err(kopierfehler)?;
+        io::copy(&mut quelle, &mut aus).map_err(kopierfehler)?;
         aus.flush().map_err(kopierfehler)?;
         aus.sync_all().map_err(kopierfehler)?;
     }
@@ -399,28 +425,60 @@ pub(crate) async fn belege_ablegen(
         if a.neu {
             neue_dateien.push(a.pfad.clone());
         }
-        let id = sqlx::query(
-            "INSERT INTO belege (buchung_id, pfad, originalname, mime, sha256, groesse, art, aufbewahren_bis, erstellt_am)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        )
-        .bind(buchung_id)
-        .bind(&a.pfad)
-        .bind(&d.name)
-        .bind(d.mime)
-        .bind(&a.sha256)
-        .bind(a.groesse as i64)
-        .bind(d.art)
-        .bind(&bis)
-        .bind(zeitpunkt)
-        .execute(&mut *tx)
-        .await
-        .map_err(db_fehler)?
-        .last_insert_rowid();
-        let neu = zeile_json(tx, "belege", id).await?;
-        protokollieren(tx, zeitpunkt, "belege", id, "neu", None, neu.as_ref()).await?;
-        ids.push(id);
+        let zeile = NeueZeile {
+            buchung_id: Some(buchung_id),
+            rechnung_id: None,
+            abgelegt: &a,
+            originalname: &d.name,
+            mime: d.mime,
+            art: d.art,
+            aufbewahren_bis: &bis,
+        };
+        ids.push(zeile_einfuegen(tx, &zeile, zeitpunkt).await?);
     }
     Ok(ids)
+}
+
+/// Was zu einer abgelegten Datei in `belege` eingetragen wird.
+pub(crate) struct NeueZeile<'a> {
+    pub buchung_id: Option<i64>,
+    pub rechnung_id: Option<i64>,
+    pub abgelegt: &'a Abgelegt,
+    pub originalname: &'a str,
+    pub mime: &'a str,
+    /// 'beleg' | 'erechnung_xml' | 'rechnung_pdf'
+    pub art: &'a str,
+    pub aufbewahren_bis: &'a str,
+}
+
+/// Schreibt eine Zeile in `belege` samt Protokoll ('neu', ganze Zeile). Läuft in der Transaktion des Aufrufers.
+pub(crate) async fn zeile_einfuegen(
+    tx: &mut SqliteConnection,
+    z: &NeueZeile<'_>,
+    zeitpunkt: &str,
+) -> Result<i64, String> {
+    let id = sqlx::query(
+        "INSERT INTO belege (buchung_id, rechnung_id, pfad, originalname, mime, sha256, groesse, art, aufbewahren_bis,
+           erstellt_am)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(z.buchung_id)
+    .bind(z.rechnung_id)
+    .bind(&z.abgelegt.pfad)
+    .bind(z.originalname)
+    .bind(z.mime)
+    .bind(&z.abgelegt.sha256)
+    .bind(z.abgelegt.groesse as i64)
+    .bind(z.art)
+    .bind(z.aufbewahren_bis)
+    .bind(zeitpunkt)
+    .execute(&mut *tx)
+    .await
+    .map_err(db_fehler)?
+    .last_insert_rowid();
+    let neu = zeile_json(tx, "belege", id).await?;
+    protokollieren(tx, zeitpunkt, "belege", id, "neu", None, neu.as_ref()).await?;
+    Ok(id)
 }
 
 /// Nach einer Änderung des Zahlungsdatums: Frist der Belege der Buchung auf max(alt, neu berechnet) setzen und jede

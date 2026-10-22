@@ -11,6 +11,7 @@ mod kunden;
 mod latex;
 mod liquiditaet;
 mod nummern;
+mod rechnungen;
 mod tectonic;
 
 use tauri::menu::{Menu, MenuBuilder, MenuItemBuilder, SubmenuBuilder};
@@ -158,6 +159,16 @@ pub fn run() {
             tectonic::tectonic_pruefen,
             latex::compile_latex,
             latex::pdf_oeffnen,
+            rechnungen::beleg_entwurf_speichern,
+            rechnungen::beleg_entwurf_loeschen,
+            rechnungen::beleg_ausstellen,
+            rechnungen::beleg_bezahlt,
+            rechnungen::beleg_offen,
+            rechnungen::beleg_angebot_status,
+            rechnungen::beleg_umwandeln,
+            rechnungen::beleg_stornieren,
+            rechnungen::beleg_pdf_ablegen,
+            rechnungen::beleg_scan_anhaengen,
             #[cfg(debug_assertions)]
             demo::demo_status,
             #[cfg(debug_assertions)]

@@ -9,6 +9,7 @@ import './styles/charts.css';
 import './styles/buchungen.css';
 import './styles/belege.css';
 import './styles/blatt.css';
+import './styles/rechnungen.css';
 import './styles/vorlagen.css';
 import './styles/kunden.css';
 import './styles/auswertung.css';

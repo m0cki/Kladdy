@@ -80,6 +80,11 @@ pub const MIGRATIONEN: &[MigrationsDatei] = &[
         beschreibung: "kunden",
         sql: include_str!("../migrations/0006_kunden.sql"),
     },
+    MigrationsDatei {
+        version: 7,
+        beschreibung: "rechnungen",
+        sql: include_str!("../migrations/0007_rechnungen.sql"),
+    },
 ];
 
 /// Verbindungs-URL zu einer Datei im App-Verzeichnis, wie sie das Plugin und `Database.load` erwarten.
@@ -648,14 +653,17 @@ mod tests {
             .execute(&mut c)
             .await
             .unwrap();
-            // Indizes aus 0005
+            // Indizes aus 0005 und 0007
             let indizes: Vec<String> = sqlx::query_scalar(
                 "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'belege' ORDER BY name",
             )
             .fetch_all(&mut c)
             .await
             .unwrap();
-            assert_eq!(indizes, vec!["belege_buchung_id", "belege_sha256"]);
+            assert_eq!(
+                indizes,
+                vec!["belege_buchung_id", "belege_rechnung_id", "belege_sha256"]
+            );
 
             let meldung = |e: sqlx::Error| db_fehler(e);
             let f = sqlx::query("DELETE FROM belege WHERE id = 1")

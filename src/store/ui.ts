@@ -37,7 +37,7 @@ function loadSidebar(): boolean {
   }
 }
 
-export type DrawerId = 'update-notes' | 'erfassen' | 'kunde' | null;
+export type DrawerId = 'update-notes' | 'erfassen' | 'kunde' | 'beleg' | null;
 export type ToastIcon = 'check' | 'info' | 'warn' | 'download';
 export interface ToastAction {
   label: string;

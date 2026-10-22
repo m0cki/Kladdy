@@ -1760,11 +1760,34 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
      „Müller & Söhne 100%“ (Entwurf, keine Nummer, Sonderzeichen in den Positionen) setzen und öffnen, Hinweis auf den
      ersten Paket-Download, lesbare Fehler mit Baustein und Zeile, HTML-Vorschau zum Vergleich. **Offen:** Logo im Kopf
      (Makro `\LogoDatei` und Bild-Übergabe sind vorbereitet, es fehlt die Logo-Ablage aus Phase 1), GiroCode (erledigt
-     mit Teil 6), Bausteine bearbeiten (Teil 5), Beleg-Maske (Teil 2); ein echter Tectonic-Lauf war beim Bauen nicht möglich
+     mit Teil 6), Bausteine bearbeiten (erledigt mit Teil 5), Beleg-Maske (erledigt mit Teil 2); ein echter Tectonic-Lauf war beim Bauen nicht möglich
      (Tectonic nicht installiert) – beim ersten Testbeleg prüfen, ob PDF und HTML-Vorschau übereinstimmen.
      Keine Migration nötig
-  2. Rechnungen & Quittungen (§6.6): Liste, Beleg-Maske, Finalisieren/Status/Storno als Rust-Transaktion, Eigenbeleg
-     buchen, Angebot, Badge „überfällig“
+  2. Rechnungen & Quittungen (§6.6) – **erledigt (Branch `phase-3-rechnungen`, auf Teil 5)**: Rust
+     `src-tauri/src/rechnungen.rs` mit zehn Commands (`beleg_entwurf_speichern`/`_loeschen`, `beleg_ausstellen`,
+     `beleg_bezahlt`, `beleg_offen`, `beleg_angebot_status`, `beleg_umwandeln`, `beleg_stornieren`, `beleg_pdf_ablegen`,
+     `beleg_scan_anhaengen`), je eine Transaktion samt Protokoll. Ausstellen = Nummer aus dem Kreis der Art (Jahr des
+     Belegdatums), Kunde per ID oder neu, Schnappschuss `snapshot_json` = `{ version: 1, dokument, bausteine }` (Werte aus
+     der Datenbank überschreiben die des Frontends), bei Quittung/Eigenbeleg/bezahlter Rechnung die Buchung mit
+     `rechnung_id` (eine schon erfasste Zahlung wird verknüpft), Termin ⇒ erledigt. Danach setzt Tectonic das PDF aus dem
+     Schnappschuss, `beleg_pdf_ablegen` legt es genau einmal ab (scheitert das, bleibt der Beleg gültig, „PDF erzeugen“
+     holt es nach). „Bezahlt“ bucht genau eine Einnahme, „doch offen“ bucht sie gegen; Angebot offen/abgelehnt,
+     „In Rechnung umwandeln“ = angenommen; Storno = Stornobeleg (Art `storno`, eigene Nummer, negative Positionen) +
+     Gegenbuchung. **Migration 0007** (`zahlungsart`, `entwurf_json`, Indizes, ein Beleg höchstens einmal storniert,
+     Trigger: ausgestellte Belege und ihre Positionen nie löschen/ändern außer Status, `bezahlt_am`, `zahlungsart` und
+     einmalig PDF/Scan/Schnappschuss; `storniert` ist endgültig). Frontend: Liste `src/pages/Belege.tsx` (Alle · Offen ·
+     Bezahlt, Monat · Jahr · Gesamt, Suche, Sortierung, Status-Menü am Badge `components/belege/BelegStatus.tsx`,
+     „Neu“-Menü mit nächsten Nummern), Maske `src/pages/BelegEditor.tsx` (`#/belege/neu?art=…`, `#/belege/<id>`; Karten
+     je Art, Positionen mit Ziehen `components/belege/PositionenEditor.tsx`, Live-Vorschau, Pflichtangaben-Check,
+     GiroCode, ⌘S Entwurf, ⌘P Drucken, PDF, Mail, unterschriebenes Exemplar), Rückfragen `components/belege/BelegDialog.tsx`,
+     Logik `src/lib/rechnungen.ts` (+ Tests), `lib/belegaktionen.ts`, `lib/belegpdf.ts` (alte Demo-Belege ohne
+     Schnappschuss werden aus den Spalten nachgebaut), Lesen `lib/queries/rechnungen.ts`, roter Zähler „überfällig“ in der
+     Seitenleiste, Einstellungen › Belege (Beleg bei Einnahmen, Zahlungsziel, Gültigkeit Angebote). Mail-Links dürfen jetzt
+     Betreff und Text tragen (`kunden.rs`). **Nächste Migration: 0008.**
+     **Auf dem Mac prüfen:** Rechnung für „Müller & Söhne 100%“ ausstellen ⇒ Nummer, PDF abgelegt und wie die Vorschau,
+     GiroCode mit echter Nummer scannen; „Bezahlt“ ⇒ genau eine Einnahme in Ein- & Ausgänge, „doch offen“ ⇒ Gegenbuchung;
+     Quittung „Finalisieren & buchen“; Eigenbeleg „Buchen“ (Ausgabe); Angebot ⇒ Rechnung; Storno ⇒ Stornobeleg mit
+     Gegenbuchung; ausgestellter Beleg nicht mehr änderbar; überfällige Rechnung ⇒ roter Zähler; Einträge im Protokoll.
   3. Erfassen-Schublade „Beleg zum Ertrag“ (§6.4) + Vorbelegung `beleg` (Befehlspalette, native Menüs, „Neu“-Menü)
   4. Termine (§6.5)
   5. Vorlagen-Seite als Baukasten (§7.0, Prototyp `#/vorlagen`) – **erledigt (Branch `phase-3-vorlagen-baukasten`)**:

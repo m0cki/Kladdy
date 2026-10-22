@@ -64,3 +64,33 @@ export const speichereFirma = (f: Firma): Promise<boolean> => einstellungSchreib
 export const ustModusAusWert = (v: unknown): UstModus => (v === 'regel' ? 'regel' : UST_MODUS_STANDARD);
 export const ladeUstModus = async (): Promise<UstModus> => ustModusAusWert(await einstellungLesen('ust_modus'));
 export const speichereUstModus = (m: UstModus): Promise<boolean> => einstellungSchreiben('ust_modus', m);
+
+/* ---------- Belege (Einstellungen › Belege, §6.10) ---------- */
+
+export interface BelegEinstellungen {
+  /** „Beleg bei Einnahmen“: Vorauswahl in der Erfassen-Schublade und für vorbereitete Belege bei Terminen */
+  beleg_art: 'quittung' | 'rechnung';
+  /** Zahlungsziel neuer Rechnungen in Tagen */
+  zahlungsziel_tage: number;
+  /** Gültigkeit neuer Angebote in Tagen */
+  angebot_tage: number;
+}
+
+export const BELEG_EINSTELLUNGEN_STANDARD: BelegEinstellungen = { beleg_art: 'quittung', zahlungsziel_tage: 14, angebot_tage: 30 };
+
+const tage = (v: unknown, standard: number): number =>
+  typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 365 ? v : standard;
+
+/** Gespeicherten Wert lesen; Unbekanntes ⇒ Standard. */
+export function belegEinstellungenAusWert(v: unknown): BelegEinstellungen {
+  const s = BELEG_EINSTELLUNGEN_STANDARD;
+  if (!istObjekt(v)) return { ...s };
+  return {
+    beleg_art: v.beleg_art === 'rechnung' ? 'rechnung' : 'quittung',
+    zahlungsziel_tage: tage(v.zahlungsziel_tage, s.zahlungsziel_tage),
+    angebot_tage: tage(v.angebot_tage, s.angebot_tage),
+  };
+}
+
+export const ladeBelegEinstellungen = async (): Promise<BelegEinstellungen> => belegEinstellungenAusWert(await einstellungLesen('belege'));
+export const speichereBelegEinstellungen = (b: BelegEinstellungen): Promise<boolean> => einstellungSchreiben('belege', b);

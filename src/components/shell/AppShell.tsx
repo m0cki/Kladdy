@@ -19,6 +19,7 @@ import { UpdateNotesDrawer } from './UpdateNotesDrawer';
 import { ErfassenSchublade } from '../erfassen/ErfassenSchublade';
 import { KundeSchublade } from '../kunden/KundeSchublade';
 import { BelegDropOverlay } from '../belege/BelegDropOverlay';
+import { BelegDialog } from '../belege/BelegDialog';
 
 export function AppShell() {
   const collapsed = useUi((s) => s.sidebarCollapsed);
@@ -102,6 +103,7 @@ export function AppShell() {
       <UpdateNotesDrawer />
       <ErfassenSchublade />
       <KundeSchublade />
+      <BelegDialog />
       <BelegDropOverlay />
       <Toasts />
     </>
