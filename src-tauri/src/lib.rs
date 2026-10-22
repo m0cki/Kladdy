@@ -142,6 +142,7 @@ pub fn run() {
             belege::beleg_anhaengen,
             belege::beleg_oeffnen,
             belege::beleg_zeigen,
+            belege::beleg_pdf_lesen,
             kunden::kunde_anlegen,
             kunden::kunde_aendern,
             kunden::kunde_notiz,

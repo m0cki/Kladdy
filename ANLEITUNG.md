@@ -1848,7 +1848,23 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
      **Auf dem Mac prüfen:** Testrechnung aus dem PDF mit einer Banking-App scannen (Empfänger, IBAN, Betrag 162,98 €,
      Zweck „Entwurf“; nach Teil 2 mit echter Rechnungsnummer), Code im PDF scharf und so groß wie in der Vorschau.
      Keine Migration nötig
-  7. Beleg-Drop mit Erkennung (pdf.js, Regeln aus `prototyp/js/beleg.js`)
+  7. Beleg-Drop mit Erkennung (§6.4) – **erledigt (Branch `phase-3-belegerkennung`, auf Teil 3)**: `src/lib/erkennung/`:
+     `regeln.ts` (Port von `prototyp/js/beleg.js`: Betrag, Datum, Lastschrift ⇒ Abbuchungstag als Zahlungsdatum +
+     Rechnungsdatum als `belegdatum`, Rechnungs-/Bonnummer, Geschäft, Kategorie aus Historie/Stichworten, Beschreibung,
+     eigene Belege ⇒ Einnahme, Dateiname füllt Lücken; je Feld Herkunft `pdf`/`dateiname`), `pdftext.ts` (`pdfjs-dist`
+     6.4 Legacy-Build, Worker per Vite-`?url`, erste 3 Seiten, Zeitlimit), `zeilen.ts` (Textstücke ⇒ Zeilen),
+     `pdfreparatur.ts` (Rettung für PDFs mit Objekten nur im Objekt-Stream, z. B. `Rechnung_Telekom.pdf`),
+     `erkennen.ts` (Ablauf; Bytes über den neuen Rust-Command `beleg_pdf_lesen`; Fotos/XML nur Dateiname, Vision folgt in
+     Phase 7), `anwenden.ts` (füllt nur leere bzw. unveränderte Felder). `lib/belegablage.ts` startet die Erkennung nach
+     `beleg_pruefen` im Hintergrund, Ergebnis in `useErfassen.erkennung`; die Schublade zeigt oben „Erkannt: …“ und an
+     den Feldern „aus PDF“/„aus Dateiname“ (`components/erfassen/BelegErkennung.tsx`). Tests lesen die vier
+     Beispielbelege auch mit echtem pdf.js. Keine Migration. **Auf dem Mac prüfen:** die vier Beispielbelege aufs Fenster
+     ziehen (einmal per ⌘O): Bauhaus ⇒ 47,83 € · 14.09.2026 · Bauhaus · Produkte & Material, Nr. 4711 · Gartencenter ⇒
+     56,43 € · 05.10.2026 · Gartencenter Blütenreich GmbH · Aral ⇒ 78,95 € · 07.10.2026 · Aral (mit Demo-Daten „Aral
+     Tankstelle“) · Sprit & Fahrzeug · Telekom (Lastschrift) ⇒ 39,95 €, Zahlungsdatum 20.10.2026 mit Hinweis
+     „Rechnungsdatum 05.10.2026 · abgebucht am 20.10.2026“, nach dem Speichern `belegdatum` 2026-10-05. Außerdem: Marken
+     verschwinden beim Ändern, ein getippter Betrag bleibt beim Drop auf die offene Schublade stehen, ein Foto bringt
+     nur Werte aus dem Dateinamen, und im Release-Build lädt der pdf.js-Worker.
 - **Offen aus Phase 1 (Teil 1+2):** optionale Kategorien (AfA,
   Bewirtung, Geschenke, Homeoffice), Kategorien bearbeiten und EÜR-Zuordnung pro Jahr (braucht eigene Tabelle),
   Firmenlogo (nach der Dateiablage), sichtbare Fehlermeldung statt stillem Abbruch, wenn die Sicherung vor einer

@@ -1,6 +1,7 @@
 /* Kladdy · Belege ablegen (§6.4 „Beleg“, „Drag & Drop auf das Fenster“)
  * Dropzone, Overlay und file-chip stehen in components.css (§9.4); hier nur die Ergänzungen für Dateilisten,
- * die Büroklammer der Liste mit ihrem Menü und ruhigere Bewegung. Farben ausschließlich über Tokens. */
+ * den Kasten der Belegerkennung, die Büroklammer der Liste mit ihrem Menü und ruhigere Bewegung.
+ * Farben ausschließlich über Tokens. */
 
 /* ============ Dateilisten in der Schublade ============ */
 .bu-file { gap: 8px; padding: 6px 6px 6px 12px; }
@@ -16,6 +17,23 @@
 .bl-dz-klein .ic { width: 18px; height: 18px; }
 .bl-dz-klein b { margin-top: 0; font-size: .8rem; font-weight: 600; color: var(--text-2); }
 .bu-nobeleg { display: flex; flex-direction: column; gap: 6px; }
+
+/* ============ Belegerkennung oben in der Schublade (§6.4, wie .bu-recog im Prototyp) ============ */
+.bu-recog {
+  display: flex; align-items: flex-start; gap: 12px; margin-top: 16px; padding: 12px 8px 12px 14px; border-radius: 13px;
+  background: color-mix(in oklab, var(--accent) 9%, var(--surface)); border: 1px solid var(--accent-line); animation: rise .45s var(--ease) both;
+}
+.bu-recog > .ic { color: var(--accent); margin-top: 1px; }
+.bu-recog.none { background: var(--surface-2); border-color: var(--border); }
+.bu-recog.none > .ic { color: var(--muted); }
+.bu-recog.loading { border-style: dashed; }
+.bu-recog-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.bu-recog-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; font-size: .85rem; color: var(--text); }
+.bu-recog-head b { font-weight: 650; }
+.bu-recog-head .muted { font-size: .74rem; }
+.bu-recog .hint { margin: 0; }
+.bu-recog-hints { margin: 0; padding-left: 16px; font-size: .74rem; color: var(--text-2); display: flex; flex-direction: column; gap: 2px; }
+.bu-recog > .icon-btn { margin-top: -4px; }
 
 /* ============ Büroklammer in der Liste (Knopf) ============ */
 button.bu-clip { width: 22px; height: 22px; border-radius: 7px; }
@@ -37,3 +55,4 @@ button.bu-clip:focus-visible { outline: 2px solid var(--accent); outline-offset:
 /* ============ Bewegung ============ */
 :root[data-motion="reduced"] .drop-card, :root[data-motion="reduced"] .dropzone.over { transform: none; }
 :root[data-motion="reduced"] .drop-card { transition: none; }
+:root[data-motion="reduced"] .bu-recog { animation-name: fade; }

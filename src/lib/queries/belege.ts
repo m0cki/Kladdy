@@ -2,6 +2,7 @@
  * Belege werden nie gelöscht (GoBD) – es gibt deshalb kein Entfernen, nur Ablegen, Öffnen und im Finder zeigen.
  * - belegPruefen: liest die Dateien nur (Typ, Größe, Hash, schon vorhanden?), kopiert nichts.
  * - belegAnhaengen: legt Dateien zu einer bestehenden Buchung ab (auch im festgeschriebenen Zeitraum, nicht an Gegenbuchungen).
+ * - belegPdfLesen: Bytes einer PDF für die Erkennung (pdf.js im Webview), legt nichts ab.
  * - Neue Buchungen bekommen ihre Dateien über `belege` in buchung_anlegen/_aendern (gleiche Transaktion). */
 import { invoke } from '@tauri-apps/api/core';
 import { abfrage } from '../db';
@@ -34,6 +35,9 @@ export const belegPruefen = (pfade: string[]): Promise<BelegPruefung[]> => invok
 
 export const belegAnhaengen = (buchungId: number, pfade: string[]): Promise<{ ids: number[] }> =>
   invoke<{ ids: number[] }>('beleg_anhaengen', { buchungId, pfade });
+
+/** Inhalt einer gezogenen bzw. gewählten PDF für die Belegerkennung (nur lesen; Rust prüft Typ und Größe). */
+export const belegPdfLesen = (pfad: string): Promise<ArrayBuffer> => invoke<ArrayBuffer>('beleg_pdf_lesen', { pfad });
 
 /** Datei mit dem Standardprogramm öffnen. */
 export const belegOeffnen = (id: number): Promise<void> => invoke<void>('beleg_oeffnen', { id });

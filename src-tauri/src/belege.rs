@@ -669,6 +669,16 @@ pub async fn beleg_datei(
     sicherer_pfad(ablage, &pfad, &name)
 }
 
+/// Inhalt einer Quelldatei für die Belegerkennung (§6.4 „Erkennung in der Mac-App“): nur PDFs, höchstens 50 MB,
+/// nur lesen. Den Text holt pdf.js im Webview.
+pub fn pdf_lesen(pfad: &str) -> Result<Vec<u8>, String> {
+    let datei = datei_pruefen(pfad)?;
+    if datei.endung != "pdf" {
+        return Err("Text wird nur aus PDFs gelesen.".into());
+    }
+    fs::read(&datei.quelle).map_err(|e| format!("Die Datei ist nicht lesbar: {e}"))
+}
+
 /// macOS: `open` (Standard-App) bzw. `open -R` (im Finder zeigen).
 fn mit_open(zeigen: bool, datei: &Path) -> Result<(), String> {
     let mut befehl = std::process::Command::new("/usr/bin/open");
@@ -725,6 +735,14 @@ pub async fn beleg_anhaengen(
     )
     .await?;
     Ok(Angehaengt { ids })
+}
+
+/// Frontend: `invoke('beleg_pdf_lesen', { pfad })` – Bytes einer gezogenen bzw. gewählten PDF für die Erkennung
+/// (kommen als ArrayBuffer an). Legt nichts ab.
+#[tauri::command]
+pub async fn beleg_pdf_lesen(pfad: String) -> Result<tauri::ipc::Response, String> {
+    let inhalt = pdf_lesen(&pfad)?;
+    Ok(tauri::ipc::Response::new(inhalt))
 }
 
 /// Frontend: `invoke('beleg_oeffnen', { id })` – öffnet die abgelegte Datei mit der Standard-App.
@@ -1440,6 +1458,21 @@ mod tests {
             sicherer_pfad(&o.join("gibt-es-nicht"), "2026/a.pdf", "a.pdf").unwrap_err(),
             "Die Datei des Belegs fehlt: a.pdf"
         );
+        let _ = fs::remove_dir_all(&o);
+    }
+
+    #[test]
+    fn pdf_lesen_nur_pdfs() {
+        let o = testordner("pdf-lesen");
+        let pdf = schreiben(&o, "Rechnung.pdf", b"%PDF-1.4 Test");
+        let bild = schreiben(&o, "Foto.jpg", b"jpeg");
+        assert_eq!(pdf_lesen(&pdf).unwrap(), b"%PDF-1.4 Test".to_vec());
+        assert_eq!(
+            pdf_lesen(&bild).unwrap_err(),
+            "Text wird nur aus PDFs gelesen."
+        );
+        assert!(pdf_lesen("relativ.pdf").is_err());
+        assert!(pdf_lesen(&o.join("fehlt.pdf").to_string_lossy()).is_err());
         let _ = fs::remove_dir_all(&o);
     }
 }
