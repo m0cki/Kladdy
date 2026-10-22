@@ -38,6 +38,8 @@ use crate::nummern;
 pub const DEMO_DB_DATEI: &str = "kladdy-dev-demo.db";
 /// Ablageordner für Belege im Demo-Modus (wie `belege::BELEGE_ORDNER`).
 pub const DEMO_BELEGE_ORDNER: &str = "belege-dev-demo";
+/// Ablageordner für das Firmenlogo im Demo-Modus (wie `firmenlogo::ASSETS_ORDNER`).
+pub const DEMO_ASSETS_ORDNER: &str = "assets-dev-demo";
 /// Markierungsdatei im App-Verzeichnis: vorhanden = Demo-Modus an.
 pub const MARKER: &str = "demo-aktiv-dev";
 /// Einstellungen, die zum Rechner gehören und in die Demo-Datenbank übernommen werden.
@@ -722,17 +724,19 @@ pub async fn anlegen_in_ordner(
     ergebnis
 }
 
-/// Entfernt Markierung, Demo-Datenbank und Demo-Belege. Ohne Demo-Daten passiert nichts (kein Fehler).
+/// Entfernt Markierung, Demo-Datenbank, Demo-Belege und Demo-Logos. Ohne Demo-Daten passiert nichts (kein Fehler).
 pub fn entfernen_in_ordner(ordner: &Path, daten_ordner: &Path) -> Result<(), String> {
     entfernen_falls_da(&ordner.join(MARKER))?;
     db_loeschen(ordner)?;
-    let belege = daten_ordner.join(DEMO_BELEGE_ORDNER);
-    match std::fs::remove_dir_all(&belege) {
-        Err(e) if e.kind() != std::io::ErrorKind::NotFound => {
-            Err(format!("{}: {e}", belege.display()))
+    for unterordner in [DEMO_BELEGE_ORDNER, DEMO_ASSETS_ORDNER] {
+        let pfad = daten_ordner.join(unterordner);
+        if let Err(e) = std::fs::remove_dir_all(&pfad)
+            && e.kind() != std::io::ErrorKind::NotFound
+        {
+            return Err(format!("{}: {e}", pfad.display()));
         }
-        _ => Ok(()),
     }
+    Ok(())
 }
 
 /* ---------- Commands (nur Debug-Build registriert) ---------- */
@@ -1033,6 +1037,7 @@ mod tests {
         )
         .unwrap();
         std::fs::create_dir_all(daten_ordner.join(BELEGE_ORDNER)).unwrap();
+        std::fs::create_dir_all(daten_ordner.join(DEMO_ASSETS_ORDNER)).unwrap();
 
         let einstellungen = vec![("tectonic_pfad".to_string(), "\"/opt/tectonic\"".to_string())];
         let zahlen = tauri::async_runtime::block_on(anlegen_in_ordner(
@@ -1172,6 +1177,7 @@ mod tests {
         assert!(!ordner.join(MARKER).exists());
         assert!(db_dateien(&ordner).iter().all(|p| !p.exists()));
         assert!(!daten_ordner.join(DEMO_BELEGE_ORDNER).exists());
+        assert!(!daten_ordner.join(DEMO_ASSETS_ORDNER).exists());
         assert!(daten_ordner.join(BELEGE_ORDNER).exists());
         assert_eq!(std::fs::read(ordner.join(DB_DATEI)).unwrap(), b"echt");
         // zweimal entfernen ist kein Fehler

@@ -131,6 +131,8 @@ export interface ErtragKontext {
   kunden: readonly KundeAnschrift[];
   firma: Firma;
   ustModus: UstModus;
+  /** aktuelles Firmenlogo (Dateiname oder '') */
+  logo?: string;
   kreise: readonly Nummernkreis[];
   kennwerte: ReadonlyMap<number, KennwerteJahr>;
   vorlagen: Readonly<Record<ErtragsArt, readonly VorlagenWahl[]>>;
@@ -245,7 +247,7 @@ export interface BelegVorbereitet {
 /** Alles für beleg_ausstellen – samt Pflichtangaben-Check wie in der Maske (mit `bezug`: zum Termin bzw. den Entwurf). */
 export function belegVorbereiten(f: Formular, e: Ertrag, cent: number, ctx: ErtragKontext, bezug: ErtragBezug | null = null): BelegVorbereitet {
   const formular = belegFormular(f, e, cent, ctx, bezug);
-  const dokument = formularZuDokument(formular, { kunden: ctx.kunden, firma: ctx.firma, ustModus: ctx.ustModus });
+  const dokument = formularZuDokument(formular, { kunden: ctx.kunden, firma: ctx.firma, ustModus: ctx.ustModus, logo: ctx.logo });
   const gedruckt = bausteineFuer(dokument, vorlageFuer(e, ctx.vorlagen).bausteine).filter((b) => istBausteinTyp(b.typ));
   const naechste = naechsteBelegNummer(ctx.kreise, e.art, f.zahlungsdatum, ctx.heute);
   const jahr = Number((istDatum(f.zahlungsdatum) ? f.zahlungsdatum : ctx.heute).slice(0, 4));

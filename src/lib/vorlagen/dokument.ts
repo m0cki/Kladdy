@@ -106,6 +106,9 @@ export interface BelegDokument {
   ausgestellt_am: string | null;
   /** Schnappschuss der Firmendaten beim Ausstellen */
   firma: Firma;
+  /** Firmenlogo beim Ausstellen: Dateiname in <appDataDir>/assets (`logo-<sha256>.png`, lib/firmenlogo.ts); fehlt oder
+   * leer = keins. Steht im Schnappschuss (`snapshot_json.dokument.logo`), damit ein Nachdruck das Logo von damals trägt. */
+  logo?: string | null;
   ust_modus: UstModus;
   /** Stornobeleg: Verweis auf das Original (Titel „Stornorechnung“ usw., Beträge negativ, kein Zahlungsaufruf) */
   storno_von?: { nummer: string; datum: string } | null;

@@ -4,6 +4,7 @@
 import type { ErtragKontext, ErtragsArt } from '../ertrag';
 import type { BelegZeile } from '../rechnungen';
 import { ladeBelegEinstellungen, ladeFirma, ladeUstModus } from './einstellungen';
+import { ladeFirmenlogo } from './firmenlogo';
 import { ladeNummernkreise } from './nummernkreise';
 import { ladeKundenAnschrift, ladeOffeneRechnungen } from './rechnungen';
 import { ladeKennwerte } from './steuer';
@@ -16,7 +17,7 @@ export interface ErtragStamm extends Omit<ErtragKontext, 'heute'> {
 }
 
 export async function ladeErtragStamm(): Promise<ErtragStamm> {
-  const [kunden, firma, ustModus, kreise, kennwerte, einstellungen, quittung, rechnung, offene] = await Promise.all([
+  const [kunden, firma, ustModus, kreise, kennwerte, einstellungen, quittung, rechnung, offene, logo] = await Promise.all([
     ladeKundenAnschrift(),
     ladeFirma(),
     ladeUstModus(),
@@ -26,11 +27,13 @@ export async function ladeErtragStamm(): Promise<ErtragStamm> {
     ladeVorlagenFuerArt('quittung'),
     ladeVorlagenFuerArt('rechnung'),
     ladeOffeneRechnungen(),
+    ladeFirmenlogo(),
   ]);
   return {
     kunden,
     firma,
     ustModus,
+    logo,
     kreise,
     kennwerte,
     vorlagen: { quittung, rechnung },

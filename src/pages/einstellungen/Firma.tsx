@@ -1,8 +1,12 @@
 /* Einstellungen › Firma (§6.10, Pflichtangaben §2.3). Gespeichert in einstellungen['firma'] über lib/queries/einstellungen.ts
  * (jede Änderung ins Protokoll). Jedes Feld wird beim Verlassen geprüft (lib/firma.ts) und nur gültig gespeichert.
- * Firmenlogo: braucht die Dateiablage in <appDataDir>/assets – bis dahin nur ein Hinweis. */
+ * Firmenlogo (§6.10, Prototyp „logo-feld“): Kachel mit Vorschau, Klick oder Bild daraufziehen ⇒ Upload (lib/logoablage.ts),
+ * „Zurücksetzen“ ⇒ App-Symbol, beides mit „Rückgängig“. Die Kachel ist eine eigene Dropzone: ein Drop auf sie öffnet
+ * nicht die Erfassen-Schublade. */
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { Building2, CircleCheck, ImageIcon, TriangleAlert } from 'lucide-react';
+import { Building2, CircleCheck, RotateCcw, TriangleAlert, Upload } from 'lucide-react';
+import { Firmenlogo } from '../../components/ui/Firmenlogo';
+import { setzeDropZone, useBelegZiehen } from '../../lib/belegablage';
 import {
   FIRMA_FELDER,
   FIRMA_LABEL,
@@ -12,6 +16,7 @@ import {
   type Firma as FirmaDaten,
   type FirmaFeld,
 } from '../../lib/firma';
+import { logoAusDrop, logoWaehlen, logoZuruecksetzen, useFirmenlogo } from '../../lib/logoablage';
 import { ladeFirma, speichereFirma } from '../../lib/queries/einstellungen';
 import { useUi } from '../../store/ui';
 import { Ladeansicht, fehlerText, useLaden } from './Laden';
@@ -185,14 +190,61 @@ function FirmaFormular({ gespeichert, neuLaden }: { gespeichert: FirmaDaten; neu
       ))}
 
       <SetCard title="Firmenlogo" i={GRUPPEN.length + 2}>
-        <div className="set-note" data-setting="firmenlogo">
-          <ImageIcon />
-          <span>
-            <b>Kommt später.</b> Das eigene Logo (oben links im Menü und im Kopf von Rechnungen) lässt sich hochladen, sobald
-            Kladdy Dateien ablegen kann. Bis dahin steht dort das Kladdy-Symbol.
-          </span>
-        </div>
+        <LogoFeld />
       </SetCard>
     </>
+  );
+}
+
+/** Firmenlogo: Kachel (Klick = Dialog, Bild daraufziehen), Name, Hinweis, „Logo hochladen …“ und „Zurücksetzen“. */
+function LogoFeld() {
+  const name = useFirmenlogo((s) => s.name);
+  const laeuft = useFirmenlogo((s) => s.laeuft);
+  const ueber = useBelegZiehen((s) => s.ziehen && s.zone);
+  const kachel = useRef<HTMLButtonElement>(null);
+
+  // Nur Drops über der Kachel gehen ans Logo, alle anderen wie üblich (Erfassen-Schublade)
+  useEffect(() => {
+    setzeDropZone({ element: () => kachel.current, nimmt: logoAusDrop });
+    return () => setzeDropZone(null);
+  }, []);
+
+  return (
+    <div className="set-row" data-setting="firmenlogo">
+      <div className="logo-feld">
+        <button
+          ref={kachel}
+          type="button"
+          className={`dropzone logo-dz${ueber ? ' over' : ''}`}
+          onClick={() => void logoWaehlen()}
+          disabled={laeuft}
+          aria-busy={laeuft || undefined}
+          title="Bild hierher ziehen oder klicken"
+          aria-label="Logo hochladen"
+        >
+          <Firmenlogo name={name} />
+        </button>
+        <div className="logo-info">
+          <b>{name ? 'Eigenes Logo' : 'Standard-Symbol'}</b>
+          <small>PNG, JPG, SVG oder WebP – am besten quadratisch, mit weißem oder transparentem Hintergrund.</small>
+          <div className="row wrap">
+            <button type="button" className="btn subtle" onClick={() => void logoWaehlen()} disabled={laeuft}>
+              <Upload />
+              {name ? 'Anderes Logo …' : 'Logo hochladen …'}
+            </button>
+            {name ? (
+              <button type="button" className="btn ghost" onClick={() => void logoZuruecksetzen()} disabled={laeuft}>
+                <RotateCcw />
+                Zurücksetzen
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </div>
+      <p className="hint">
+        Erscheint oben links im Menü und im Kopf von Rechnungen und Angeboten. Auf die Quittung kommt es mit dem Baustein „Kopf
+        mit Logo“ (Vorlagen). Bereits ausgestellte Belege behalten ihr bisheriges Aussehen.
+      </p>
+    </div>
   );
 }

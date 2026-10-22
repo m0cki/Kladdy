@@ -3,6 +3,8 @@
  * - Leere Bausteine fallen weg (im Editor: grauer Platzhalter), ausgeblendete (`aus`) immer.
  * - Fußzeile und Unterschrift „am Seitenende“ sitzen unten (.sh-unten), Wasserzeichen ENTWURF/STORNIERT.
  * - GiroCode im Baustein „Zahlung“: dieselbe Modulmatrix wie girocode.png im PDF (lib/girocode).
+ * - Firmenlogo im Baustein „Kopf“: die Datei aus `doc.logo` (ausgestellte Belege: die aus dem Schnappschuss), im Editor
+ *   ohne Logo ein Platzhalter.
  * - BlattVorschau skaliert das Blatt auf die verfügbare Breite (wie mount() im Prototyp).
  * Stile: src/styles/blatt.css */
 import { Fragment, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react';
@@ -36,6 +38,7 @@ import { betragInWorten } from '../../lib/latex/zahl-in-worten';
 import { ibanFormat } from '../../lib/firma';
 import { girocodeFuer, qrGroesseMm } from '../../lib/girocode/girocode';
 import { qrPfad } from '../../lib/girocode/qr';
+import { useLogoUrl } from '../../lib/logoablage';
 
 /** Markiert die fehlende Nummer im Text (wird zum grauen „Entwurf“). */
 const ENTWURF = '\u0000';
@@ -62,6 +65,8 @@ interface Ctx {
   empf: Empfaenger;
   summe: number;
   editable: boolean;
+  /** Blob-URL des Firmenlogos (null = keins oder noch nicht geladen) */
+  logoUrl: string | null;
 }
 
 /** Platzhalter ersetzen wie `ersetzen` (Ränder getrimmt), fehlende Nummer grau; null = nichts zu drucken. */
@@ -112,8 +117,8 @@ function PosMini({ positionen }: { positionen: readonly BelegPosition[] }) {
 const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode | null>> = {
   kopf(b, x) {
     const claim = b.text('claim') ? ph(b.text('claim'), x) : null;
-    // Firmenlogo folgt mit der Logo-Ablage; bis dahin im Editor nur der Platzhalter
-    const logo = b.an('logo') && x.editable ? <span className="blk-logo-slot">Logo</span> : null;
+    // Firmenlogo wie \LogoDatei im PDF; ohne Logo im Editor nur der Platzhalter
+    const logo = !b.an('logo') ? null : x.logoUrl ? <img src={x.logoUrl} alt="" /> : x.editable ? <span className="blk-logo-slot">Logo</span> : null;
     return (
       <div className="blk-kopf">
         <div className="blk-kopf-l">
@@ -438,7 +443,8 @@ export interface BlattProps {
 
 /** Das Blatt in Originalgröße (210 mm breit). */
 export function Blatt({ doc, bausteine, editable = false, ausgewaehlt = null, onWaehle, skala, ref }: BlattProps) {
-  const x: Ctx = { doc, werte: platzhalterWerte(doc), empf: empfaenger(doc), summe: belegSumme(doc), editable };
+  const logoUrl = useLogoUrl(doc.logo);
+  const x: Ctx = { doc, werte: platzhalterWerte(doc), empf: empfaenger(doc), summe: belegSumme(doc), editable, logoUrl };
   const format = formatVon(doc.art);
   const oben: ReactNode[] = [];
   const unten: ReactNode[] = [];

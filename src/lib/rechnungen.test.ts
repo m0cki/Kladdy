@@ -245,6 +245,10 @@ describe('Formular', () => {
     expect(eb.kunde).toMatchObject({ id: null, name: 'Parkhaus am Markt' });
     expect(eb.eigenbeleg).toEqual({ grund: 'kein', grund_text: '', gebucht: null });
     expect(eb.faellig_am).toBeNull();
+    // Firmenlogo aus dem Kontext (wird beim Ausstellen mit eingefroren), ohne Logo null
+    expect(d.logo).toBeNull();
+    const logo = `logo-${'0'.repeat(64)}.png`;
+    expect(formularZuDokument(formular({ kunde: 'Anna Schmidt · K-0001' }), { ...ctx, logo }).logo).toBe(logo);
   });
 
   it('Art wechseln: Standardtexte und Empfänger', () => {

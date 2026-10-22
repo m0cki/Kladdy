@@ -159,3 +159,17 @@ export const belegZusatz = (n: number | null | undefined): string => (n && n > 0
 
 /** Toast nach „Beleg anhängen“: „2 Belege an Ausgabe 2026-0003 angehängt“. */
 export const angehaengtText = (n: number, wo: string): string => `${belegeAnzahl(n)} an ${wo} angehängt`;
+
+/* ---------- Eigene Dropzone einer Seite (z. B. Firmenlogo-Kachel, lib/belegablage.ts) ---------- */
+
+export interface Punkt {
+  x: number;
+  y: number;
+}
+
+/** Position eines Datei-Drags aufs Fenster in CSS-Pixeln. Tauri meldet sie als PhysicalPosition; auf dem Mac sind
+ * es aber schon Punkte (wry nimmt draggingLocation ohne Skalierung), anderswo echte Pixel ⇒ durch die Skalierung. */
+export function dropPunkt(p: Punkt, skala: number, mac: boolean): Punkt {
+  const s = mac || !(skala > 0) ? 1 : skala;
+  return { x: p.x / s, y: p.y / s };
+}

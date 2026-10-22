@@ -497,6 +497,8 @@ export interface DokumentKontext {
   kunden: readonly KundeAnschrift[];
   firma: Firma;
   ustModus: UstModus;
+  /** aktuelles Firmenlogo (Dateiname, '' bzw. fehlt = keins) – wird beim Ausstellen mit eingefroren */
+  logo?: string;
 }
 
 /** Formular ⇒ Belegdokument für Vorschau, Pflichtangaben und den Schnappschuss beim Ausstellen. */
@@ -522,6 +524,7 @@ export function formularZuDokument(f: BelegFormular, ctx: DokumentKontext): Bele
     eigenbeleg: art === 'eigenbeleg' ? { grund: f.grund, grund_text: f.grundText, gebucht: null } : null,
     ausgestellt_am: null,
     firma: ctx.firma,
+    logo: ctx.logo || null,
     ust_modus: ctx.ustModus,
   };
 }

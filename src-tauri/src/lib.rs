@@ -7,6 +7,7 @@ mod datenbank;
 // Demo-Daten nur in der Entwicklung (`npm run tauri dev`): im Release-Build gibt es weder Modul noch Commands.
 #[cfg(debug_assertions)]
 mod demo;
+mod firmenlogo;
 mod kunden;
 mod latex;
 mod liquiditaet;
@@ -144,6 +145,9 @@ pub fn run() {
             belege::beleg_oeffnen,
             belege::beleg_zeigen,
             belege::beleg_pdf_lesen,
+            firmenlogo::firmenlogo_quelle_lesen,
+            firmenlogo::firmenlogo_ablegen,
+            firmenlogo::firmenlogo_lesen,
             kunden::kunde_anlegen,
             kunden::kunde_aendern,
             kunden::kunde_notiz,

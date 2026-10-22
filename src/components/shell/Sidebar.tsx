@@ -13,7 +13,7 @@ import { ladeUeberfaelligAnzahl } from '../../lib/queries/rechnungen';
 import { ladeTerminZaehler } from '../../lib/queries/termine';
 import { heute } from '../../lib/zeitraum';
 import { useUi } from '../../store/ui';
-import { Logo } from '../ui/Logo';
+import { Marke } from '../ui/Firmenlogo';
 
 const isActive = (path: string, to: string) => path === to || path.startsWith(to + '/');
 
@@ -155,7 +155,7 @@ export function Sidebar() {
     <aside className="sidebar" id="sidebar">
       <div className="sb-head" data-tauri-drag-region="deep">
         <Link className="brand" to={START} title="Zu Ein- & Ausgänge" aria-label="Kladdy – Startseite">
-          <Logo />
+          <Marke />
           <span className="brand-text">
             <b>Kladdy</b>
             <small>Kleingewerbe</small>

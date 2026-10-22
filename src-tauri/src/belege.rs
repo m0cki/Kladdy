@@ -263,12 +263,16 @@ fn ablegen_als(
     }
 }
 
-enum Fehler {
+/// Ergebnis von `kopieren_und_verknuepfen`, wenn es nicht klappt (auch für das Firmenlogo, firmenlogo.rs).
+pub(crate) enum Fehler {
+    /// Zielname gibt es schon (gleicher Inhalt)
     Vorhanden,
     Text(String),
 }
 
-fn kopieren_und_verknuepfen(
+/// Schreibt `quelle` in die Zwischendatei, prüft die Prüfsumme, schützt sie und verknüpft sie hart mit dem Ziel
+/// (scheitert, statt zu überschreiben). Die Zwischendatei entfernt der Aufrufer.
+pub(crate) fn kopieren_und_verknuepfen(
     mut quelle: impl Read,
     zwischen: &Path,
     ziel: &Path,

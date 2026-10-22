@@ -182,6 +182,9 @@ describe('Beleg aus der Schublade', () => {
     expect(q.daten?.positionen).toEqual([{ beschreibung: 'Rasen mähen', menge: 1, einheit: 'Stk.', einzelpreis_cent: 6_000, kategorie_id: null }]);
     expect(q.dokument.kunde).toMatchObject({ id: 1, name: 'Anna Schmidt', ort: 'Seehausen' });
     expect(q.gedruckt.length).toBeGreaterThan(0);
+    expect(q.dokument.logo).toBeNull();
+    const logo = `logo-${'f'.repeat(64)}.png`;
+    expect(belegVorbereiten(formular(), ertrag(), 6_000, { ...ctx, logo }).dokument.logo).toBe(logo);
 
     const offen = belegVorbereiten(formular({ wer: 'Clara Neu' }), ertrag({ art: 'rechnung', bezahlt: false }), 6_000, ctx);
     expect(offen.fehlt).toEqual(['Name und Anschrift (Kunde)']);

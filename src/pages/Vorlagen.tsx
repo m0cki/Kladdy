@@ -62,8 +62,9 @@ import { datenbankVerfuegbar } from '../lib/db';
 import { fehlerText } from '../lib/fehler';
 import type { Firma } from '../lib/firma';
 import { texTeile, type TexTeilArt } from '../lib/latex/hervorheben';
-import { KompilierFehler, belegTex, fehlerZeilen, kompiliere, pdfOeffnen } from '../lib/latex/kompilieren';
+import { KompilierFehler, belegLogo, belegTex, fehlerZeilen, kompiliere, pdfOeffnen } from '../lib/latex/kompilieren';
 import { mainTex } from '../lib/latex/vorlage';
+import { useFirmenlogo } from '../lib/logoablage';
 import { inTauri } from '../lib/menu';
 import { UST_MODUS_STANDARD, ladeFirma, ladeUstModus, type UstModus } from '../lib/queries/einstellungen';
 import { ladeEigeneVorlage, speichereVorlage, vorlageZuruecksetzen, type EigeneVorlage } from '../lib/queries/vorlagen';
@@ -366,7 +367,8 @@ function Baukasten({ art, basis, start }: { art: Belegart; basis: Basis; start: 
     };
   }, [palette]);
 
-  const doc = useMemo(() => beispielbeleg(art, basis.firma, basis.ust, heute()), [art, basis]);
+  const logo = useFirmenlogo((s) => s.name);
+  const doc = useMemo(() => ({ ...beispielbeleg(art, basis.firma, basis.ust, heute()), logo: logo || null }), [art, basis, logo]);
   const pflicht = useMemo(() => pflichtCheck(doc, bausteine), [doc, bausteine]);
   const eigeneFirma = basis.firma !== BEISPIEL_FIRMA;
 
@@ -497,7 +499,7 @@ function Baukasten({ art, basis, start }: { art: Belegart; basis: Basis; start: 
 
   const pdfErzeugen = async () => {
     setPdf({ status: 'laeuft' });
-    const tex = belegTex(doc, bausteine, accent);
+    const tex = belegTex(doc, bausteine, accent, await belegLogo(doc));
     const name = `Kladdy-Vorlage-${ARTEN[art].label}.pdf`;
     try {
       await kompiliere({ main: tex.main.tex, daten: tex.daten, assets: tex.assets }, name);

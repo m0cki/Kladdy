@@ -55,7 +55,7 @@
 .sheet .blk-firma { font-size: 15pt; font-weight: 700; line-height: 1.15; letter-spacing: -.01em; color: var(--akz); }
 .sheet .blk-claim { margin-top: 1mm; font-size: 8.5pt; color: var(--grau); }
 .sheet .blk-logo { height: 16mm; max-width: 60mm; display: flex; justify-content: flex-end; flex: none; }
-.sheet .blk-logo img { height: 100%; width: auto; object-fit: contain; }
+.sheet .blk-logo img { height: 100%; width: auto; max-width: 60mm; object-fit: contain; object-position: right top; }
 .sheet .blk-logo-slot { width: 30mm; height: 16mm; display: grid; place-items: center; border: .3mm dashed var(--slot); border-radius: 2mm; color: var(--slot-text); font-size: 7pt; letter-spacing: .12em; text-transform: uppercase; }
 .sheet.sh-a5q .blk-kopf { min-height: 10mm; }
 .sheet.sh-a5q .blk-logo, .sheet.sh-a5q .blk-logo-slot { height: 10mm; }
