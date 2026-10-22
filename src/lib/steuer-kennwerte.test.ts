@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   KENNWERTE,
+  anzeigeJahr,
   jahrFehler,
   jahrVorschlag,
   kennwertAlsEingabe,
@@ -79,6 +80,8 @@ describe('Jahr anlegen', () => {
     expect(jahrFehler(2026, [2026])).toMatch(/schon/);
     expect(jahrFehler(1999, [])).toMatch(/zwischen/);
     expect(jahrFehler(2026.5, [])).toMatch(/zwischen/);
+    expect(jahrFehler(2026, [2026])).toBe('Für 2026 gibt es schon Kennwerte.');
+    expect(jahrFehler(2026, [2026], 'eine EÜR-Zuordnung')).toBe('Für 2026 gibt es schon eine EÜR-Zuordnung.');
   });
 
   it('übernimmt die Werte aus dem nächstälteren Jahr, sonst aus dem ältesten', () => {
@@ -86,5 +89,12 @@ describe('Jahr anlegen', () => {
     expect(kopierQuelle([2024, 2026], 2025)).toBe(2024);
     expect(kopierQuelle([2026, 2027], 2025)).toBe(2026);
     expect(kopierQuelle([], 2026)).toBeNull();
+  });
+
+  it('zeigt das laufende Jahr, wenn es Werte hat, sonst das neueste', () => {
+    expect(anzeigeJahr([2025, 2026], 2026)).toBe(2026);
+    expect(anzeigeJahr([2025, 2026], 2027)).toBe(2026);
+    expect(anzeigeJahr([2026, 2028], 2027)).toBe(2028);
+    expect(anzeigeJahr([], 2026)).toBeNull();
   });
 });

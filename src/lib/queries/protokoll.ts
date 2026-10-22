@@ -1,6 +1,6 @@
 /* GoBD-Änderungsprotokoll (ANLEITUNG §2.5, §5 Tabelle protokoll): jede Änderung an buchungen, rechnungen, belege
  * (und weiteren Stammdaten) mit alt/neu als JSON. Stammdaten ohne INTEGER-ID (einstellungen, steuer_parameter,
- * nummernkreise) tragen datensatz_id = 0 und ihren Textschlüssel in protokoll.schluessel (Migration 0003).
+ * euer_zuordnung, nummernkreise) tragen datensatz_id = 0 und ihren Textschlüssel in protokoll.schluessel (Migration 0003).
  * Einträge werden nur angehängt, nie geändert oder gelöscht.
  * Hinweis: Aus dem Frontend sind Änderung und Protokolleintrag zwei Aufrufe (keine gemeinsame Transaktion, siehe db.ts).
  * Wo beides zwingend zusammengehört (finalisieren, stornieren, festschreiben), schreibt der Rust-Command das Protokoll
@@ -26,8 +26,8 @@ export type ProtokollTabelleId =
   | 'vorlagen';
 
 /** Stammdaten mit Textschlüssel (Migration 0003): datensatz_id = 0, Schlüssel in protokoll.schluessel,
- *  z. B. 'firma' (einstellungen), '2026' (steuer_parameter: Jahr), 'rechnung' (nummernkreise). */
-export type ProtokollTabelleText = 'einstellungen' | 'steuer_parameter' | 'nummernkreise';
+ *  z. B. 'firma' (einstellungen), '2026' (steuer_parameter und euer_zuordnung: Jahr), 'rechnung' (nummernkreise). */
+export type ProtokollTabelleText = 'einstellungen' | 'steuer_parameter' | 'euer_zuordnung' | 'nummernkreise';
 
 export type ProtokollTabelle = ProtokollTabelleId | ProtokollTabelleText;
 

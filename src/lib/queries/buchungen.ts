@@ -48,11 +48,18 @@ export async function ladeOhneBelegAnzahl(): Promise<number> {
   return r?.n ?? 0;
 }
 
-/** Kategorien für die Kacheln (nicht archiviert, in fester Reihenfolge). */
-export const ladeKategorienWahl = (): Promise<KategorieWahl[]> =>
+/**
+ * Kategorien für Kacheln und Filter in fester Reihenfolge: die sichtbaren (nicht ausgeblendet, lib/kategorien.ts).
+ * Dazu `auch` (die Kategorie der Buchung, die gerade bearbeitet wird – Rust erlaubt sie beim Ändern weiter) bzw. mit
+ * `benutzte` alle ausgeblendeten, auf die Buchungen verweisen (Filter in Ein- & Ausgänge).
+ */
+export const ladeKategorienWahl = (opt: { auch?: number | null; benutzte?: boolean } = {}): Promise<KategorieWahl[]> =>
   abfrage<KategorieWahl>(
-    `SELECT id, name, typ, icon, farbe, stichworte, euer_bereich, abziehbar_prozent, wareneingang, zaehlt_ku_umsatz
-       FROM kategorien WHERE archiviert = 0 ORDER BY sortierung, name`,
+    `SELECT k.id, k.name, k.typ, k.icon, k.farbe, k.stichworte, k.euer_bereich, k.abziehbar_prozent, k.wareneingang, k.zaehlt_ku_umsatz
+       FROM kategorien k
+      WHERE k.archiviert = 0 OR k.id = $1 OR ($2 = 1 AND EXISTS (SELECT 1 FROM buchungen b WHERE b.kategorie_id = k.id))
+      ORDER BY k.sortierung, k.name`,
+    [opt.auch ?? null, opt.benutzte ?? false],
   );
 
 /** Kunden für die Vorschläge „Name · K-0012“ (zuletzt mit Einnahme zuerst, dann nach Name). */

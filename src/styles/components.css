@@ -570,3 +570,36 @@ input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 7px; }
 .nk-std { display: inline-flex; align-items: center; gap: 4px; padding: 0; color: var(--text-2); font: inherit; text-decoration: underline dotted; text-underline-offset: 3px; }
 .nk-std:hover { color: var(--text); }
 .nk-std .ic { width: 12px; height: 12px; }
+
+/* Einstellungen › Steuern: Kategorien und EÜR-Zuordnung (Kategoriefarbe aus den Daten nur als --c) */
+.kat-table td, .euer-table td { vertical-align: middle; }
+.kat-table tr.kat-aktiv td { background: var(--accent-soft); }
+.kat-name { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.kat-name > span { display: flex; flex-direction: column; min-width: 0; }
+.kat-name b { font-weight: 600; }
+.kat-name small { display: block; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: .74rem; }
+.kat-ic { width: 28px; height: 28px; border-radius: 8px; flex: none; display: grid; place-items: center; font-style: normal; color: var(--c, var(--muted)); background: color-mix(in oklab, var(--c, var(--muted)) 15%, transparent); }
+.kat-ic .ic { width: 16px; height: 16px; }
+.kat-kz { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.kat-kz small { color: var(--muted); font-size: .74rem; }
+.kat-akt { white-space: nowrap; }
+.kat-form { display: flex; flex-direction: column; gap: 14px; padding: 16px; border-radius: var(--radius); border: 1px solid var(--accent-line); background: var(--surface-2); }
+.kat-form .input:not(:focus) { background: var(--surface); }
+.kat-form-titel { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: .9rem; font-weight: 650; }
+.kat-schalter { align-self: end; padding-bottom: 6px; }
+.kat-wahl { display: flex; flex-wrap: wrap; gap: 6px; }
+.kat-symbol { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; color: var(--text-2); border: 1px solid var(--border); background: var(--surface); transition: border-color .15s, background .15s, color .15s; }
+.kat-symbol .ic { width: 17px; height: 17px; }
+.kat-symbol:hover { border-color: var(--border-strong); color: var(--text); }
+.kat-symbol.on { color: var(--c); border-color: color-mix(in oklab, var(--c) 60%, transparent); background: color-mix(in oklab, var(--c) 12%, var(--surface)); }
+.kat-farbe { width: 26px; height: 26px; border-radius: 50%; background: var(--c); border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--border); transition: box-shadow .15s, transform .2s var(--spring); }
+.kat-farbe:hover { transform: scale(1.08); }
+.kat-farbe.on { box-shadow: 0 0 0 2px var(--c); }
+.kat-aus { display: flex; flex-direction: column; gap: 8px; list-style: none; margin: 0; padding: 0; }
+.kat-aus li { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface-2); }
+.kat-aus li.kat-aktiv { border-color: var(--accent-line); }
+.kat-aus li .kat-name { flex: 1; }
+.kat-aus li .kat-name small { max-width: none; white-space: normal; }
+.euer-table .euer-bereich { min-width: 240px; }
+.euer-table .euer-zeile { display: block; width: 76px; margin-left: auto; }
+.euer-table .hint { margin: 4px 0 0; }

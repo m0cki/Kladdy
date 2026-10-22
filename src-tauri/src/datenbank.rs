@@ -85,6 +85,11 @@ pub const MIGRATIONEN: &[MigrationsDatei] = &[
         beschreibung: "rechnungen",
         sql: include_str!("../migrations/0007_rechnungen.sql"),
     },
+    MigrationsDatei {
+        version: 8,
+        beschreibung: "kategorien",
+        sql: include_str!("../migrations/0008_kategorien.sql"),
+    },
 ];
 
 /// Verbindungs-URL zu einer Datei im App-Verzeichnis, wie sie das Plugin und `Database.load` erwarten.
@@ -454,11 +459,13 @@ mod tests {
         tauri::async_runtime::block_on(async {
             migrieren(&db, MIGRATIONEN.len()).await;
             let mut c = verbinden(&db).await;
-            let kategorien: Vec<(String, String)> =
-                sqlx::query_as("SELECT name, typ FROM kategorien ORDER BY sortierung")
-                    .fetch_all(&mut c)
-                    .await
-                    .unwrap();
+            // sichtbar: die vier Standardkategorien (die optionalen sind ausgeblendet)
+            let kategorien: Vec<(String, String)> = sqlx::query_as(
+                "SELECT name, typ FROM kategorien WHERE archiviert = 0 ORDER BY sortierung",
+            )
+            .fetch_all(&mut c)
+            .await
+            .unwrap();
             assert_eq!(
                 kategorien,
                 vec![
@@ -817,6 +824,135 @@ mod tests {
             .await
             .unwrap();
             assert_eq!(tabellen, 0);
+            c.close().await.unwrap();
+        });
+        let _ = std::fs::remove_dir_all(&ordner);
+    }
+
+    #[test]
+    fn migration_kategorien_katalog_und_euer_zuordnung() {
+        let ordner = testordner("kategorien");
+        let db = ordner.join("kladdy.db");
+        // Stelle der Migration in MIGRATIONEN (ihre Nummer steht nur dort und im Dateinamen)
+        let davor = MIGRATIONEN
+            .iter()
+            .position(|m| m.beschreibung == "kategorien")
+            .unwrap();
+        tauri::async_runtime::block_on(async {
+            // Stand davor mit einer Ausgabe in „Sonstige Kosten“
+            migrieren(&db, davor).await;
+            let mut c = verbinden(&db).await;
+            sqlx::query(
+                "INSERT INTO buchungen (nummer, typ, zahlungsdatum, betrag_cent, kategorie_id, zahlungsart, beschreibung, erstellt_am, geaendert_am)
+                 VALUES ('2026-0001', 'ausgabe', '2026-10-20', 1999, 4, 'bank', 'Handy', 'jetzt', 'jetzt')",
+            )
+            .execute(&mut c)
+            .await
+            .unwrap();
+            c.close().await.unwrap();
+
+            migrieren(&db, MIGRATIONEN.len()).await;
+            let mut c = verbinden(&db).await;
+            // Standardkategorien unverändert sichtbar, der Katalog ausgeblendet dahinter
+            let kategorien: Vec<(String, i64)> =
+                sqlx::query_as("SELECT name, archiviert FROM kategorien ORDER BY sortierung, id")
+                    .fetch_all(&mut c)
+                    .await
+                    .unwrap();
+            assert_eq!(
+                kategorien,
+                vec![
+                    ("Dienstleistungen".into(), 0),
+                    ("Produkte & Material".into(), 0),
+                    ("Sprit & Fahrzeug".into(), 0),
+                    ("Sonstige Kosten".into(), 0),
+                    ("Abschreibungen (AfA)".into(), 1),
+                    ("Bewirtung".into(), 1),
+                    ("Geschenke".into(), 1),
+                    ("Homeoffice".into(), 1),
+                ]
+            );
+            let bewirtung: (Option<String>, i64) = sqlx::query_as(
+                "SELECT euer_bereich, abziehbar_prozent FROM kategorien WHERE name = 'Bewirtung'",
+            )
+            .fetch_one(&mut c)
+            .await
+            .unwrap();
+            assert_eq!(bewirtung, (Some("Bewirtungsaufwendungen".into()), 70));
+            let kategorie: i64 = sqlx::query_scalar("SELECT kategorie_id FROM buchungen")
+                .fetch_one(&mut c)
+                .await
+                .unwrap();
+            assert_eq!(kategorie, 4);
+            let index: i64 = sqlx::query_scalar(
+                "SELECT count(*) FROM sqlite_master WHERE type = 'index' AND name = 'buchungen_kategorie_id'",
+            )
+            .fetch_one(&mut c)
+            .await
+            .unwrap();
+            assert_eq!(index, 1);
+
+            // EÜR-Zuordnung 2026: alle acht Kategorien, Bereich wie die Kategorie, Zeilen leer
+            let zuordnung: (i64, i64, i64) = sqlx::query_as(
+                "SELECT count(*), count(euer_bereich), count(euer_zeile) FROM euer_zuordnung WHERE jahr = 2026",
+            )
+            .fetch_one(&mut c)
+            .await
+            .unwrap();
+            assert_eq!(zuordnung, (8, 0, 0));
+            // je Jahr und Kategorie eine Zeile, nur bekannte Kategorien, Zeilen 1–999, Jahre 2000–2100
+            // (Spalten: jahr, kategorie_id, euer_bereich, euer_zeile)
+            for sql in [
+                "INSERT INTO euer_zuordnung VALUES (2026, 1, NULL, NULL)",
+                "INSERT INTO euer_zuordnung VALUES (2027, 99, NULL, NULL)",
+                "INSERT INTO euer_zuordnung VALUES (2027, 1, NULL, 0)",
+                "INSERT INTO euer_zuordnung VALUES (2027, 1, NULL, 1000)",
+                "INSERT INTO euer_zuordnung VALUES (2027, 1, ' ', NULL)",
+                "INSERT INTO euer_zuordnung VALUES (1999, 1, NULL, NULL)",
+            ] {
+                assert!(sqlx::query(sql).execute(&mut c).await.is_err(), "{sql}");
+            }
+            sqlx::query("INSERT INTO euer_zuordnung VALUES (2027, 1, 'Sonstige Einnahmen', 12)")
+                .execute(&mut c)
+                .await
+                .unwrap();
+
+            // Je Art bleibt mindestens eine Kategorie sichtbar
+            let f = sqlx::query("UPDATE kategorien SET archiviert = 1 WHERE id = 1")
+                .execute(&mut c)
+                .await
+                .map_err(db_fehler)
+                .unwrap_err();
+            assert!(f.starts_with("Mindestens eine Kategorie je Art"), "{f}");
+            sqlx::query("UPDATE kategorien SET archiviert = 1 WHERE id IN (2, 3)")
+                .execute(&mut c)
+                .await
+                .unwrap();
+            let f = sqlx::query("UPDATE kategorien SET archiviert = 1 WHERE id = 4")
+                .execute(&mut c)
+                .await
+                .map_err(db_fehler)
+                .unwrap_err();
+            assert!(f.starts_with("Mindestens eine Kategorie je Art"), "{f}");
+            sqlx::query("UPDATE kategorien SET archiviert = 0 WHERE name = 'Bewirtung'")
+                .execute(&mut c)
+                .await
+                .unwrap();
+            sqlx::query("UPDATE kategorien SET archiviert = 1 WHERE id = 4")
+                .execute(&mut c)
+                .await
+                .unwrap();
+            // Die Art einer benutzten Kategorie steht fest, die einer unbenutzten nicht
+            let f = sqlx::query("UPDATE kategorien SET typ = 'einnahme' WHERE id = 4")
+                .execute(&mut c)
+                .await
+                .map_err(db_fehler)
+                .unwrap_err();
+            assert!(f.starts_with("Die Art einer Kategorie"), "{f}");
+            sqlx::query("UPDATE kategorien SET typ = 'einnahme' WHERE name = 'Geschenke'")
+                .execute(&mut c)
+                .await
+                .unwrap();
             c.close().await.unwrap();
         });
         let _ = std::fs::remove_dir_all(&ordner);
