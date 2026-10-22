@@ -1,12 +1,15 @@
 /* Der eine Erfassen-Weg (§6, §6.4): `erfassen(vorbelegung)` öffnet die Erfassen-Schublade von jeder Seite aus
  * („+ Erfassen“ im Kopf von Ein- & Ausgänge, ⌘N, Befehlspalette; andere Seiten nur vorbelegt). `bearbeiten(id)` öffnet
  * dieselbe Schublade mit einer bestehenden Buchung. Mit ungespeicherten Eingaben wird vorher nachgefragt
- * (Toast „Verwerfen“ / „Weiter bearbeiten“), ebenso beim Schließen. */
+ * (Toast „Verwerfen“ / „Weiter bearbeiten“), ebenso beim Schließen.
+ * Belegerkennung (Datei-Drop, ⌘O): lib/belegablage.ts startet sie nach dem Öffnen bzw. Vormerken, das Ergebnis kommt als
+ * `erkennung` hierher (gebunden an Auftrag und Datei); die Schublade füllt damit leere Felder (lib/erkennung/anwenden.ts). */
 import { create } from 'zustand';
 import { useUi } from '../store/ui';
 import { belegeZusammenfuehren, type VorgemerkterBeleg } from './belege';
 import type { BuchungTyp, Zahlungsart } from './buchungen';
 import type { ErtragsArt } from './ertrag';
+import type { Erkennung } from './erkennung/regeln';
 
 export interface Vorbelegung {
   typ?: BuchungTyp;
@@ -37,22 +40,49 @@ interface ErfassenState {
   belege: VorgemerkterBeleg[];
   /** Kann die offene Schublade Dateien annehmen? (false z. B. bei einer Gegenbuchung oder ohne Datenbank) */
   nimmtBelege: boolean;
+  /** Belegerkennung zu einer vorgemerkten Datei der offenen Schublade (null = keine) */
+  erkennung: ErkennungsStand | null;
 }
 
+/** Erkennung läuft bzw. ist fertig. `fuer` = Auftrag (n), `pfad` = erkannte Datei; `id` wechselt bei jeder neuen Erkennung. */
+export type ErkennungsStand =
+  | { id: number; fuer: number; pfad: string; status: 'laeuft' }
+  | { id: number; fuer: number; pfad: string; status: 'fertig'; ergebnis: Erkennung };
+
 /** Was die Schublade gerade zeigen soll. `n` wechselt bei jedem Öffnen ⇒ Formular neu aufbauen. */
-export const useErfassen = create<ErfassenState>(() => ({ auftrag: null, belege: [], nimmtBelege: true }));
+export const useErfassen = create<ErfassenState>(() => ({ auftrag: null, belege: [], nimmtBelege: true, erkennung: null }));
 
 /** Dateien zur offenen Schublade hinzufügen (gleiche Datei nur einmal). */
 export function belegeVormerken(neu: VorgemerkterBeleg[]): void {
   useErfassen.setState((s) => ({ belege: belegeZusammenfuehren(s.belege, neu) }));
 }
 
-/** Eine vorgemerkte Datei wieder herausnehmen (abgelegte Belege bleiben, die werden nie gelöscht). */
+/** Eine vorgemerkte Datei wieder herausnehmen (abgelegte Belege bleiben, die werden nie gelöscht). Ihre Erkennung endet mit. */
 export function belegEntfernen(pfad: string): void {
-  useErfassen.setState((s) => ({ belege: s.belege.filter((b) => b.pfad !== pfad) }));
+  useErfassen.setState((s) => ({ belege: s.belege.filter((b) => b.pfad !== pfad), erkennung: s.erkennung?.pfad === pfad ? null : s.erkennung }));
 }
 
-export const belegeLeeren = (): void => useErfassen.setState({ belege: [] });
+export const belegeLeeren = (): void => useErfassen.setState({ belege: [], erkennung: null });
+
+let erkennungZaehler = 0;
+
+/** Erkennung für eine vorgemerkte Datei der offenen Schublade beginnen. Kennung oder null (Datei nicht vorgemerkt). */
+export function erkennungBeginnen(pfad: string): number | null {
+  const s = useErfassen.getState();
+  if (!s.auftrag || !s.belege.some((b) => b.pfad === pfad)) return null;
+  const id = ++erkennungZaehler;
+  useErfassen.setState({ erkennung: { id, fuer: s.auftrag.n, pfad, status: 'laeuft' } });
+  return id;
+}
+
+/** Ergebnis eintragen – nur wenn seitdem keine andere Erkennung begonnen hat und die Datei noch vorgemerkt ist. */
+export function erkennungFertig(id: number, ergebnis: Erkennung): void {
+  const s = useErfassen.getState();
+  const e = s.erkennung;
+  if (!e || e.id !== id) return;
+  if (!s.belege.some((b) => b.pfad === e.pfad)) useErfassen.setState({ erkennung: null });
+  else useErfassen.setState({ erkennung: { id: e.id, fuer: e.fuer, pfad: e.pfad, status: 'fertig', ergebnis } });
+}
 
 let zaehler = 0;
 const FRAGE = 'erfassen-frage';
@@ -91,7 +121,7 @@ function nachVerwerfen(text: string, weiter: () => void): void {
 }
 
 function oeffne(auftrag: Auftrag): void {
-  useErfassen.setState({ auftrag, belege: auftrag.art === 'neu' ? belegeZusammenfuehren([], auftrag.vorbelegung.belege ?? []) : [], nimmtBelege: true });
+  useErfassen.setState({ auftrag, belege: auftrag.art === 'neu' ? belegeZusammenfuehren([], auftrag.vorbelegung.belege ?? []) : [], nimmtBelege: true, erkennung: null });
   const ui = useUi.getState();
   if (ui.drawer === 'erfassen') ui.setUngespeichert(false);
   else ui.openDrawer('erfassen');

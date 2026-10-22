@@ -3,14 +3,17 @@
  *   - offene Erfassen-Schublade, die Dateien annimmt (neu, bearbeiten oder festgeschrieben ansehen): dort vormerken;
  *   - sonst: Erfassen-Schublade als Ausgabe mit den Dateien öffnen (der eine Erfassen-Weg, nur vorbelegt).
  * Ungültige Dateien ⇒ ein Warn-Toast mit dem Text aus Rust. Doppelte Dateien zeigt die Schublade als Hinweis.
- * Nur in der Mac-App; im Browser passiert beim Ziehen nichts. Erkennung von Betrag/Datum/Geschäft kommt erst in Phase 3. */
+ * Danach läuft im Hintergrund die Belegerkennung für die erste PDF (sonst die erste Datei, dann nur der Dateiname):
+ * lib/erkennung/erkennen.ts; das Ergebnis geht an useErfassen.erkennung, die Schublade füllt damit leere Felder.
+ * Nur in der Mac-App; im Browser passiert beim Ziehen nichts. */
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { open } from '@tauri-apps/plugin-dialog';
 import { create } from 'zustand';
 import { useUi } from '../store/ui';
-import { DIALOG_FILTER, abgelehntText, angehaengtText, doppeltText, pruefungAuswerten, type VorgemerkterBeleg } from './belege';
+import { DIALOG_FILTER, abgelehntText, angehaengtText, dateiArt, doppeltText, pruefungAuswerten, type VorgemerkterBeleg } from './belege';
 import { typName, type BuchungTyp } from './buchungen';
-import { belegeLeeren, belegeVormerken, erfassen, useErfassen } from './erfassen';
+import { belegeLeeren, belegeVormerken, erfassen, erkennungBeginnen, erkennungFertig, useErfassen } from './erfassen';
+import { belegErkennen } from './erkennung/erkennen';
 import { fehlerText } from './fehler';
 import { inTauri } from './menu';
 import { belegAnhaengen, belegPruefen } from './queries/belege';
@@ -46,6 +49,15 @@ export async function belegeUebernehmen(pfade: string[]): Promise<void> {
   if (!gueltig.length) return;
   if (schubladeNimmtBelege()) belegeVormerken(gueltig);
   else erfassen({ typ: 'ausgabe', belege: gueltig });
+  erkennen(gueltig);
+}
+
+/** Erkennung für die erste PDF (sonst die erste Datei) – nur wenn die Schublade sie vorgemerkt hat, ohne auf sie zu warten. */
+function erkennen(dateien: readonly VorgemerkterBeleg[]): void {
+  const datei = dateien.find((b) => dateiArt(b.name, b.mime) === 'pdf') ?? dateien[0];
+  const id = datei ? erkennungBeginnen(datei.pfad) : null;
+  if (!datei || id === null) return;
+  void belegErkennen(datei).then((ergebnis) => erkennungFertig(id, ergebnis));
 }
 
 /** Nativer Datei-Dialog (mehrere Dateien, nur erlaubte Typen). Leer bei Abbruch. */

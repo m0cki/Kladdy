@@ -8,7 +8,9 @@
  * beim Speichern als `belege` mit; bei gesperrten Einträgen (festgeschrieben) nur über „Beleg anhängen“ (beleg_anhaengen).
  * Neue Einnahme: „Beleg zum Ertrag“ (BelegZumErtrag.tsx, lib/ertrag.ts) – Beleg erstellen stellt Quittung bzw. Rechnung
  * samt Einnahme in EINER Transaktion aus (beleg_ausstellen), „Offene Rechnung zuordnen“ bucht deren Zahlung
- * (beleg_bezahlt), „Ohne eigenen Beleg“ ist die einfache Einnahme (buchung_anlegen). */
+ * (beleg_bezahlt), „Ohne eigenen Beleg“ ist die einfache Einnahme (buchung_anlegen).
+ * Belegerkennung: useBelegErkennung (BelegErkennung.tsx) füllt leere Felder, zeigt oben die Zusammenfassung und an den
+ * Feldern „aus PDF“ / „aus Dateiname“. */
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -96,6 +98,7 @@ import { KategorieIcon, ZAHLUNGSWEG_ICON } from '../buchungen/Symbole';
 import { BelegDropzone, VorgemerkteBelege, VorhandeneBelege, useBelegeZuBuchung } from '../belege/BelegDateien';
 import { belegDialog } from '../belege/BelegDialog';
 import { BelegZumErtrag } from './BelegZumErtrag';
+import { useBelegErkennung, type ErkennungAnsicht } from './BelegErkennung';
 
 interface Stamm {
   kategorien: KategorieWahl[];
@@ -288,6 +291,19 @@ export function ErfassenSchublade() {
     setForm((f) => (f ? { ...f, [k]: v } : f));
   }, []);
   const fehlerWeg = (k: FormFeld) => setFehler((x) => (x[k] ? { ...x, [k]: undefined } : x));
+  // beim eigenen Beleg ist die Datei das unterschriebene Exemplar – daraus wird nichts ins Formular übernommen
+  const erkannt = useBelegErkennung({
+    auftragN,
+    bereit: aktuell,
+    form,
+    start,
+    neu: !bearbeitung,
+    nurLesen: nurLesen || weg === 'beleg',
+    katGewaehlt,
+    kategorien: stamm?.kategorien,
+    setForm,
+    fehlerWeg,
+  });
 
   /* ---------- Speichern ---------- */
   const speichern = useCallback(
@@ -369,7 +385,7 @@ export function ErfassenSchublade() {
         kunden: stamm.kunden,
         heute: h,
         festBis: offenRechnung ? null : stamm.festBis,
-        belegdatum: zeile?.belegdatum ?? null,
+        belegdatum: zeile?.belegdatum ?? erkannt.belegdatum,
       });
       const ef = weg === 'beleg' ? ertragPruefen(form, ertrag, belege.length) : null;
       if (!r.ok || ef) {
@@ -484,7 +500,7 @@ export function ErfassenSchublade() {
         setSpeichert(false);
       }
     },
-    [form, stamm, zeile, nurLesen, speichert, belege, weg, ertrag, ertragStamm, ertragAktiv, navigate],
+    [form, stamm, zeile, nurLesen, speichert, belege, weg, ertrag, ertragStamm, ertragAktiv, navigate, erkannt.belegdatum],
   );
 
   // ⌘↩ speichern, ⇧⌘↩ speichern & neu
@@ -639,6 +655,7 @@ export function ErfassenSchublade() {
             nimmtBelege={nimmtBelege}
             fehler={fehler}
             katVorschlag={katVorschlag}
+            erkannt={erkannt}
             set={set}
             fehlerWeg={fehlerWeg}
             weg={weg}
@@ -703,6 +720,8 @@ interface InhaltProps {
   nimmtBelege: boolean;
   fehler: Partial<Record<FormFeld, string>>;
   katVorschlag: boolean;
+  /** Belegerkennung: Kasten oben und Marken „aus PDF“ / „aus Dateiname“ an den Feldern */
+  erkannt: ErkennungAnsicht;
   set: <K extends keyof Formular>(k: K, v: Formular[K]) => void;
   fehlerWeg: (k: FormFeld) => void;
   onTyp: (t: BuchungTyp) => void;
@@ -731,7 +750,7 @@ const TIP_RECHNUNGSDATUM = 'Datum der Rechnung. Die Einnahme wird erst erfasst, 
 const TIP_NR = 'Bei Ausgaben die Rechnungs- oder Bonnummer des Geschäfts. Eigene Quittungen und Rechnungen (QU-/RE-…) bekommen ihre Nummer beim Ausstellen.';
 
 function FormularInhalt(props: InhaltProps) {
-  const { form, stamm, zeile, sp, belege, nimmtBelege, fehler, katVorschlag, set, fehlerWeg, onTyp, onKategorie, vorschlagen } = props;
+  const { form, stamm, zeile, sp, belege, nimmtBelege, fehler, katVorschlag, erkannt, set, fehlerWeg, onTyp, onKategorie, vorschlagen } = props;
   const { weg, belegArt, offenRechnung, ertragBereich, onEigenbeleg } = props;
   const { pathname } = useLocation();
   const seiteZeitraum = useUi((s) => s.zeitraum);
@@ -791,6 +810,7 @@ function FormularInhalt(props: InhaltProps) {
 
   return (
     <>
+      {erkannt.kopf}
       {zeile && sp ? (
         <div className={`bu-link ${sp !== 'festgeschrieben' ? 'lock' : ''}`}>
           <Lock />
@@ -841,6 +861,7 @@ function FormularInhalt(props: InhaltProps) {
         <div className="field">
           <label className="field-label" htmlFor="bf-betrag">
             Betrag
+            {erkannt.marke('betrag')}
           </label>
           <div className="input-wrap">
             <input
@@ -871,12 +892,13 @@ function FormularInhalt(props: InhaltProps) {
           <div className="field">
             <span className="field-label">
               Kategorie
-              {katVorschlag ? (
-                <span className="sugg-tag" title="Aus den Stichworten vorgeschlagen – bitte kurz prüfen">
-                  <Sparkles />
-                  Vorschlag
-                </span>
-              ) : null}
+              {erkannt.marke('kategorieId') ??
+                (katVorschlag ? (
+                  <span className="sugg-tag" title="Aus den Stichworten vorgeschlagen – bitte kurz prüfen">
+                    <Sparkles />
+                    Vorschlag
+                  </span>
+                ) : null)}
             </span>
             <div id="bf-kategorie" className={`bu-tiles bu-kat-tiles ${katVorschlag ? 'suggested' : ''} ${fehler.kategorie ? 'invalid' : ''}`} role="radiogroup" aria-label="Kategorie">
               {kats.map((k) => {
@@ -915,6 +937,7 @@ function FormularInhalt(props: InhaltProps) {
               <span className="q" aria-hidden="true">
                 ?
               </span>
+              {erkannt.marke('zahlungsdatum')}
             </label>
             <input
               id="bf-zahlungsdatum"
@@ -936,6 +959,7 @@ function FormularInhalt(props: InhaltProps) {
                 <span className="q" aria-hidden="true">
                   ?
                 </span>
+                {erkannt.marke('belegnummer')}
               </label>
               <input
                 id="bf-belegnummer"
@@ -959,6 +983,7 @@ function FormularInhalt(props: InhaltProps) {
           <div className="field full">
             <label className="field-label" htmlFor="bf-beschreibung">
               Beschreibung
+              {erkannt.marke('beschreibung')}
             </label>
             <input
               id="bf-beschreibung"
@@ -980,6 +1005,7 @@ function FormularInhalt(props: InhaltProps) {
               <label className="field-label" htmlFor="bf-wer">
                 {ausgabe ? 'Geschäft' : 'Kunde'}
                 <small className="muted">{belegArt === 'rechnung' ? 'für die Rechnung nötig' : 'optional'}</small>
+                {erkannt.marke('wer')}
               </label>
               <input
                 id="bf-wer"
