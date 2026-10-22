@@ -13,6 +13,7 @@ mod liquiditaet;
 mod nummern;
 mod rechnungen;
 mod tectonic;
+mod termine;
 
 use tauri::menu::{Menu, MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{AppHandle, Emitter, Runtime};
@@ -170,6 +171,13 @@ pub fn run() {
             rechnungen::beleg_stornieren,
             rechnungen::beleg_pdf_ablegen,
             rechnungen::beleg_scan_anhaengen,
+            termine::termin_speichern,
+            termine::termin_erledigt,
+            termine::termin_nicht_erledigt,
+            termine::termin_ohne_beleg,
+            termine::termin_absagen,
+            termine::termin_zuruecksetzen,
+            termine::termin_loeschen,
             #[cfg(debug_assertions)]
             demo::demo_status,
             #[cfg(debug_assertions)]

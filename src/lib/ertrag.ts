@@ -10,7 +10,9 @@ import { naechsteNummer, type Nummernkreis } from './numbering';
 import type { UstModus } from './queries/einstellungen';
 import type { VorlagenWahl } from './queries/vorlagen';
 import {
+  artWechseln,
   faelligText,
+  formularSumme,
   formularZuDaten,
   formularZuDokument,
   neuesFormular,
@@ -48,12 +50,16 @@ export interface Ertrag {
   offenId: number | null;
 }
 
-/** Start: vom Aufrufer vorgewählter Beleg ⇒ „Beleg erstellen“; mit mitgebrachter Datei (Drop) ⇒ „Ohne eigenen Beleg“. */
-export function ertragStart(v: { beleg?: ErtragsArt; belege?: readonly unknown[] }, belegArt: ErtragsArt): Ertrag {
+/** Start: vom Aufrufer vorgewählter Beleg ⇒ „Beleg erstellen“; mit mitgebrachter Datei (Drop) ⇒ „Ohne eigenen Beleg“.
+ *  Zu einem Termin ist eine Rechnung standardmäßig „noch offen“ (nach dem Termin zahlt der Kunde meist später). */
+export function ertragStart(
+  v: { beleg?: ErtragsArt; belege?: readonly unknown[]; termin?: number; entwurf?: number },
+  belegArt: ErtragsArt,
+): Ertrag {
   return {
     weg: v.beleg ? 'beleg' : v.belege?.length ? 'ohne' : 'beleg',
     art: v.beleg ?? belegArt,
-    bezahlt: true,
+    bezahlt: v.termin == null && v.entwurf == null,
     vorlage: null,
     adresse: '',
     leistung: '',
@@ -152,8 +158,25 @@ export function vorlageFuer(e: Pick<Ertrag, 'art' | 'vorlage'>, vorlagen: Ertrag
   );
 }
 
-/** Erfassen-Formular + Beleg-Angaben ⇒ Formular der Beleg-Maske. `cent` = gelesener Betrag. */
-export function belegFormular(f: Formular, e: Ertrag, cent: number, ctx: Pick<ErtragKontext, 'kunden' | 'vorlagen' | 'zahlungszielTage' | 'heute'>): BelegFormular {
+/** Termin bzw. vorbereiteter Beleg, zu dem die Einnahme gehört (Termine › „Quittung ausstellen“, Maske eines
+ *  vorbereiteten Belegs, §6.5). */
+export interface ErtragBezug {
+  /** Termin: ID und Tag (wird das Leistungsdatum) */
+  termin: { id: number; datum: string } | null;
+  /** vorbereiteter Beleg ohne Nummer als Formular der Maske (formularAusEntwurf) */
+  entwurf: BelegFormular | null;
+}
+
+/** Erfassen-Formular + Beleg-Angaben ⇒ Formular der Beleg-Maske. `cent` = gelesener Betrag. Mit vorbereitetem Entwurf
+ *  (Prototyp buchungen.js speichern): dessen Texte, Vorlage und Positionen bleiben, solange der Betrag zur Summe passt;
+ *  Kunde, Datum, Betreff und Zahlung kommen aus der Schublade. */
+export function belegFormular(
+  f: Formular,
+  e: Ertrag,
+  cent: number,
+  ctx: Pick<ErtragKontext, 'kunden' | 'vorlagen' | 'zahlungszielTage' | 'heute'>,
+  bezug: ErtragBezug | null = null,
+): BelegFormular {
   const k = kundeAufloesen(f.wer, ctx.kunden, f.kundeBewusstNeu);
   const kunde = k.art === 'kunde' ? (ctx.kunden.find((x) => x.id === k.kunde.id) ?? null) : null;
   const basis = neuesFormular(
@@ -167,18 +190,43 @@ export function belegFormular(f: Formular, e: Ertrag, cent: number, ctx: Pick<Er
       zahlungsart: f.zahlungsart,
       bezahlt: e.art === 'rechnung' && e.bezahlt,
       kategorieId: f.kategorieId,
+      terminId: bezug?.termin?.id ?? null,
     },
     { heute: ctx.heute, zielTage: { rechnung: ctx.zahlungszielTage } },
   );
   const leistung = e.leistung.trim();
-  return {
+  const form: BelegFormular = {
     ...basis,
     // wie in der Schublade gebunden („Name · K-0012“ bzw. bewusst neuer Kunde mit gleichem Namen)
     kunde: f.wer.trim(),
     kundeBewusstNeu: f.kundeBewusstNeu,
     adresse: e.adresse.trim() ? e.adresse : basis.adresse,
+    // Leistungsdatum eines Termins ist sein Tag, nicht der Zahlungstag
+    leistungVon: bezug?.termin?.datum ?? basis.leistungVon,
     positionen: basis.positionen.map((p, i) => (i === 0 && leistung ? { ...p, beschreibung: leistung } : p)),
     vorlageId: vorlageFuer(e, ctx.vorlagen).id,
+  };
+  const entwurf = bezug?.entwurf;
+  if (!entwurf) return form;
+  const w = entwurf.art === e.art ? entwurf : artWechseln(entwurf, e.art, { rechnung: ctx.zahlungszielTage });
+  const passt = formularSumme(w) === cent;
+  const positionen = !passt ? form.positionen : w.positionen.length === 1 && leistung ? [{ ...w.positionen[0], beschreibung: leistung }] : w.positionen;
+  return {
+    ...w,
+    kunde: form.kunde,
+    kundeBewusstNeu: form.kundeBewusstNeu,
+    adresse: form.adresse,
+    datum: form.datum,
+    leistungVon: bezug?.termin ? form.leistungVon : w.leistungVon || form.leistungVon,
+    zielTage: form.zielTage,
+    betreff: form.betreff,
+    zahlungsart: form.zahlungsart,
+    bezahltAm: form.bezahltAm,
+    positionen,
+    mehrere: e.art === 'quittung' && positionen.length > 1,
+    vorlageId: form.vorlageId,
+    terminId: w.terminId ?? form.terminId,
+    buchungId: null,
   };
 }
 
@@ -194,9 +242,9 @@ export interface BelegVorbereitet {
   fehlt: string[];
 }
 
-/** Alles für beleg_ausstellen – samt Pflichtangaben-Check wie in der Maske. */
-export function belegVorbereiten(f: Formular, e: Ertrag, cent: number, ctx: ErtragKontext): BelegVorbereitet {
-  const formular = belegFormular(f, e, cent, ctx);
+/** Alles für beleg_ausstellen – samt Pflichtangaben-Check wie in der Maske (mit `bezug`: zum Termin bzw. den Entwurf). */
+export function belegVorbereiten(f: Formular, e: Ertrag, cent: number, ctx: ErtragKontext, bezug: ErtragBezug | null = null): BelegVorbereitet {
+  const formular = belegFormular(f, e, cent, ctx, bezug);
   const dokument = formularZuDokument(formular, { kunden: ctx.kunden, firma: ctx.firma, ustModus: ctx.ustModus });
   const gedruckt = bausteineFuer(dokument, vorlageFuer(e, ctx.vorlagen).bausteine).filter((b) => istBausteinTyp(b.typ));
   const naechste = naechsteBelegNummer(ctx.kreise, e.art, f.zahlungsdatum, ctx.heute);

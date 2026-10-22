@@ -829,6 +829,7 @@ mod tests {
             beschreibung: "Erde".into(),
             heute: "2026-10-15".into(),
             belege,
+            termin_id: None,
         }
     }
 

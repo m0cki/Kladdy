@@ -12,6 +12,7 @@ import './styles/blatt.css';
 import './styles/rechnungen.css';
 import './styles/vorlagen.css';
 import './styles/kunden.css';
+import './styles/termine.css';
 import './styles/auswertung.css';
 import './styles/liquiditaet.css';
 import App from './App';

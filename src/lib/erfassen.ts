@@ -1,5 +1,6 @@
 /* Der eine Erfassen-Weg (§6, §6.4): `erfassen(vorbelegung)` öffnet die Erfassen-Schublade von jeder Seite aus
- * („+ Erfassen“ im Kopf von Ein- & Ausgänge, ⌘N, Befehlspalette; andere Seiten nur vorbelegt). `bearbeiten(id)` öffnet
+ * („+ Erfassen“ im Kopf von Ein- & Ausgänge, ⌘N, Befehlspalette; andere Seiten nur vorbelegt, z. B. Termine mit
+ * `termin` und `entwurf` zum Ausstellen des vorbereiteten Belegs). `bearbeiten(id)` öffnet
  * dieselbe Schublade mit einer bestehenden Buchung. Mit ungespeicherten Eingaben wird vorher nachgefragt
  * (Toast „Verwerfen“ / „Weiter bearbeiten“), ebenso beim Schließen.
  * Belegerkennung (Datei-Drop, ⌘O): lib/belegablage.ts startet sie nach dem Öffnen bzw. Vormerken, das Ergebnis kommt als
@@ -29,6 +30,11 @@ export interface Vorbelegung {
   belege?: VorgemerkterBeleg[];
   /** Einnahme mit eigenem Beleg, Art vorgewählt (Neu-Menü, Befehlspalette, Menü „Quittung/Rechnung schreiben …“) */
   beleg?: ErtragsArt;
+  /** Termin, zu dem die Einnahme gehört (Termine › „Quittung ausstellen“): wird beim Speichern abgehakt bzw. „ohne
+   *  Beleg“ bzw. mit der zugeordneten Rechnung abgeschlossen (§6.5) */
+  termin?: number;
+  /** vorbereiteter Beleg ohne Nummer: „Beleg erstellen“ stellt diesen Entwurf mit Nummer aus statt einen neuen */
+  entwurf?: number;
 }
 
 export type Auftrag = { art: 'neu'; vorbelegung: Vorbelegung; n: number } | { art: 'bearbeiten'; id: number; n: number };

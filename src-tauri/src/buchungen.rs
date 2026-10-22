@@ -25,6 +25,7 @@ use crate::belege;
 use crate::datenbank::{self, db_fehler};
 use crate::kunden;
 use crate::nummern;
+use crate::termine;
 
 /// Eingabe aus der Erfassen-Schublade (src/lib/…). Feldnamen exakt so (snake_case).
 #[derive(Debug, Clone, Deserialize)]
@@ -56,6 +57,9 @@ pub struct BuchungEingabe {
     /// abgelegt (src/belege.rs). Fehlt der Schlüssel, keine.
     #[serde(default)]
     pub belege: Vec<String>,
+    /// nur beim Anlegen einer Einnahme: Termin, den sie „ohne eigenen Beleg“ abschließt (termine.rs, §6.5)
+    #[serde(default)]
+    pub termin_id: Option<i64>,
 }
 
 /// Antwort an das Frontend.
@@ -94,6 +98,7 @@ struct Geprueft {
     beschreibung: String,
     jahr_heute: i64,
     belege: Vec<String>,
+    termin_id: Option<i64>,
 }
 
 /// Getrimmter Text, leer ⇒ None.
@@ -180,6 +185,9 @@ fn pruefen(d: &BuchungEingabe) -> Result<Geprueft, String> {
     } else if d.kunde_id.is_some() || neuer_kunde.is_some() {
         return Err("Einen Kunden gibt es nur bei Einnahmen.".into());
     }
+    if d.termin_id.is_some() && !einnahme {
+        return Err("Ein Termin gehört nur zu einer Einnahme.".into());
+    }
     Ok(Geprueft {
         typ: d.typ.clone(),
         zahlungsdatum: d.zahlungsdatum.clone(),
@@ -195,6 +203,7 @@ fn pruefen(d: &BuchungEingabe) -> Result<Geprueft, String> {
         beschreibung,
         jahr_heute,
         belege: d.belege.clone(),
+        termin_id: d.termin_id,
     })
 }
 
@@ -401,12 +410,16 @@ async fn anlegen_in(
         return Err(festgeschrieben_meldung(&bis));
     }
     kategorie_pruefen(tx, g.kategorie_id, &g.typ, None).await?;
+    if let Some(t) = g.termin_id {
+        termine::abschluss_pruefen(tx, t).await?;
+    }
     let (kunde_id, kunde_nummer, kunde_neu) = kunde_bestimmen(tx, g, zeitpunkt).await?;
     let nummer = nummern::vergeben_fortlaufend(tx, "buchung", g.jahr_heute).await?;
     let id = sqlx::query(
         "INSERT INTO buchungen (nummer, typ, zahlungsdatum, belegdatum, betrag_cent, privatanteil_prozent,
-           kategorie_id, kunde_id, lieferant, art, zahlungsart, belegnummer, beschreibung, erstellt_am, geaendert_am)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'zahlung', ?, ?, ?, ?, ?)",
+           kategorie_id, kunde_id, lieferant, art, zahlungsart, belegnummer, beschreibung, termin_id, erstellt_am,
+           geaendert_am)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'zahlung', ?, ?, ?, ?, ?, ?)",
     )
     .bind(&nummer)
     .bind(&g.typ)
@@ -420,6 +433,7 @@ async fn anlegen_in(
     .bind(&g.zahlungsart)
     .bind(&g.belegnummer)
     .bind(&g.beschreibung)
+    .bind(g.termin_id)
     .bind(zeitpunkt)
     .bind(zeitpunkt)
     .execute(&mut *tx)
@@ -428,6 +442,10 @@ async fn anlegen_in(
     .last_insert_rowid();
     let neu = zeile_json(tx, "buchungen", id).await?;
     protokollieren(tx, zeitpunkt, "buchungen", id, "neu", None, neu.as_ref()).await?;
+    // Einnahme ohne eigenen Beleg zum Termin: Termin erledigt „ohne Beleg“, sein Entwurf wird verworfen
+    if let Some(t) = g.termin_id {
+        termine::abschliessen_in(tx, t, true, zeitpunkt).await?;
+    }
     let belege = belege::belege_ablegen(
         tx,
         ablage,
@@ -500,6 +518,9 @@ pub async fn aendern(
     zeitpunkt: &str,
 ) -> Result<BuchungErgebnis, String> {
     let g = pruefen(daten)?;
+    if g.termin_id.is_some() {
+        return Err("Einen Termin verknüpft nur das Erfassen einer neuen Einnahme.".into());
+    }
     belege::in_transaktion_mit_ablage(conn, ablage, async |tx, neue| {
         aendern_in(tx, ablage, id, &g, zeitpunkt, neue).await
     })
@@ -787,6 +808,7 @@ mod tests {
             beschreibung: " Rasen mähen ".into(),
             heute: "2026-10-15".into(),
             belege: vec![],
+            termin_id: None,
         }
     }
 

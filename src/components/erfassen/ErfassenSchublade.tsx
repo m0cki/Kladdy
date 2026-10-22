@@ -10,7 +10,10 @@
  * samt Einnahme in EINER Transaktion aus (beleg_ausstellen), „Offene Rechnung zuordnen“ bucht deren Zahlung
  * (beleg_bezahlt), „Ohne eigenen Beleg“ ist die einfache Einnahme (buchung_anlegen).
  * Belegerkennung: useBelegErkennung (BelegErkennung.tsx) füllt leere Felder, zeigt oben die Zusammenfassung und an den
- * Feldern „aus PDF“ / „aus Dateiname“. */
+ * Feldern „aus PDF“ / „aus Dateiname“.
+ * Termin bzw. vorbereiteter Beleg (Vorbelegung `termin`/`entwurf`, §6.5): oben eine Hinweiszeile; „Beleg erstellen“ stellt
+ * den Entwurf mit Nummer aus (Termin ⇒ erledigt), „Offene Rechnung zuordnen“ macht die Rechnung zum Beleg des Termins,
+ * „Ohne eigenen Beleg“ schließt ihn „ohne Beleg“ ab – der Entwurf wird dabei verworfen, alles in Rust. */
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -86,9 +89,11 @@ import {
   ladeLieferanten,
 } from '../../lib/queries/buchungen';
 import { ladeErtragStamm, type ErtragStamm } from '../../lib/queries/ertrag';
-import { belegAusstellen, belegBezahlt, belegScanAnhaengen } from '../../lib/queries/rechnungen';
-import type { BelegZeile as RechnungsZeile } from '../../lib/rechnungen';
+import { belegAusstellen, belegBezahlt, belegScanAnhaengen, ladeBeleg } from '../../lib/queries/rechnungen';
+import { ladeTermin } from '../../lib/queries/termine';
+import { formularAusEntwurf, type BelegZeile as RechnungsZeile } from '../../lib/rechnungen';
 import { storniere, storniereMitNachfrage } from '../../lib/storno';
+import { ART_LABEL, erfassenHinweis, ertragAusEntwurf, ertragBezug, vorbelegungMitBezug, type ErfassenBezug } from '../../lib/termine';
 import { heute, imZeitraum, istDatum, zeitraum } from '../../lib/zeitraum';
 import { useUi, type Toast, type ToastAction } from '../../store/ui';
 import { Drawer } from '../ui/Drawer';
@@ -113,6 +118,31 @@ async function ladeStamm(): Promise<Stamm> {
 }
 
 const standardKategorie = (kats: readonly KategorieWahl[], typ: BuchungTyp): number | null => kats.find((k) => k.typ === typ)?.id ?? null;
+
+/** Termin bzw. vorbereiteter Beleg zur neuen Einnahme (Termine › „Quittung ausstellen“, Maske eines vorbereiteten
+ *  Belegs, §6.5). Ein schon ausgestellter Entwurf zählt nicht mehr; ohne `entwurf` gilt der des Termins. */
+async function ladeBezug(v: Vorbelegung, h: string): Promise<ErfassenBezug | null> {
+  if (v.termin == null && v.entwurf == null) return null;
+  let termin = v.termin != null ? await ladeTermin(v.termin) : null;
+  const entwurfId = v.entwurf ?? termin?.entwurf?.id ?? null;
+  let entwurf: ErfassenBezug['entwurf'] = null;
+  if (entwurfId != null) {
+    const b = await ladeBeleg(entwurfId);
+    if (b && !b.beleg.nummer) {
+      entwurf = { id: entwurfId, kundeId: b.beleg.kunde_id, formular: formularAusEntwurf(b.beleg, b.positionen, h) };
+      if (!termin && b.beleg.termin_id != null) termin = await ladeTermin(b.beleg.termin_id);
+    }
+  }
+  return termin || entwurf ? { termin, entwurf } : null;
+}
+
+/** Text zum Termin im Toast nach dem Speichern. */
+function terminText(b: ErfassenBezug | null, abschluss: string): string {
+  if (!b?.termin) return '';
+  const art = b.entwurf?.formular.art;
+  const verworfen = abschluss !== 'erledigt' && (art === 'quittung' || art === 'rechnung') ? ` · vorbereitete ${ART_LABEL[art]} verworfen` : '';
+  return ` · Termin ${abschluss}${verworfen}`;
+}
 
 /** Toast, dessen Knöpfe ihn auch schließen. */
 function toastMit(t: Omit<Toast, 'id' | 'actions'>, aktionen: ToastAction[]): void {
@@ -189,6 +219,8 @@ export function ErfassenSchublade() {
     setErtragFehler(undefined);
   }, []);
   const [stamm, setStamm] = useState<Stamm | null>(null);
+  // Termin bzw. vorbereiteter Beleg (nur neue Einnahmen aus Termine bzw. der Maske eines vorbereiteten Belegs)
+  const [bezug, setBezug] = useState<ErfassenBezug | null>(null);
   const [zeile, setZeile] = useState<BuchungZeile | null>(null);
   const [form, setForm] = useState<Formular | null>(null);
   const [start, setStart] = useState('');
@@ -215,22 +247,26 @@ export function ErfassenSchublade() {
     (async () => {
       const neu = auftrag.art === 'neu';
       // Belege zum Ertrag nur für neue Einträge; scheitert das Laden, bleibt „Ohne eigenen Beleg“
-      const [s, es] = await Promise.all([
+      const [s, es, b] = await Promise.all([
         ladeStamm(),
         neu ? ladeErtragStamm().then((x): ErtragStamm | string => x, (e: unknown) => fehlerText(e)) : Promise.resolve(null),
+        neu ? ladeBezug(auftrag.vorbelegung, heute()) : Promise.resolve(null),
       ]);
+      // was der Aufrufer nicht vorgibt, kommt aus Termin bzw. Entwurf (Kunde, Betrag, Leistung, Art)
+      const v: Vorbelegung = auftrag.art === 'neu' ? vorbelegungMitBezug(auftrag.vorbelegung, b) : {};
       let f: Formular;
       let z: BuchungZeile | null = null;
       if (auftrag.art === 'bearbeiten') {
         z = await ladeBuchung(auftrag.id);
         if (!z) throw new Error('Diesen Eintrag gibt es nicht (mehr).');
         f = formularAus(z);
-      } else f = leeresFormular(s, auftrag.vorbelegung);
+      } else f = leeresFormular(s, v);
       if (!aktiv) return;
       const esOk = es && typeof es !== 'string' ? es : null;
-      const e0 = ertragStart(auftrag.art === 'neu' ? auftrag.vorbelegung : {}, esOk?.belegArt ?? 'quittung');
+      const e0: Ertrag = { ...ertragStart(v, esOk?.belegArt ?? 'quittung'), ...(b?.entwurf ? ertragAusEntwurf(b.entwurf) : {}) };
       const e: Ertrag = esOk ? e0 : { ...e0, weg: 'ohne' };
       setStamm(s);
+      setBezug(b);
       setZeile(z);
       setForm(f);
       setStart(formularSchluessel(f));
@@ -323,8 +359,9 @@ export function ErfassenSchublade() {
           ertragAktiv ? ladeErtragStamm().catch(() => ertragStamm) : Promise.resolve(ertragStamm),
         ]);
         const f = leeresFormular(s, { typ: form.typ, datum: form.zahlungsdatum, zahlungsart: form.zahlungsart });
-        const e: Ertrag = { ...ertrag, adresse: '', leistung: '', offenId: null };
+        const e: Ertrag = { ...ertrag, adresse: '', leistung: '', offenId: null, ...(bezug ? { vorlage: null, bezahlt: true } : {}) };
         setStamm(s);
+        setBezug(null); // der nächste Eintrag gehört zu keinem Termin mehr
         setForm(f);
         setStart(formularSchluessel(f));
         setErtragStamm(es);
@@ -359,13 +396,16 @@ export function ErfassenSchublade() {
         }
         setSpeichert(true);
         try {
-          const res = await belegBezahlt(re.id, form.zahlungsdatum, form.zahlungsart, h);
+          // zum Termin: die bezahlte Rechnung wird sein Beleg, ein vorbereiteter Entwurf wird verworfen (Rust)
+          const termin = bezug?.termin?.id ?? null;
+          const res = await belegBezahlt(re.id, form.zahlungsdatum, form.zahlungsart, h, termin);
           ui.datenGeaendert();
           if (belege.length && res.buchung_id != null && res.buchung_nummer) {
             await anhaengen({ id: res.buchung_id, nummer: res.buchung_nummer, typ: 'einnahme' }, belege);
           }
           const ziel = { ...re, status: 'bezahlt' as const, bezahlt_am: form.zahlungsdatum, zahlungsart: form.zahlungsart };
-          toastMit({ text: `${re.nummer} bezahlt · Einnahme ${res.buchung_nummer ?? ''} gespeichert`, icon: 'check' }, [
+          const zumTermin = re.termin_id != null && re.termin_id === termin ? '' : terminText(bezug, 'erledigt (mit dieser Rechnung)');
+          toastMit({ text: `${re.nummer} bezahlt · Einnahme ${res.buchung_nummer ?? ''} gespeichert${zumTermin}`, icon: 'check' }, [
             { label: 'Beleg öffnen', run: () => navigate(`/belege/${re.id}`) },
             { label: 'Rückgängig', run: () => belegDialog('doch-offen', ziel) },
           ]);
@@ -405,9 +445,11 @@ export function ErfassenSchublade() {
       /* Beleg erstellen: Quittung bzw. Rechnung samt Einnahme (außer bei offener Rechnung) in einer Transaktion */
       if (weg === 'beleg') {
         if (!ertragStamm) return;
-        const v = belegVorbereiten(form, ertrag, r.daten.betrag_cent, { ...ertragStamm, heute: h });
+        // mit vorbereitetem Entwurf: genau dieser bekommt seine Nummer (Termin ⇒ erledigt, beides in Rust)
+        const entwurfId = bezug?.entwurf?.id ?? null;
+        const v = belegVorbereiten(form, ertrag, r.daten.betrag_cent, { ...ertragStamm, heute: h }, ertragBezug(bezug));
         if (v.fehlt.length || !v.daten) {
-          const pfad = maskenPfad(ertrag.art, {
+          const pfad = entwurfId != null ? `/belege/${entwurfId}` : maskenPfad(ertrag.art, {
             betrag: r.daten.betrag_cent,
             datum: form.zahlungsdatum,
             text: form.beschreibung,
@@ -431,7 +473,7 @@ export function ErfassenSchublade() {
         }
         setSpeichert(true);
         try {
-          const res = await belegAusstellen(null, v.daten, {
+          const res = await belegAusstellen(entwurfId, v.daten, {
             dokument: { ...v.dokument, akzent: ui.settings.accent },
             bausteine: v.gedruckt,
             kategorie_id: r.daten.kategorie_id,
@@ -439,6 +481,7 @@ export function ErfassenSchublade() {
           });
           ui.datenGeaendert();
           const teile = [offenRechnung ? `${res.nummer} ausgestellt · noch offen` : `Einnahme gespeichert · ${res.nummer} erstellt`];
+          if (bezug?.termin) teile.push('Termin erledigt');
           if (res.kunde_neu && res.kunde_nummer) teile.push(`neuer Kunde ${res.kunde_nummer}`);
           // Schritt 2: unterschriebenes Exemplar (ergänzt den Beleg, ersetzt ihn nicht)
           const scan = belege[0];
@@ -458,7 +501,7 @@ export function ErfassenSchublade() {
             summe_cent: r.daten.betrag_cent,
             zahlungsart: offenRechnung ? null : form.zahlungsart,
             bezahlt_am: offenRechnung ? null : form.zahlungsdatum,
-            termin_id: null,
+            termin_id: bezug?.termin?.id ?? null,
           };
           toastMit({ text: teile.join(' · '), icon: 'check' }, [
             { label: 'Beleg öffnen', run: () => navigate(`/belege/${res.id}`) },
@@ -474,7 +517,10 @@ export function ErfassenSchublade() {
         return;
       }
 
-      const daten = belege.length ? { ...r.daten, belege: belege.map((b) => b.pfad) } : r.daten;
+      // neue Einnahme ohne eigenen Beleg zum Termin: schließt ihn „ohne Beleg“ ab (Rust, dieselbe Transaktion)
+      const terminId = !zeile && r.daten.typ === 'einnahme' ? (bezug?.termin?.id ?? null) : null;
+      const mitDateien = belege.length ? { ...r.daten, belege: belege.map((b) => b.pfad) } : r.daten;
+      const daten = terminId != null ? { ...mitDateien, termin_id: terminId } : mitDateien;
       setSpeichert(true);
       try {
         if (zeile) {
@@ -489,8 +535,9 @@ export function ErfassenSchublade() {
         const { modus, anker } = ui.zeitraum;
         const z = zeitraum(modus, anker);
         const extra = `${res.kunde_neu && res.kunde_nummer ? ` · neuer Kunde ${res.kunde_nummer}` : ''}${imZeitraum(z, r.daten.zahlungsdatum) ? '' : ` · liegt außerhalb von ${z.label}`}`;
+        const zumTermin = terminId != null ? terminText(bezug, 'ohne Beleg abgeschlossen') : '';
         const ziel = { id: res.id, nummer: res.nummer, typ: r.daten.typ };
-        toastMit({ text: `${typName(r.daten.typ)} gespeichert · ${res.nummer}${belegZusatz(res.belege_neu)}${extra}`, icon: 'check' }, [
+        toastMit({ text: `${typName(r.daten.typ)} gespeichert · ${res.nummer}${belegZusatz(res.belege_neu)}${extra}${zumTermin}`, icon: 'check' }, [
           { label: 'Rückgängig', run: () => void storniere(ziel, undefined, `${typName(r.daten.typ)} ${res.nummer} zurückgenommen · storniert (im Protokoll)`) },
         ]);
         await danach();
@@ -500,7 +547,7 @@ export function ErfassenSchublade() {
         setSpeichert(false);
       }
     },
-    [form, stamm, zeile, nurLesen, speichert, belege, weg, ertrag, ertragStamm, ertragAktiv, navigate, erkannt.belegdatum],
+    [form, stamm, zeile, nurLesen, speichert, belege, weg, ertrag, ertragStamm, ertragAktiv, navigate, erkannt.belegdatum, bezug],
   );
 
   // ⌘↩ speichern, ⇧⌘↩ speichern & neu
@@ -678,6 +725,11 @@ export function ErfassenSchublade() {
               ) : null
             }
             onEigenbeleg={eigenbeleg}
+            terminHinweis={
+              bezug && form.typ === 'einnahme' && !bearbeitung ? (
+                <TerminHinweis bezug={bezug} weg={weg} art={ertrag.art} />
+              ) : null
+            }
             onTyp={(t) => {
               setForm((f) => {
                 if (!f || f.typ === t) return f;
@@ -735,6 +787,8 @@ interface InhaltProps {
   /** Rechnung „noch offen“: das Datum ist das Rechnungsdatum, gezahlt wird später */
   offenRechnung: boolean;
   ertragBereich: ReactNode;
+  /** Hinweiszeile zum Termin bzw. vorbereiteten Beleg (oben) */
+  terminHinweis: ReactNode;
   onEigenbeleg: () => void;
 }
 
@@ -751,7 +805,7 @@ const TIP_NR = 'Bei Ausgaben die Rechnungs- oder Bonnummer des Geschäfts. Eigen
 
 function FormularInhalt(props: InhaltProps) {
   const { form, stamm, zeile, sp, belege, nimmtBelege, fehler, katVorschlag, erkannt, set, fehlerWeg, onTyp, onKategorie, vorschlagen } = props;
-  const { weg, belegArt, offenRechnung, ertragBereich, onEigenbeleg } = props;
+  const { weg, belegArt, offenRechnung, ertragBereich, onEigenbeleg, terminHinweis } = props;
   const { pathname } = useLocation();
   const seiteZeitraum = useUi((s) => s.zeitraum);
   const ro = sp !== null;
@@ -811,6 +865,7 @@ function FormularInhalt(props: InhaltProps) {
   return (
     <>
       {erkannt.kopf}
+      {terminHinweis}
       {zeile && sp ? (
         <div className={`bu-link ${sp !== 'festgeschrieben' ? 'lock' : ''}`}>
           <Lock />
@@ -1146,6 +1201,19 @@ function FormularInhalt(props: InhaltProps) {
         ) : null}
       </section>
     </>
+  );
+}
+
+/* ---------- Oben: Termin bzw. vorbereiteter Beleg (Prototyp terminHint) ---------- */
+
+function TerminHinweis({ bezug, weg, art }: { bezug: ErfassenBezug; weg: Ertragsweg; art: ErtragsArt }) {
+  const teile = erfassenHinweis({ termin: bezug.termin, entwurfArt: bezug.entwurf?.formular.art ?? null, weg, art });
+  if (!teile.length) return null;
+  return (
+    <div className="bu-link bu-termin" role="note">
+      <CalendarDays />
+      <span>{teile.map((t, i) => (t.fett ? <b key={i}>{t.text}</b> : <span key={i}>{t.text}</span>))}</span>
+    </div>
   );
 }
 

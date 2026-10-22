@@ -1807,7 +1807,46 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
      Beleg verknüpft, PDF abgelegt; Rechnung „noch offen“ ⇒ unter Offen, keine Einnahme; dann neue Einnahme „Offene
      Rechnung zuordnen“ ⇒ bezahlt, genau eine Einnahme; Firmendaten ohne Steuernummer ⇒ Toast nennt sie; neuer Kunde
      ⇒ unter Kunden angelegt; „Rückgängig“ ⇒ Stornobeleg; „Speichern & neu“ zeigt die nächste Nummer.
-  4. Termine (§6.5)
+  4. Termine (§6.5) – **erledigt (Branch `phase-3-termine`, auf Teil 7)**: Rust `src-tauri/src/termine.rs` mit sieben
+     Commands (`termin_speichern`, `termin_erledigt`, `termin_nicht_erledigt`, `termin_ohne_beleg`, `termin_absagen`,
+     `termin_zuruecksetzen`, `termin_loeschen`), je eine Transaktion samt Protokoll. Eintragen/Ändern: Kunde per ID oder
+     neu (angelegt mit der Adresse des Termins; fehlt einem Kunden die Anschrift, wird sie ergänzt), „Beleg vorbereiten:
+     Quittung | Rechnung | Keinen“ legt den Entwurf ohne Nummer an bzw. gleicht ihn an (`rechnungen::vorbereitung_schreiben_in`,
+     Termin und Kunde immer vom Termin; in der Maske ergänzte Positionen und ein eigener Betreff bleiben) bzw. verwirft ihn
+     (Protokoll 'geloescht_entwurf'); ausgestellte Belege bleiben unberührt. „✓ Erledigt“ nur heute und Vergangenes,
+     „Doch nicht erledigt“ (nicht mehr mit Beleg oder Einnahme), „Ohne Beleg abschließen“ (Entwurf verworfen),
+     „Absagen“ (Grund optional an die Notiz, Entwurf verworfen – kein Storno), „Wieder einplanen“ (`termin_speichern` mit
+     `wieder_einplanen`), Löschen nur abgesagter Termine ohne Bezüge (Protokoll 'geloescht'). „Rückgängig“ setzt Status,
+     „ohne Beleg“ und Notiz zurück und legt verworfene Entwürfe neu an (`termin_zuruecksetzen`, geht nicht mehr, sobald es
+     einen Beleg oder eine Einnahme gibt). Erfassen-Schublade mit Vorbelegung `termin`/`entwurf` (Hinweiszeile wie
+     `terminHint`, fehlende Werte aus Termin und Entwurf): „Beleg erstellen“ stellt den Entwurf mit Nummer aus
+     (`beleg_ausstellen` mit dessen ID; Leistungsdatum = Termin, Texte und Positionen bleiben, solange der Betrag passt;
+     eine Rechnung ist dabei standardmäßig „noch offen“) und hakt den Termin ab; „Offene Rechnung zuordnen“
+     (`beleg_bezahlt` mit `termin`) macht die bezahlte Rechnung über ihre Einnahme (`buchungen.termin_id`) zum Beleg des
+     Termins; „Ohne eigenen Beleg“ (`buchung_anlegen` mit `termin_id`) schließt ihn „ohne Beleg“ ab – beide in derselben
+     Transaktion, der Entwurf wird verworfen. Ein Termin hat höchstens einen gültigen Beleg bzw. eine Einnahme (Rust
+     prüft das auch beim Ausstellen). Frontend: Seite `src/pages/Termine.tsx` (Anstehend · Erledigt · Alle mit Zählern,
+     Wochenstreifen mit Sprung zum Tag, „Nachtragen“ mit „War der Termin?“ bzw. „Beleg fehlt“, Agenda nach Tagen, Beleg-Chip,
+     „⋯“-Menü, `?t=<id>` und `?neu=1[&kunde=…&datum=…]`), Termin-Schublade `src/components/termine/TerminSchublade.tsx`
+     (Kundenhinweis mit Notiz und Nachfrage bei gleichem Namen, Überschneidungen, Ø-Betrag je Leistung, Ansicht „Termin
+     absagen“), Logik `src/lib/termine.ts` (+ Tests), Aktionen mit Toast und Rückgängig `lib/termin-aktionen.ts`, Daten
+     `lib/queries/termine.ts`, `src/styles/termine.css`. Beleg-Maske eines vorbereiteten Belegs: „Quittung ausstellen“ bzw.
+     „Rechnung schreiben“ öffnet die Erfassen-Schublade mit diesem Entwurf (ungespeicherte Änderungen werden vorher
+     gespeichert), ebenso „Quittung ausstellen …“ im Status-Menü der Liste – kein zweiter Ausstell-Weg. Seitenleiste:
+     Zähler heute bzw. rot nachzutragen und erledigt ohne Beleg. Kunden-Schublade: „Termin eintragen“ im Fuß, Termin-Hinweise
+     und Termine im Verlauf führen zum Termin; eine zugeordnete Rechnung deckt im Verlauf ihren Termin ab. Befehlspalette
+     „Termin eintragen“ ohne Phasen-Hinweis. Apple Kalender und Mitteilung am Morgen folgen mit Phase 7. Keine Migration.
+     **Auf dem Mac prüfen:** Termin für einen neuen Namen mit Adresse und „Quittung“ eintragen ⇒ Kunde mit Adresse angelegt,
+     unter Rechnungen & Quittungen → Offen „Vorbereitet · Termin …“, keine Nummer verbraucht; Termin verschieben bzw.
+     Leistung/Betrag ändern ⇒ Entwurf folgt, „Rechnung“ ⇒ Entwurf wird Rechnung, „Keinen“ ⇒ verworfen. Termin von heute
+     „✓ Erledigt“ ⇒ Toast mit „Quittung ausstellen“ und Rückgängig (künftige Termine ohne Erledigt-Knopf); „Quittung
+     ausstellen“ ⇒ Erfassen-Schublade vorbefüllt mit Hinweiszeile, Speichern ⇒ QU-Nummer am vorbereiteten Entwurf,
+     Einnahme gebucht, Chip „QU-… ✓“. „Rechnung schreiben“ ⇒ „noch offen“. Erfassen zum Termin mit „Offene Rechnung
+     zuordnen“ ⇒ Chip mit RE-Nummer, Entwurf weg; mit „Ohne eigenen Beleg“ ⇒ Chip „bezahlt ohne Beleg“. Vergangener
+     geplanter Termin ⇒ „Nachtragen“ und roter Zähler; erledigt ohne Beleg ⇒ „Beleg fehlt“, „Ohne Beleg abschließen“ mit
+     Rückgängig. Absagen mit Grund ⇒ Notiz ergänzt, Entwurf verworfen, Rückgängig holt beides zurück; „Wieder einplanen“;
+     abgesagten Termin löschen. Beleg-Maske eines vorbereiteten Belegs zeigt „Quittung ausstellen“ statt „Finalisieren“.
+     Kunden-Schublade „Termin eintragen“; ⌘K „Termin eintragen“ und Suchtreffer öffnen die Schublade. Einträge im Protokoll.
   5. Vorlagen-Seite als Baukasten (§7.0, Prototyp `#/vorlagen`) – **erledigt (Branch `phase-3-vorlagen-baukasten`)**:
      `src/pages/Vorlagen.tsx` (+ `src/styles/vorlagen.css`), Art auch aus der Adresse
      (`#/belege/vorlagen?art=rechnung|quittung|angebot|eigenbeleg`, ohne Angabe die zuletzt gewählte). Links die

@@ -176,8 +176,9 @@ export const belegEntwurfLoeschen = (id: number): Promise<BelegErgebnis> => invo
 export const belegAusstellen = (id: number | null, daten: BelegDaten, ausstellen: AusstellenDaten): Promise<BelegErgebnis> =>
   invoke<BelegErgebnis>('beleg_ausstellen', { id, daten, ausstellen });
 
-export const belegBezahlt = (id: number, datum: string, zahlungsart: string, heute: string): Promise<BelegErgebnis> =>
-  invoke<BelegErgebnis>('beleg_bezahlt', { id, datum, zahlungsart, heute });
+/** Als bezahlt markieren; mit `termin` (Erfassen-Schublade zum Termin) wird die Rechnung zum Beleg des Termins. */
+export const belegBezahlt = (id: number, datum: string, zahlungsart: string, heute: string, termin: number | null = null): Promise<BelegErgebnis> =>
+  invoke<BelegErgebnis>('beleg_bezahlt', { id, datum, zahlungsart, heute, termin });
 
 export const belegOffen = (id: number, heute: string): Promise<BelegErgebnis> => invoke<BelegErgebnis>('beleg_offen', { id, heute });
 

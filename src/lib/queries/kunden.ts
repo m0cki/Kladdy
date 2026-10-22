@@ -28,7 +28,11 @@ const VERLAUF_SQL = `
            WHERE b.rechnung_id = r.id AND b.storno_von_id IS NULL
              AND NOT EXISTS (SELECT 1 FROM buchungen s WHERE s.storno_von_id = b.id)
            ORDER BY b.zahlungsdatum DESC, b.id DESC LIMIT 1) AS zahlungsart,
-         r.faellig_am, NULL AS notiz, r.termin_id, NULL AS belegnummer, 0 AS belege_anzahl
+         r.faellig_am, NULL AS notiz,
+         -- Termin des Belegs; eine zum Termin zugeordnete Rechnung („Offene Rechnung zuordnen“) über ihre Einnahme
+         COALESCE(r.termin_id, (SELECT b.termin_id FROM buchungen b
+                                 WHERE b.rechnung_id = r.id AND b.termin_id IS NOT NULL ORDER BY b.id DESC LIMIT 1)) AS termin_id,
+         NULL AS belegnummer, 0 AS belege_anzahl
     FROM rechnungen r
    WHERE r.kunde_id IS NOT NULL AND r.art IN ('rechnung', 'quittung', 'angebot') AND ($1 IS NULL OR r.kunde_id = $1)
   UNION ALL
