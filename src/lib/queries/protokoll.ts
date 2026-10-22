@@ -22,7 +22,8 @@ export type ProtokollTabelleId =
   | 'kategorien'
   | 'anlagen'
   | 'planposten'
-  | 'wiederkehrend';
+  | 'wiederkehrend'
+  | 'vorlagen';
 
 /** Stammdaten mit Textschlüssel (Migration 0003): datensatz_id = 0, Schlüssel in protokoll.schluessel,
  *  z. B. 'firma' (einstellungen), '2026' (steuer_parameter: Jahr), 'rechnung' (nummernkreise). */

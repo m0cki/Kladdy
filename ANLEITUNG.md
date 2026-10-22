@@ -1767,7 +1767,28 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
      buchen, Angebot, Badge „überfällig“
   3. Erfassen-Schublade „Beleg zum Ertrag“ (§6.4) + Vorbelegung `beleg` (Befehlspalette, native Menüs, „Neu“-Menü)
   4. Termine (§6.5)
-  5. Vorlagen-Seite als Baukasten (§7.0, Prototyp `#/vorlagen`)
+  5. Vorlagen-Seite als Baukasten (§7.0, Prototyp `#/vorlagen`) – **erledigt (Branch `phase-3-vorlagen-baukasten`)**:
+     `src/pages/Vorlagen.tsx` (+ `src/styles/vorlagen.css`), Art auch aus der Adresse
+     (`#/belege/vorlagen?art=rechnung|quittung|angebot|eigenbeleg`, ohne Angabe die zuletzt gewählte). Links die
+     Bausteinliste (Griff zum Ziehen über Zeiger-Ereignisse – kein HTML5-DnD, die Mac-App fängt Drops am Fenster ab –,
+     ↑/↓ auf dem Griff und in der Einstellungskarte, Auge = `aus`, × mit Rückgängig), „+ Baustein hinzufügen“ (Palette
+     nach `BAUSTEINE[typ].arten`, eingefügt unter dem ausgewählten), Einstellungen aus `BAUSTEINE[typ].felder` mit
+     Platzhalter-Chips (`{name}` an der Schreibmarke) und der Pflichtangaben-Check mit Beispieldaten. Rechts die
+     Live-Vorschau (Klick ins Blatt wählt den Baustein), „PDF“ wie der Testbeleg (Entwurf ohne Nummer, Fehler mit Baustein
+     und Zeile) und „LaTeX“ (main.tex nur lesen, `src/lib/latex/hervorheben.ts`). Beispieldaten für alle vier Arten:
+     `beispielbeleg()` in `lib/vorlagen/beispiel.ts` (eigene Firmendaten, sobald Name oder Inhaber eingetragen sind).
+     Logik in `src/lib/vorlagen/baukasten.ts` (einfügen, entfernen, ausblenden, verschieben, ziehen, Platzhalter,
+     `nurErlaubte`). **Tabelle `vorlagen`:** nur eigene Kopien, je Art eine Zeile („Meine Rechnung“, „Meine Quittung“,
+     „Mein Angebot“, „Mein Eigenbeleg“), angelegt bei der ersten Änderung am Standard, danach automatisch gespeichert
+     (600 ms entprellt, beim Verlassen sofort). `ist_standard` = 1 heißt „diese Kopie ist die Vorlage der Art“;
+     „Zurücksetzen“ setzt 0 statt zu löschen (Rückgängig, `rechnungen.vorlage_id` bleibt gültig), die nächste Änderung nimmt
+     dieselbe Zeile wieder. Geschrieben aus dem Frontend über `nacheinander`, protokolliert (tabelle 'vorlagen', nur
+     geänderte Felder). Schnittstelle für die Beleg-Maske in `src/lib/queries/vorlagen.ts`: `ladeAktiveBausteine(art)` und
+     `ladeVorlagenFuerArt(art)` (Standard mit `id` null + aktive eigene Kopie, Feld `aktiv`); beim Finalisieren die
+     Bausteine in den Schnappschuss einfrieren. Im Browser ohne Datenbank: Standardvorlagen, nichts wird gespeichert.
+     **Auf dem Mac prüfen:** Ziehen in der Liste, erste Änderung ⇒ „Meine …“ und „gespeichert“, nach Neustart noch da,
+     Zurücksetzen mit Rückgängig, Steuerhinweis entfernen ⇒ Check rot, „PDF“ von der Vorlagen-Seite, Einträge im
+     Protokoll. **Offen:** Vorschau mit einem echten Beleg statt Beispieldaten (nach der Beleg-Maske). Keine Migration nötig
   6. GiroCode (EPC-QR, §6.6) – **erledigt (Branch `phase-3-girocode`, auf Teil 1)**: `src/lib/girocode/` –
      `qr.ts` (TS-Port des Encoders aus `prototyp/js/qr.js`: Byte-Modus UTF-8, Version 1–40, Reed-Solomon, acht Masken
      mit Strafpunkten ⇒ Modulmatrix + SVG mit `crispEdges`), `epc.ts` (EPC069-12 Version 002: BIC optional, Name max. 70,

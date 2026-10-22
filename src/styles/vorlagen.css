@@ -1,0 +1,111 @@
+/* Kladdy · Vorlagen-Baukasten (§7.0) – portiert aus referenz/prototyp/css/vorlagen.css. Präfix .vl-.
+ * Links Bausteinliste (Griff, Auge, ×), Palette „+ Baustein hinzufügen“, Einstellungen mit Platzhalter-Chips und
+ * Pflichtangaben-Check; rechts die klebende Vorschau (Blatt aus blatt.css) bzw. die LaTeX-Ansicht.
+ * Ziehen läuft über Zeiger-Ereignisse (Seite pages/Vorlagen.tsx). Farben ausschließlich über Tokens (§9). */
+
+.vl-layout { display: grid; grid-template-columns: minmax(320px, 400px) minmax(0, 1fr); gap: var(--gap); align-items: start; }
+.vl-sk-liste { height: 420px; }
+.vl-sk-feld { height: 220px; }
+.vl-sk-blatt { height: 640px; }
+
+/* ---------- Bausteinliste ---------- */
+.vl-blocks { list-style: none; margin: 0 -8px; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.vl-blocks.zieht, .vl-blocks.zieht * { cursor: grabbing; }
+.vl-blk {
+  position: relative; display: flex; align-items: center; gap: 8px; padding: 7px 6px 7px 4px; border-radius: var(--radius-sm); cursor: pointer;
+  transition: background .2s, opacity .2s, box-shadow .2s;
+}
+.vl-blk:hover { background: var(--hover); }
+.vl-blk.on { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); }
+.vl-blk.aus .vl-meta, .vl-blk.aus .vl-ic { opacity: .45; }
+.vl-blk.aus .vl-meta b { text-decoration: line-through; }
+.vl-blk.dragging { opacity: .35; }
+.vl-blk.drop-before { box-shadow: inset 0 2px 0 var(--accent); }
+.vl-blk.drop-after { box-shadow: inset 0 -2px 0 var(--accent); }
+.vl-grip { display: grid; place-items: center; width: 18px; align-self: stretch; color: var(--muted); cursor: grab; opacity: .5; touch-action: none; border-radius: 6px; transition: opacity .2s, color .2s; }
+.vl-blk:hover .vl-grip, .vl-grip:focus-visible { opacity: 1; }
+.vl-grip:hover { color: var(--text); }
+.vl-grip .ic { width: 16px; height: 16px; }
+.vl-ic { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; flex: none; background: var(--surface-2); border: 1px solid var(--border); color: var(--accent); }
+.vl-ic .ic { width: 16px; height: 16px; }
+.vl-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; text-align: left; border-radius: 6px; }
+.vl-meta b { font-size: .86rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vl-meta small { font-size: .72rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vl-blk .icon-btn { opacity: 0; transition: opacity .15s, background .2s, color .2s; }
+.vl-blk:hover .icon-btn, .vl-blk.on .icon-btn, .vl-blk:focus-within .icon-btn, .vl-blk.aus .vl-eye { opacity: 1; }
+.vl-del:hover { color: var(--neg); }
+.vl-empty { padding: 14px 10px; color: var(--muted); font-size: .84rem; }
+.vl-ohne-db { margin: -6px 0 10px; }
+
+/* Kopf der Liste: eigene Vorlage, „gespeichert“, Zurücksetzen */
+.vl-saved { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; color: var(--pos); font-weight: 600; opacity: 0; animation: vlSaved 1.8s var(--ease); }
+.vl-saved .ic { width: 12px; height: 12px; }
+@keyframes vlSaved { 10%, 70% { opacity: 1; } }
+:root[data-motion="off"] .vl-saved { opacity: 1; }
+.vl-reset { padding: 6px 10px; font-size: .78rem; flex: none; }
+.vl-reset .ic { width: 14px; height: 14px; }
+
+/* ---------- Baustein hinzufügen ---------- */
+.vl-add { position: relative; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.vl-add > .btn { width: 100%; }
+.vl-palette {
+  position: absolute; left: -8px; right: -8px; top: calc(100% + 8px); z-index: 20; padding: 8px; border-radius: 16px;
+  background: var(--surface); border: 1px solid var(--border-strong); box-shadow: var(--shadow-lg);
+  transform-origin: top center; animation: vlPalette .25s var(--ease) both;
+}
+@keyframes vlPalette { from { opacity: 0; transform: translateY(-6px) scale(.985); } }
+:root[data-motion="reduced"] .vl-palette { animation-name: fade; animation-duration: .15s; }
+.vl-pal-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 6px 8px 8px; }
+.vl-pal-head b { font-size: .84rem; }
+.vl-pal-head small { font-size: .72rem; color: var(--muted); }
+.vl-pal-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; max-height: 360px; overflow-y: auto; }
+.vl-pal-item { display: flex; align-items: flex-start; gap: 9px; padding: 9px; border-radius: 11px; text-align: left; transition: background .15s; }
+.vl-pal-item:hover, .vl-pal-item:focus-visible { background: var(--accent-soft); }
+.vl-pal-item > .ic { color: var(--accent); margin-top: 1px; }
+.vl-pal-item span { display: flex; flex-direction: column; min-width: 0; }
+.vl-pal-item b { font-size: .8rem; font-weight: 650; }
+.vl-pal-item small { font-size: .7rem; color: var(--muted); line-height: 1.35; }
+
+/* ---------- Einstellungen ---------- */
+.vl-move { gap: 2px; flex: none; }
+.vl-ph { display: flex; flex-wrap: wrap; gap: 4px; }
+.vl-ph .chip { font-family: var(--mono); font-size: .68rem; padding: 2px 7px; cursor: pointer; }
+.vl-ph .chip:hover { border-color: var(--accent-line); color: var(--accent); }
+
+/* ---------- Pflichtangaben ---------- */
+.vl-check-titel.bad .ic { color: var(--neg); }
+.vl-check { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: .83rem; }
+.vl-check li { display: flex; align-items: flex-start; gap: 8px; }
+.vl-check li .ic { width: 16px; height: 16px; margin-top: 1px; }
+.vl-check li.ok .ic { color: var(--pos); }
+.vl-check li.offen .ic { color: var(--muted); }
+.vl-check li.bad .ic { color: var(--neg); }
+.vl-check small { display: block; color: var(--muted); font-size: .73rem; }
+.vl-check-fuss { margin-top: 12px; }
+
+/* ---------- Vorschau ---------- */
+.vl-right { position: sticky; top: calc(var(--topbar-h) + 14px); display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.vl-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.vl-doc { display: inline-flex; align-items: center; gap: 6px; font-size: .8rem; color: var(--muted); }
+.vl-doc .ic { width: 16px; height: 16px; }
+/* Blatt höher als das Fenster (A4): in der Bühne blättern, statt unten abgeschnitten zu kleben */
+.vl-right .vl-desk { max-height: calc(100vh - var(--topbar-h) - 90px); overflow-y: auto; }
+.vl-pdf-hinweis { margin: -4px 0 0; }
+.vl-pdf-fehler > span { flex: 1; min-width: 0; }
+.vl-pdf-fehler > .icon-btn { margin: -6px -6px 0 0; }
+
+/* LaTeX (Experten-Ansicht, nur lesen) */
+.vl-latex { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.vl-code {
+  margin: 0; max-height: calc(100vh - var(--topbar-h) - 220px); overflow: auto; padding: 14px 16px; border-radius: 12px;
+  background: var(--surface-2); border: 1px solid var(--border); font: 12px/1.6 var(--mono); color: var(--text-2); white-space: pre; tab-size: 2;
+}
+.vl-code .tx-c { color: var(--muted); font-style: italic; }
+.vl-code .tx-k { color: var(--accent); font-weight: 600; }
+.vl-code .tx-b { color: var(--series-2); }
+
+@media (max-width: 1100px) {
+  .vl-layout { grid-template-columns: minmax(0, 1fr); }
+  .vl-right { position: static; }
+  .vl-right .vl-desk { max-height: none; overflow: hidden; }
+}
