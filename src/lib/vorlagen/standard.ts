@@ -1,7 +1,7 @@
 /* Mitgelieferte Standardvorlagen je Belegart (ANLEITUNG §7.5/§7.6, Prototyp App.sheet.STANDARD).
  *
  * Wo sie liegen: **im Code**, nicht in der Datenbank. So kann ein App-Update die Standards verbessern, ohne Migration.
- * Die Tabelle `vorlagen` hält später (Vorlagen-Seite, Phase 3 Teil 5) nur eigene Kopien: Die erste Änderung an einem
+ * Die Tabelle `vorlagen` hält nur eigene Kopien (lib/queries/vorlagen.ts, Vorlagen-Seite): Die erste Änderung an einem
  * Standard legt eine Kopie an, „Zurücksetzen“ nimmt wieder diesen Stand. GoBD: Ausgestellte Belege frieren ihre
  * Bausteine im `snapshot_json` ein – ein späteres Update der Standards verändert sie nicht. */
 import type { Baustein } from './bausteine';
