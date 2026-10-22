@@ -4,10 +4,12 @@
  *
  * Zusätzlich zu §7.4 (für die Bausteine): \KundeAnzeige (Name, Quittung ohne Namen „Barverkauf“),
  * \KundeAdresseEinzeilig, \FirmaPLZ, \FirmaStadt, \LeistungsdatumLabel, \Zahlungsziel, \AnzahlPositionen,
- * \QuittungFuer, \Quittiert, \EigenbelegGrund, \GebuchtAls, \UnterschriftDatum, \Storniert (1 oder leer).
+ * \QuittungFuer, \Quittiert, \EigenbelegGrund, \GebuchtAls, \UnterschriftDatum, \Storniert (1 oder leer),
+ * \GiroCode (`girocode.png` bei offener Rechnung mit gültigen EPC-Daten, sonst leer; die Datei liefert belegAssets).
  * Tests: latex.test.ts */
 import { formatBetrag } from '../money';
 import { ibanFormat } from '../firma';
+import { girocodeDatei } from '../girocode/girocode';
 import {
   ARTEN,
   HINWEIS_19,
@@ -44,7 +46,7 @@ export const MAKRO_NAMEN = [
   'Betreff', 'Einleitung', 'Positionen', 'Gesamt', 'BetragInWorten', 'Zahlungsart', 'Steuerhinweis', 'Zahlungshinweis',
   'Schlusstext', 'Gruss',
   'KundeAnzeige', 'KundeAdresseEinzeilig', 'FirmaPLZ', 'FirmaStadt', 'LeistungsdatumLabel', 'Zahlungsziel', 'AnzahlPositionen',
-  'QuittungFuer', 'Quittiert', 'EigenbelegGrund', 'GebuchtAls', 'UnterschriftDatum', 'Storniert',
+  'QuittungFuer', 'Quittiert', 'EigenbelegGrund', 'GebuchtAls', 'UnterschriftDatum', 'Storniert', 'GiroCode',
 ] as const;
 
 export type MakroName = (typeof MAKRO_NAMEN)[number];
@@ -117,6 +119,8 @@ export function makroWerte(doc: BelegDokument): Record<MakroName, string> {
     GebuchtAls: e1(gebuchtText(doc)),
     UnterschriftDatum: e1(unterschriftDatum(doc)),
     Storniert: doc.storniert ? '1' : '',
+    // fester Dateiname (kein Nutzerwert); belegAssets liefert die Datei, sobald main.tex sie einbindet
+    GiroCode: girocodeDatei(doc),
   };
 }
 

@@ -4,7 +4,7 @@ import { BEISPIEL_FIRMA, testbeleg } from '../vorlagen/beispiel';
 import { BELEGARTEN, type BelegDokument } from '../vorlagen/dokument';
 import { standardVorlage } from '../vorlagen/standard';
 import { MAKRO_NAMEN, datenTex, makroWerte, positionenTex } from './daten';
-import { KompilierFehler, fehlerZeilen } from './kompilieren';
+import { KompilierFehler, belegAssets, belegTex, fehlerZeilen } from './kompilieren';
 import { abstandMm, bereichZuZeile, mainTex, textTex } from './vorlage';
 
 const rechnung = (): BelegDokument => testbeleg('rechnung', BEISPIEL_FIRMA, 'klein', '2026-10-18');
@@ -99,6 +99,14 @@ describe('daten.tex', () => {
 
   it('keine Positionen ⇒ leeres \\Positionen', () => {
     expect(datenTex({ ...rechnung(), positionen: [] })).toContain('\\newcommand{\\Positionen}{}');
+  });
+
+  it('\\GiroCode nur bei offener Rechnung mit gültigen EPC-Daten', () => {
+    expect(makro(datenTex(rechnung()), 'GiroCode')).toBe('girocode.png');
+    expect(makro(datenTex(quittung()), 'GiroCode')).toBe('');
+    expect(makroWerte({ ...rechnung(), quittiert: { am: '2026-10-18', zahlungsweg: 'bar' } }).GiroCode).toBe('');
+    expect(makroWerte({ ...rechnung(), firma: { ...BEISPIEL_FIRMA, iban: 'DE89370400440532013001' } }).GiroCode).toBe('');
+    expect(makroWerte({ ...rechnung(), positionen: [] }).GiroCode).toBe('');
   });
 });
 
@@ -199,6 +207,35 @@ describe('main.tex', () => {
     for (const b of m.bereiche) expect(zeilen[b.von - 1]).toMatch(/^% Baustein \d+: /);
   });
 
+  it('GiroCode im Baustein „Zahlung“: nur mit \\GiroCode, Größe aus qrgroesse, ohne Bankkasten rechts', () => {
+    const tex = (bausteine: Baustein[], art: 'rechnung' | 'angebot' = 'rechnung') => mainTex(art, bausteine, '#6366f1').tex;
+    const std = tex(standardVorlage('rechnung'));
+    expect(std).toContain(String.raw`\ifdefempty{\GiroCode}{%`);
+    expect(std).toContain(String.raw`\includegraphics[width=28mm]{\GiroCode}`);
+    // Bankverbindung + 6 mm Abstand + Code mit 2 × 2 mm Rand = volle Breite
+    expect(std).toContain(String.raw`\begin{minipage}[c]{\dimexpr\linewidth-38mm\relax}`);
+    expect(std).toContain(String.raw`\begin{minipage}[c]{32mm}\centering`);
+    expect(std).toContain(String.raw`Mit der Banking-App\\scannen und bezahlen`);
+    expect(std).not.toContain('girocode.png'); // Dateiname nur in daten.tex
+    const gross = tex([{ typ: 'zahlung', qrgroesse: '34' }]);
+    expect(gross).toContain(String.raw`\includegraphics[width=34mm]{\GiroCode}`);
+    expect(gross).toContain(String.raw`\begin{minipage}[c]{38mm}\centering`);
+    const boese = tex([{ typ: 'zahlung', qrgroesse: '28mm]{/etc/passwd}' }]);
+    expect(boese).toContain(String.raw`\includegraphics[width=28mm]{\GiroCode}`);
+    expect(boese).not.toContain('passwd');
+    const ohneQr = tex([{ typ: 'zahlung', qr: false }]);
+    expect(ohneQr).not.toContain(String.raw`\GiroCode`);
+    expect(ohneQr).toContain('Bankverbindung');
+    expect(tex([{ typ: 'zahlung' }], 'angebot')).not.toContain(String.raw`\GiroCode`);
+    const ohneBank = tex([{ typ: 'zahlung', bank: false }]);
+    expect(ohneBank).toContain(String.raw`\ifdefempty{\GiroCode}{}{\vspace{3mm}\noindent\hfill\begin{minipage}[c]{32mm}`);
+    expect(ohneBank).not.toContain('Bankverbindung');
+    for (const t of [std, gross, ohneQr, ohneBank]) {
+      expect(klammernOk(t)).toBe(true);
+      expect(t.slice(t.indexOf('\\begin{document}'))).not.toMatch(/\n\s*\n/);
+    }
+  });
+
   it('Abstände wie in der Vorschau', () => {
     expect(abstandMm(null, 'titel')).toBe(0);
     expect(abstandMm(null, 'positionen')).toBe(6);
@@ -211,6 +248,27 @@ describe('main.tex', () => {
     expect(abstandMm('text', 'unterschrift')).toBe(10);
     expect(abstandMm(null, 'unterschrift', true)).toBe(0);
     expect(abstandMm('text', 'positionen')).toBe(3.5);
+  });
+});
+
+describe('Bilder für den Satz', () => {
+  it('girocode.png genau dann, wenn main.tex den GiroCode einbindet', () => {
+    const r = belegAssets(rechnung(), standardVorlage('rechnung'));
+    expect(r.map((a) => a.name)).toEqual(['girocode.png']);
+    expect(Array.from(r[0].daten.subarray(0, 8))).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+    expect(belegAssets(quittung(), standardVorlage('quittung'))).toEqual([]);
+    expect(belegAssets(rechnung(), [{ typ: 'zahlung', qr: false }])).toEqual([]);
+    expect(belegAssets(rechnung(), [{ typ: 'zahlung', aus: true }])).toEqual([]);
+    expect(belegAssets({ ...rechnung(), firma: { ...BEISPIEL_FIRMA, iban: '' } }, standardVorlage('rechnung'))).toEqual([]);
+    expect(belegAssets({ ...rechnung(), quittiert: { am: '2026-10-18', zahlungsweg: 'bank' } }, standardVorlage('rechnung'))).toEqual([]);
+  });
+
+  it('belegTex liefert die Bilder mit', () => {
+    const t = belegTex(rechnung(), standardVorlage('rechnung'), '#6366f1');
+    expect(t.assets.map((a) => a.name)).toEqual(['girocode.png']);
+    expect(makro(t.daten, 'GiroCode')).toBe('girocode.png');
+    expect(t.main.tex).toContain(String.raw`{\GiroCode}`);
+    expect(belegTex(quittung(), standardVorlage('quittung'), '#6366f1').assets).toEqual([]);
   });
 });
 

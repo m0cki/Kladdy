@@ -1759,8 +1759,8 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
      Frontend `src/lib/latex/kompilieren.ts`. Einstellungen › Daten › „Testbeleg erzeugen“: Rechnung oder Quittung an
      „Müller & Söhne 100%“ (Entwurf, keine Nummer, Sonderzeichen in den Positionen) setzen und öffnen, Hinweis auf den
      ersten Paket-Download, lesbare Fehler mit Baustein und Zeile, HTML-Vorschau zum Vergleich. **Offen:** Logo im Kopf
-     (Makro `\LogoDatei` und Bild-Übergabe sind vorbereitet, es fehlt die Logo-Ablage aus Phase 1), GiroCode (Teil 6),
-     Bausteine bearbeiten (Teil 5), Beleg-Maske (Teil 2); ein echter Tectonic-Lauf war beim Bauen nicht möglich
+     (Makro `\LogoDatei` und Bild-Übergabe sind vorbereitet, es fehlt die Logo-Ablage aus Phase 1), GiroCode (erledigt
+     mit Teil 6), Bausteine bearbeiten (Teil 5), Beleg-Maske (Teil 2); ein echter Tectonic-Lauf war beim Bauen nicht möglich
      (Tectonic nicht installiert) – beim ersten Testbeleg prüfen, ob PDF und HTML-Vorschau übereinstimmen.
      Keine Migration nötig
   2. Rechnungen & Quittungen (§6.6): Liste, Beleg-Maske, Finalisieren/Status/Storno als Rust-Transaktion, Eigenbeleg
@@ -1768,7 +1768,24 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
   3. Erfassen-Schublade „Beleg zum Ertrag“ (§6.4) + Vorbelegung `beleg` (Befehlspalette, native Menüs, „Neu“-Menü)
   4. Termine (§6.5)
   5. Vorlagen-Seite als Baukasten (§7.0, Prototyp `#/vorlagen`)
-  6. GiroCode (EPC-QR, §6.6)
+  6. GiroCode (EPC-QR, §6.6) – **erledigt (Branch `phase-3-girocode`, auf Teil 1)**: `src/lib/girocode/` –
+     `qr.ts` (TS-Port des Encoders aus `prototyp/js/qr.js`: Byte-Modus UTF-8, Version 1–40, Reed-Solomon, acht Masken
+     mit Strafpunkten ⇒ Modulmatrix + SVG mit `crispEdges`), `epc.ts` (EPC069-12 Version 002: BIC optional, Name max. 70,
+     `EUR153.00` aus Cent ohne Float, 0,01–999.999.999,99 €, Zweck max. 140, max. 331 Byte, Umbrüche in Werten werden
+     Leerzeichen; IBAN/BIC über `ibanFehler`/`feldFehler` aus `lib/firma.ts`), `png.ts` (eigener PNG-Schreiber: 1 Bit,
+     Palette weiß/#111111, 10 px je Modul, zlib ohne Kompression), `girocode.ts` (`girocodeFuer(doc)` ⇒ `{ ok, payload,
+     matrix, svg }` oder `{ ok: false, fehler }` für das Formular der Beleg-Maske – Fehler nie auf dem Blatt; Inhalt aus
+     dem Firmen-Schnappschuss, Name sonst Inhaber, Gesamtbetrag, Zweck = Rechnungsnummer bzw. „Entwurf“, Stufe M;
+     `girocodeMoeglich` = Rechnung und nicht `quittiert`; `qrGroesseMm` 18–45 mm). Vorschau: Baustein „Zahlung“ zeigt
+     den Code rechts im Bankkasten (ohne Kasten rechtsbündig) mit „Mit der Banking-App scannen und bezahlen“, Farbe
+     `--qr` in `blatt.css`. PDF: Makro `\GiroCode` (`girocode.png` oder leer), main.tex bindet den Code nur bei gesetztem
+     Makro ein (Layout wie die Vorschau), die PNG liefern `belegAssets(doc, bausteine)` bzw. `belegTex(…).assets` –
+     wer einen Beleg setzt, gibt `assets` immer mit. Testbeleg trägt den Code bzw. nennt den Grund, warum er fehlt.
+     Tests: Payload, Prüfungen, QR-Aufbau und Rück-Dekodierung mit eigenem Decoder (Format-/Versionsinfo,
+     Reed-Solomon-Syndrome, Byte-Modus; Version 1–13, alle Masken), PNG (Signatur, IHDR, CRCs, Pixel = Matrix).
+     **Auf dem Mac prüfen:** Testrechnung aus dem PDF mit einer Banking-App scannen (Empfänger, IBAN, Betrag 162,98 €,
+     Zweck „Entwurf“; nach Teil 2 mit echter Rechnungsnummer), Code im PDF scharf und so groß wie in der Vorschau.
+     Keine Migration nötig
   7. Beleg-Drop mit Erkennung (pdf.js, Regeln aus `prototyp/js/beleg.js`)
 - **Offen aus Phase 1 (Teil 1+2):** optionale Kategorien (AfA,
   Bewirtung, Geschenke, Homeoffice), Kategorien bearbeiten und EÜR-Zuordnung pro Jahr (braucht eigene Tabelle),

@@ -162,7 +162,7 @@ export const BAUSTEINE: Readonly<Record<BausteinTyp, BausteinDef>> = {
     felder: [
       { key: 'text', label: 'Zahlungshinweis', typ: 'textarea', default: 'Bitte überweisen Sie {summe} bis zum {faellig} unter Angabe der Rechnungsnummer.' },
       { key: 'bank', label: 'Bankverbindung als Kasten', typ: 'toggle', default: true },
-      // GiroCode kommt mit Phase 3 Teil 6 (EPC-QR); die Einstellungen stehen schon im Katalog
+      // GiroCode (EPC-QR, lib/girocode): nur auf Rechnungen; Größe in mm, begrenzt über qrGroesseMm
       { key: 'qr', label: 'GiroCode (QR) anzeigen', typ: 'toggle', default: true },
       { key: 'qrgroesse', label: 'Größe GiroCode', typ: 'select', default: '28', optionen: [['24', 'klein (24 mm)'], ['28', 'mittel (28 mm)'], ['34', 'groß (34 mm)']] },
     ],

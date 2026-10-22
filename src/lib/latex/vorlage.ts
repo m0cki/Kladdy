@@ -14,6 +14,7 @@
 import { BAUSTEINE, istUnten, sichtbare, type Aufgeloest, type Baustein, type BausteinTyp } from '../vorlagen/bausteine';
 import { ARTEN, formatVon, zerlegen, type Belegart, type PlatzhalterName } from '../vorlagen/dokument';
 import { belegAkzent } from '../vorlagen/farbe';
+import { qrGroesseMm } from '../girocode/girocode';
 import { escapeStueck } from './escape';
 
 const L = String.raw;
@@ -261,14 +262,19 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => Schnipsel>>
     const label = t.leer && !t.leer.length ? '' : wennNichtLeer(t.leer, L`\textcolor{grau}{${t.tex}:} `);
     return fest(L`{${fs(9.5)}\itshape ${label}\BetragInWorten\par}`);
   },
-  zahlung(b) {
+  zahlung(b, x) {
     const t = textTex(b.text('text'));
     const hinweis = wennNichtLeer(t.leer, L`{${t.tex}\par}`);
-    // GiroCode (EPC-QR) folgt mit Phase 3 Teil 6 – bis dahin in Vorschau und PDF nur die Bankverbindung
-    const bank =
-      b.an('bank') &&
+    // Grauer Kasten wie .blk-pay.box: links die Bankverbindung, rechts (falls da) der GiroCode, senkrecht mittig
+    const kasten = (inhalt: string) =>
       zeilen(
-        L`\vspace{3mm}\noindent{\setlength{\fboxsep}{3.5mm}\colorbox{box}{\begin{minipage}{\dimexpr\linewidth-2\fboxsep\relax}${fs(8.5)}\renewcommand{\arraystretch}{1.12}%`,
+        L`\vspace{3mm}\noindent{\setlength{\fboxsep}{3.5mm}\colorbox{box}{\begin{minipage}{\dimexpr\linewidth-2\fboxsep\relax}%`,
+        inhalt,
+        L`\end{minipage}}}\par`,
+      );
+    const bank = (breite: string) =>
+      zeilen(
+        L`\begin{minipage}[c]{${breite}}${fs(8.5)}\renewcommand{\arraystretch}{1.12}%`,
         L`{${fs(9)}\bfseries Bankverbindung\par}\vspace{1.2mm}%`,
         L`\begin{tabular}{@{}l@{\hspace{5mm}}l@{}}`,
         L`\textcolor{grau}{Empfänger} & \Firma\\`,
@@ -276,10 +282,26 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => Schnipsel>>
         L`\textcolor{grau}{BIC} & \BIC\ifdefempty{\Bank}{}{ · \Bank}\\`,
         L`\textcolor{grau}{Betrag} & \textbf{\Gesamt}\\`,
         L`\textcolor{grau}{Verwendungszweck} & \ifdefempty{\Nummer}{\textcolor{leer}{\itshape Rechnungsnummer}}{\Nummer}\\`,
-        L`\end{tabular}\end{minipage}}}\par`,
+        L`\end{tabular}\end{minipage}%`,
       );
-    // Schon bei Ausstellung bezahlt: kein Zahlungsaufruf, keine Bankverbindung (Prototyp `quittiert`)
-    return fest(L`\ifdefempty{\Quittiert}{%` + '\n' + zeilen(hinweis, bank) + L`%` + '\n' + L`}{{\Quittiert\par}}`);
+    // GiroCode wie .blk-qr: Code (girocode.png) mit 2 mm weißem Rand, darunter die Bildunterschrift. Nur auf Rechnungen
+    // und nur, wenn \GiroCode gesetzt ist (gültige Daten) – Fehler stehen im Formular, nie auf dem Blatt.
+    const mm = qrGroesseMm(b.text('qrgroesse'));
+    const qr =
+      L`\begin{minipage}[c]{${zahl(mm + 4)}mm}\centering{\setlength{\fboxsep}{2mm}\colorbox{white}{\includegraphics[width=${zahl(mm)}mm]{\GiroCode}}}\par` +
+      L`\vspace{1.2mm}{${fs(6.5, 1.3)}\color{grau}Mit der Banking-App\\scannen und bezahlen\par}\end{minipage}%`;
+    const mitQr = b.an('qr') && x.art === 'rechnung';
+    let zahlung: string | false = false;
+    if (b.an('bank')) {
+      const nurBank = kasten(bank(L`\linewidth`));
+      const mitCode = kasten(zeilen(bank(L`\dimexpr\linewidth-${zahl(mm + 10)}mm\relax`), L`\hspace{6mm}%`, qr));
+      zahlung = mitQr ? zeilen(L`\ifdefempty{\GiroCode}{%`, nurBank + '%', '}{%', mitCode + '%', '}') : nurBank;
+    } else if (mitQr) {
+      // ohne Bankverbindung kein Kasten, der Code steht rechts (Vorschau: .blk-pay-sp schiebt ihn nach rechts)
+      zahlung = zeilen(L`\ifdefempty{\GiroCode}{}{\vspace{3mm}\noindent\hfill` + qr, L`\par}`);
+    }
+    // Schon bei Ausstellung bezahlt: kein Zahlungsaufruf, keine Bankverbindung, kein GiroCode (Prototyp `quittiert`)
+    return fest(L`\ifdefempty{\Quittiert}{%` + '\n' + zeilen(hinweis, zahlung) + L`%` + '\n' + L`}{{\Quittiert\par}}`);
   },
   quittung_felder(b) {
     const von = textTex(b.text('von'), true).tex;

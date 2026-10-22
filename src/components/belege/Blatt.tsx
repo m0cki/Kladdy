@@ -2,6 +2,7 @@
  * Gleiche Bausteine und Daten wie das PDF (src/lib/latex/vorlage.ts + daten.ts), damit Vorschau und PDF übereinstimmen.
  * - Leere Bausteine fallen weg (im Editor: grauer Platzhalter), ausgeblendete (`aus`) immer.
  * - Fußzeile und Unterschrift „am Seitenende“ sitzen unten (.sh-unten), Wasserzeichen ENTWURF/STORNIERT.
+ * - GiroCode im Baustein „Zahlung“: dieselbe Modulmatrix wie girocode.png im PDF (lib/girocode).
  * - BlattVorschau skaliert das Blatt auf die verfügbare Breite (wie mount() im Prototyp).
  * Stile: src/styles/blatt.css */
 import { Fragment, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react';
@@ -33,6 +34,8 @@ import {
 } from '../../lib/vorlagen/dokument';
 import { betragInWorten } from '../../lib/latex/zahl-in-worten';
 import { ibanFormat } from '../../lib/firma';
+import { girocodeFuer, qrGroesseMm } from '../../lib/girocode/girocode';
+import { qrPfad } from '../../lib/girocode/qr';
 
 /** Markiert die fehlende Nummer im Text (wird zum grauen „Entwurf“). */
 const ENTWURF = '\u0000';
@@ -245,40 +248,66 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
   zahlung(b, x) {
     const { doc } = x;
     const F = doc.firma;
-    // Schon bei Ausstellung bezahlt: kein Zahlungsaufruf, keine Bankverbindung
+    // Schon bei Ausstellung bezahlt: kein Zahlungsaufruf, keine Bankverbindung, kein GiroCode
     const q = quittiertText(doc);
     if (q) return <p className="blk-text">{q}</p>;
     const txt = b.text('text') ? ph(b.text('text'), x) : null;
-    // GiroCode (EPC-QR) folgt mit Phase 3 Teil 6
-    const bank = b.an('bank') && (
-      <div className="blk-pay box">
-        <div className="blk-bank">
-          <b>Bankverbindung</b>
-          <dl>
-            <dt>Empfänger</dt>
-            <dd>{F.name}</dd>
-            <dt>IBAN</dt>
-            <dd className="blk-iban">{F.iban ? ibanFormat(F.iban) : ''}</dd>
-            <dt>BIC</dt>
-            <dd>
-              {F.bic}
-              {F.bank ? ` · ${F.bank}` : ''}
-            </dd>
-            <dt>Betrag</dt>
-            <dd>
-              <b>{formatBetrag(x.summe)}</b>
-            </dd>
-            <dt>Verwendungszweck</dt>
-            <dd>{doc.nummer || <span className="blk-leer">Rechnungsnummer</span>}</dd>
-          </dl>
-        </div>
+    const bank = b.an('bank') ? (
+      <div className="blk-bank">
+        <b>Bankverbindung</b>
+        <dl>
+          <dt>Empfänger</dt>
+          <dd>{F.name}</dd>
+          <dt>IBAN</dt>
+          <dd className="blk-iban">{F.iban ? ibanFormat(F.iban) : ''}</dd>
+          <dt>BIC</dt>
+          <dd>
+            {F.bic}
+            {F.bank ? ` · ${F.bank}` : ''}
+          </dd>
+          <dt>Betrag</dt>
+          <dd>
+            <b>{formatBetrag(x.summe)}</b>
+          </dd>
+          <dt>Verwendungszweck</dt>
+          <dd>{doc.nummer || <span className="blk-leer">Rechnungsnummer</span>}</dd>
+        </dl>
       </div>
-    );
-    if (!txt && !bank) return null;
+    ) : null;
+    // GiroCode (EPC-QR) nur auf Rechnungen; ungültige Daten (z. B. IBAN-Prüfsumme) zeigt das Formular, das Blatt nichts
+    let qr: ReactNode = null;
+    if (b.an('qr') && doc.art === 'rechnung') {
+      const g = girocodeFuer(doc);
+      if (g.ok) {
+        const mm = qrGroesseMm(b.text('qrgroesse'));
+        const n = g.matrix.length;
+        // Größe ist Geometrie, keine Farbe: Inline-Stil wie im Prototyp; die Modulfarbe kommt aus blatt.css (--qr)
+        qr = (
+          <figure className="blk-qr">
+            <div className="blk-qr-code" style={{ width: `${mm}mm`, height: `${mm}mm` }}>
+              <svg viewBox={`0 0 ${n} ${n}`} shapeRendering="crispEdges" role="img" aria-label="GiroCode">
+                <path fill="currentColor" d={qrPfad(g.matrix)} />
+              </svg>
+            </div>
+            <figcaption>
+              Mit der Banking-App
+              <br />
+              scannen und bezahlen
+            </figcaption>
+          </figure>
+        );
+      }
+    }
+    if (!txt && !bank && !qr) return null;
     return (
       <>
         {txt && <p className="blk-text">{txt}</p>}
-        {bank}
+        {(bank || qr) && (
+          <div className={`blk-pay${bank ? ' box' : ''}`}>
+            {bank ?? <div className="blk-pay-sp" />}
+            {qr}
+          </div>
+        )}
       </>
     );
   },
