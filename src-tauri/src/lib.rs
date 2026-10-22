@@ -8,6 +8,7 @@ mod datenbank;
 #[cfg(debug_assertions)]
 mod demo;
 mod kunden;
+mod latex;
 mod liquiditaet;
 mod nummern;
 mod tectonic;
@@ -155,6 +156,8 @@ pub fn run() {
             tectonic::tectonic_suchen,
             tectonic::tectonic_pfad_pruefen,
             tectonic::tectonic_pruefen,
+            latex::compile_latex,
+            latex::pdf_oeffnen,
             #[cfg(debug_assertions)]
             demo::demo_status,
             #[cfg(debug_assertions)]

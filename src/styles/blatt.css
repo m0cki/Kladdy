@@ -1,0 +1,148 @@
+/* Papierblatt der Beleg-Vorschau (ANLEITUNG §7.0, §7.5/§7.6; Prototyp css/belege.css „Papierblatt“).
+ * Das Blatt ist immer weißes Papier, unabhängig von Hell/Dunkel: Papierfarben stehen deshalb als eigene Variablen auf
+ * .sheet (dieselben Werte nutzt die LaTeX-Präambel, src/lib/latex/vorlage.ts). Akzent = App-Akzent (§9), abgedunkelt.
+ * Maße in mm/pt wie im PDF, damit Vorschau und PDF gleich umbrechen. Komponente: src/components/belege/Blatt.tsx */
+
+/* ---------- Bühne (skalierte Vorschau) ---------- */
+.sheet-desk { position: relative; padding: 22px; border-radius: var(--radius); border: 1px solid var(--border); background: color-mix(in oklab, var(--surface-3) 70%, var(--bg)); overflow: hidden; }
+:root[data-mode="light"] .sheet-desk { background: hsl(var(--tint-h) 10% 88%); border-color: hsl(var(--tint-h) 10% 84%); }
+.sheet-stage { position: relative; margin: 0 auto; }
+.sheet-stage > .sheet { position: absolute; left: 0; top: 0; transform-origin: 0 0; box-shadow: 0 1px 2px rgb(0 0 0 / .25), 0 12px 40px -10px rgb(0 0 0 / .55); }
+:root[data-mode="light"] .sheet-stage > .sheet { box-shadow: 0 1px 2px rgb(15 20 40 / .14), 0 14px 36px -12px rgb(15 20 40 / .35); }
+
+/* ---------- Blatt ---------- */
+.sheet {
+  --akz: color-mix(in oklab, var(--accent) 86%, #000);
+  --ink: #16181d; --grau: #6b7280; --haar: #d5d8de; --papier: #fff;
+  --leer: #9ca3af; --marke: #a3a8b1; --strich: #c4c8cf; --slot: #c7cad1; --slot-text: #a0a5ae; --kasten: #f3f4f6;
+  --wm: rgb(17 24 39 / .055); --wm-rand: rgb(17 24 39 / .05); --wm-storno: rgb(220 38 38 / .13); --wm-storno-rand: rgb(220 38 38 / .11);
+  position: relative; box-sizing: border-box; display: flex; flex-direction: column;
+  width: 210mm; min-height: 297mm; padding: 18mm 20mm 10mm 22mm; overflow: hidden;
+  background: var(--papier); color: var(--ink); color-scheme: light; text-align: left; letter-spacing: 0;
+  font: 400 10pt/1.42 "Helvetica Neue", Helvetica, Arial, "Liberation Sans", sans-serif;
+  font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact; cursor: default;
+}
+.sheet.sh-a5q { min-height: 148mm; padding: 11mm 14mm 10mm; }
+.sheet *, .sheet *::before, .sheet *::after { box-sizing: border-box; }
+.sheet p, .sheet h1, .sheet figure, .sheet dl, .sheet dd { margin: 0; }
+.sheet h1 { letter-spacing: -.01em; }
+.sheet .sh-main { position: relative; z-index: 1; flex: 1 0 auto; }
+.sheet .sh-unten { position: relative; z-index: 1; margin-top: 6mm; display: flex; flex-direction: column; gap: 4mm; }
+.sheet .sh-mark { position: absolute; left: 0; width: 5mm; border-top: .2mm solid var(--marke); }
+.sheet .sh-mark.falz1 { top: 105mm; }
+.sheet .sh-mark.falz2 { top: 210mm; }
+.sheet .sh-mark.loch { top: 148.5mm; width: 8mm; }
+.sheet .sh-wm { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; pointer-events: none; overflow: hidden; }
+.sheet .sh-wm span { transform: rotate(-33deg); font-size: 92pt; font-weight: 800; line-height: 1; letter-spacing: .1em; color: var(--wm); border: 2.4mm solid var(--wm-rand); border-radius: 6mm; padding: 2mm 9mm; white-space: nowrap; }
+.sheet.sh-a5q .sh-wm span { font-size: 58pt; border-width: 1.6mm; }
+.sheet.is-storno .sh-wm span { color: var(--wm-storno); border-color: var(--wm-storno-rand); }
+
+/* Bausteine: Hülle, Abstände, Auswahl im Vorlagen-Editor */
+.sheet .blk { position: relative; }
+.sheet .blk + .blk { margin-top: 3.5mm; }
+.sheet.editable .blk { cursor: pointer; border-radius: 4px; }
+.sheet.editable .blk:hover { outline: 1px dashed color-mix(in oklab, var(--accent) 55%, transparent); outline-offset: 2px; }
+.sheet .blk.blk-sel { outline: 2px dashed var(--accent); outline-offset: 2px; border-radius: 4px; }
+.sheet .blk-leer { color: var(--leer); font-style: italic; font-weight: 400; }
+.sheet .blk-platz { padding: 2mm 3mm; border: .25mm dashed var(--strich); border-radius: 1.5mm; color: var(--leer); font-size: 8pt; font-style: italic; }
+.sheet .blk-abstand, .sheet .blk-abstand + .blk { margin-top: 0; }
+.sheet .blk-space.klein { height: 4mm; } .sheet .blk-space.mittel { height: 8mm; } .sheet .blk-space.gross { height: 14mm; }
+
+/* Kopf */
+.sheet .blk-kopf { display: flex; justify-content: space-between; align-items: flex-start; gap: 8mm; min-height: 16mm; }
+.sheet .blk-firma { font-size: 15pt; font-weight: 700; line-height: 1.15; letter-spacing: -.01em; color: var(--akz); }
+.sheet .blk-claim { margin-top: 1mm; font-size: 8.5pt; color: var(--grau); }
+.sheet .blk-logo { height: 16mm; max-width: 60mm; display: flex; justify-content: flex-end; flex: none; }
+.sheet .blk-logo img { height: 100%; width: auto; object-fit: contain; }
+.sheet .blk-logo-slot { width: 30mm; height: 16mm; display: grid; place-items: center; border: .3mm dashed var(--slot); border-radius: 2mm; color: var(--slot-text); font-size: 7pt; letter-spacing: .12em; text-transform: uppercase; }
+.sheet.sh-a5q .blk-kopf { min-height: 10mm; }
+.sheet.sh-a5q .blk-logo, .sheet.sh-a5q .blk-logo-slot { height: 10mm; }
+/* Absenderzeile & Anschrift */
+.sheet .blk-absender { font-size: 7.5pt; color: var(--grau); }
+.sheet .blk-absender.linie { display: inline-block; max-width: 85mm; font-size: 7pt; padding-bottom: .8mm; border-bottom: .2mm solid var(--haar); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sheet .blk-absenderzeile + .blk-anschrift_meta { margin-top: 2.5mm; }
+.sheet .blk-anschrift_meta { display: flex; justify-content: space-between; align-items: flex-start; gap: 8mm; }
+.sheet.sh-a4 .blk-anschrift_meta { min-height: 34mm; }
+.sheet .blk-adr { width: 85mm; min-width: 0; line-height: 1.4; }
+.sheet .blk-meta { width: 64mm; flex: none; border-collapse: collapse; font-size: 9pt; }
+.sheet .blk-meta td { padding: .55mm 0; vertical-align: top; }
+.sheet .blk-meta td:first-child { color: var(--grau); padding-right: 4mm; white-space: nowrap; }
+.sheet .blk-meta td:last-child { text-align: right; }
+/* Titel, Betreff, Text */
+.sheet .blk-titel-row { display: flex; justify-content: space-between; align-items: baseline; gap: 6mm; }
+.sheet .blk-titel-row h1 { font-size: 17pt; font-weight: 700; line-height: 1.2; }
+.sheet .blk-titel-row.akzent h1 { color: var(--akz); }
+.sheet .blk-titel-r { font-size: 10.5pt; font-weight: 700; white-space: nowrap; }
+.sheet .blk-akzentlinie { height: .45mm; margin-top: 1.8mm; background: var(--akz); }
+.sheet.sh-a5q .blk-titel-row h1 { font-size: 18pt; }
+.sheet .blk-titel + .blk-betreff { margin-top: 1.5mm; }
+.sheet .blk-betreff { font-weight: 700; }
+.sheet .blk-betreff + .blk-text { margin-top: 4.5mm; }
+.sheet .blk-text.klein { font-size: 8.5pt; }
+.sheet .blk-text.grau { font-size: 8pt; color: var(--grau); }
+.sheet .blk-worte { font-size: 9.5pt; font-style: italic; }
+.sheet .blk-worte span { color: var(--grau); }
+/* Positionen & Summe */
+.sheet .blk-positionen { margin-top: 6mm; }
+.sheet .blk-pos { width: 100%; border-collapse: collapse; font-size: 9.5pt; }
+.sheet .blk-pos th { padding: 1.6mm 0 1.6mm 3mm; font-size: 8pt; font-weight: 400; color: var(--grau); text-align: right; white-space: nowrap; border-top: .5mm solid var(--ink); border-bottom: .25mm solid var(--ink); }
+.sheet .blk-pos td { padding: 1.9mm 0 1.9mm 3mm; text-align: right; vertical-align: top; white-space: nowrap; border-bottom: .15mm solid var(--haar); }
+.sheet .blk-pos .l { text-align: left; }
+.sheet .blk-pos td.l { white-space: normal; width: 100%; }
+.sheet .blk-pos th:first-child, .sheet .blk-pos td:first-child { padding-left: 0; }
+.sheet .blk-pos .p { width: 8mm; color: var(--grau); }
+.sheet .blk-pos tbody tr:last-child td { border-bottom: .25mm solid var(--ink); }
+.sheet .blk-pos tr { break-inside: avoid; }
+.sheet .blk-summe-row { display: flex; justify-content: space-between; align-items: baseline; gap: 6mm; padding: 2.2mm 0; border-top: .25mm solid var(--ink); border-bottom: .5mm solid var(--ink); font-weight: 700; break-inside: avoid; }
+.sheet .blk-summe-row b { font-size: 11pt; color: var(--akz); white-space: nowrap; }
+.sheet .blk-positionen + .blk-summe { margin-top: 0; }
+.sheet .blk-positionen + .blk-summe .blk-summe-row { border-top: 0; }
+.sheet .blk-summe + .blk { margin-top: 5mm; }
+/* Zahlung (GiroCode folgt mit Phase 3 Teil 6) */
+.sheet .blk-zahlung { break-inside: avoid; }
+.sheet .blk-pay { display: flex; align-items: center; gap: 6mm; margin-top: 3mm; }
+.sheet .blk-pay.box { padding: 3.5mm 4.5mm; border-radius: 2.5mm; background: var(--kasten); }
+.sheet .blk-bank { flex: 1; min-width: 0; font-size: 8.5pt; }
+.sheet .blk-bank > b { display: block; margin-bottom: 1.2mm; font-size: 9pt; }
+.sheet .blk-bank dl { display: grid; grid-template-columns: max-content 1fr; gap: .6mm 5mm; }
+.sheet .blk-bank dt { color: var(--grau); }
+.sheet .blk-iban { letter-spacing: .02em; white-space: nowrap; }
+/* Quittung / Eigenbeleg */
+.sheet .blk-titel + .blk-quittung_felder, .sheet .blk-titel + .blk-eigenbeleg_felder { margin-top: 3.5mm; }
+.sheet .blk-sub { margin: -1mm 0 3mm; font-size: 8pt; color: var(--grau); }
+.sheet .blk-grid { display: grid; gap: 0 8mm; }
+.sheet .blk-grid.c2 { grid-template-columns: 1fr 1fr; }
+.sheet .blk-grid.c3 { grid-template-columns: 1.35fr 1fr 1fr; }
+.sheet .blk-feld { min-width: 0; margin-bottom: 3mm; }
+.sheet .blk-feld > small { display: block; margin-bottom: .6mm; font-size: 7.5pt; color: var(--grau); letter-spacing: .02em; }
+.sheet .blk-feld > div { font-size: 11pt; line-height: 1.3; overflow-wrap: anywhere; }
+.sheet .blk-feld > div small { display: block; margin-top: .4mm; font-size: 8.5pt; color: var(--ink); }
+.sheet .blk-big { font-size: 15pt; font-weight: 700; }
+.sheet .blk-posmini { width: 100%; margin-top: 1mm; border-collapse: collapse; font-size: 9pt; }
+.sheet .blk-posmini td { padding: .4mm 0; vertical-align: top; }
+.sheet .blk-posmini td:first-child { padding-right: 2.5mm; color: var(--grau); white-space: nowrap; }
+.sheet .blk-posmini td:last-child { padding-left: 3mm; text-align: right; white-space: nowrap; }
+.sheet .blk-quittung_felder + .blk, .sheet .blk-eigenbeleg_felder + .blk { margin-top: 0; }
+/* Unterschrift, Linie, Fußzeile */
+.sheet .blk-sign { display: grid; grid-template-columns: 1fr 1fr; gap: 14mm; padding-top: 2mm; }
+.sheet .blk-sign > div { display: flex; flex-direction: column; justify-content: flex-end; }
+.sheet .blk-sign span { min-height: 5.5mm; padding: 0 0 1mm 1mm; font-size: 9.5pt; }
+.sheet .blk-sign i { display: block; border-top: .25mm solid var(--ink); }
+.sheet .blk-sign small { margin-top: 1mm; font-size: 7.5pt; color: var(--grau); }
+.sheet .sh-main .blk-unterschrift { margin-top: 10mm; }
+.sheet .blk-hr { height: 0; margin: 0; border: 0; border-top: .2mm solid var(--haar); }
+.sheet .blk-hr.akzent { border-top: .45mm solid var(--akz); }
+.sheet .blk-hr.schwarz { border-top: .3mm solid var(--ink); }
+.sheet .blk-fuss { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6mm; padding-top: 2.4mm; border-top: .2mm solid var(--haar); font-size: 7pt; line-height: 1.45; color: var(--grau); }
+.sheet .blk-fuss.n1 { grid-template-columns: minmax(0, 1fr); }
+.sheet .blk-fuss.n2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.sheet .blk-fuss b { color: var(--ink); font-weight: 600; }
+
+/* ---------- Testbeleg (Einstellungen › Daten) ---------- */
+.tb-fehler { margin: 6px 0 0; padding-left: 18px; }
+.tb-fehler li + li { margin-top: 2px; }
+.tb-log { margin-top: 8px; }
+.tb-log summary { cursor: pointer; color: var(--muted); }
+.tb-log pre { max-height: 220px; margin: 6px 0 0; padding: 8px 10px; overflow: auto; border-radius: var(--radius-sm); background: var(--surface-2); font-size: .72rem; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+.tb-vorschau { margin-top: 12px; }
