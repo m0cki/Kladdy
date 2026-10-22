@@ -10,6 +10,7 @@ import { useUi } from '../store/ui';
 import { EmptyState } from '../components/ui/EmptyState';
 import { PageHead, reveal } from '../components/ui/PageHead';
 import Darstellung from './einstellungen/Darstellung';
+import Belege from './einstellungen/Belege';
 import Daten from './einstellungen/Daten';
 import Firma from './einstellungen/Firma';
 import Nummernkreise from './einstellungen/Nummernkreise';
@@ -22,6 +23,7 @@ const FLASH_MS = 1800;
 const INHALT: Partial<Record<BereichId, ComponentType>> = {
   darstellung: Darstellung,
   firma: Firma,
+  belege: Belege,
   steuern: Steuern,
   nummernkreise: Nummernkreise,
   daten: Daten,

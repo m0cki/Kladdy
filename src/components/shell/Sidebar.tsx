@@ -9,6 +9,8 @@ import { BEREICHE, bereichPfad, isEinstellungen } from '../../lib/einstellungen-
 import { datenbankVerfuegbar } from '../../lib/db';
 import { NAV, START } from '../../lib/navigation';
 import { ladeOhneBelegAnzahl } from '../../lib/queries/buchungen';
+import { ladeUeberfaelligAnzahl } from '../../lib/queries/rechnungen';
+import { heute } from '../../lib/zeitraum';
 import { useUi } from '../../store/ui';
 import { Logo } from '../ui/Logo';
 
@@ -31,8 +33,26 @@ function useOhneBeleg(): number {
   return n;
 }
 
+/** Roter Zähler an „Rechnungen & Quittungen“: überfällige Rechnungen (§6.1). */
+function useUeberfaellig(): number {
+  const stand = useUi((s) => s.datenStand);
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    if (!datenbankVerfuegbar()) return;
+    let aktiv = true;
+    ladeUeberfaelligAnzahl(heute())
+      .then((x) => aktiv && setN(x))
+      .catch(() => undefined);
+    return () => {
+      aktiv = false;
+    };
+  }, [stand]);
+  return n;
+}
+
 function Hauptmenue({ pathname }: { pathname: string }) {
   const ohneBeleg = useOhneBeleg();
+  const ueberfaellig = useUeberfaellig();
   return (
     <nav className="sb-scroll sb-swap" data-modus="haupt" aria-label="Hauptmenü">
       <div className="sb-section">
@@ -47,6 +67,11 @@ function Hauptmenue({ pathname }: { pathname: string }) {
                   {to === '/ein-ausgaenge' && ohneBeleg > 0 ? (
                     <span className="sb-badge" title={`${ohneBeleg} ohne Beleg`}>
                       {ohneBeleg}
+                    </span>
+                  ) : null}
+                  {to === '/belege' && ueberfaellig > 0 ? (
+                    <span className="sb-badge alarm" title={`${ueberfaellig} überfällig`}>
+                      {ueberfaellig}
                     </span>
                   ) : null}
                 </Link>

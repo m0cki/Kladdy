@@ -44,7 +44,7 @@ export const bereichPfad = (id: BereichId, feld?: string) =>
 export const BEREICHE: readonly Bereich[] = [
   { id: 'darstellung', label: 'Darstellung', icon: Palette },
   { id: 'firma', label: 'Firma', icon: Building2 },
-  { id: 'belege', label: 'Belege', icon: FileText, phase: 3, inhalt: 'Beleg bei Einnahmen: Quittung oder Rechnung.' },
+  { id: 'belege', label: 'Belege', icon: FileText },
   { id: 'steuern', label: 'Steuern', icon: Landmark },
   { id: 'nummernkreise', label: 'Nummernkreise', icon: Hash },
   { id: 'datensicherung', label: 'Datensicherung', icon: HardDriveDownload, phase: 5, inhalt: 'Sicherungsziel, „Jetzt sichern“ und „Wiederherstellen …“.' },
@@ -122,7 +122,10 @@ export const EINSTELLUNGEN: readonly EinstellungsEintrag[] = [
   ...(import.meta.env.DEV
     ? [{ id: 'demo-daten', label: 'Demo-Daten', bereich: 'daten' as const, keywords: ['Beispieldaten', 'Testdaten', 'laden', 'entfernen'] }]
     : []),
-  /* Noch nicht gebaut – springen in den Bereich */
+  /* Belege (§6.10) */
   { id: 'beleg-bei-einnahmen', label: 'Beleg bei Einnahmen', bereich: 'belege', keywords: ['Quittung', 'Rechnung', 'Vorauswahl'] },
+  { id: 'zahlungsziel', label: 'Zahlungsziel neuer Rechnungen', bereich: 'belege', keywords: ['Fälligkeit', 'fällig', 'Tage', 'Rechnung'] },
+  { id: 'angebot-gueltig', label: 'Gültigkeit neuer Angebote', bereich: 'belege', keywords: ['Angebot', 'gültig bis', 'Tage'] },
+  /* Noch nicht gebaut – springen in den Bereich */
   { id: 'datensicherung', label: 'Datensicherung', bereich: 'datensicherung', keywords: ['Backup', 'Sicherung', 'Wiederherstellen', 'USB-Stick', 'iCloud'] },
 ];

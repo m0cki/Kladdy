@@ -107,6 +107,8 @@ export interface BelegDokument {
   /** Schnappschuss der Firmendaten beim Ausstellen */
   firma: Firma;
   ust_modus: UstModus;
+  /** Stornobeleg: Verweis auf das Original (Titel „Stornorechnung“ usw., Beträge negativ, kein Zahlungsaufruf) */
+  storno_von?: { nummer: string; datum: string } | null;
 }
 
 /* ---------- Rechnen (nur Ganzzahlen) ---------- */
@@ -209,6 +211,16 @@ export const unterschriftDatum = (doc: Pick<BelegDokument, 'art' | 'datum' | 'au
 
 export const istEntwurf = (doc: Pick<BelegDokument, 'nummer' | 'storniert'>): boolean => !doc.storniert && !doc.nummer;
 
+/** Titel der Belegart; ein Stornobeleg heißt „Stornorechnung“, „Storno-Quittung“ bzw. „Storno-Eigenbeleg“. */
+export function belegTitel(doc: Pick<BelegDokument, 'art' | 'storno_von'>): string {
+  if (!doc.storno_von) return ARTEN[doc.art].label;
+  return doc.art === 'rechnung' ? 'Stornorechnung' : `Storno-${ARTEN[doc.art].label}`;
+}
+
+/** Bausteine, wie sie für dieses Dokument gedruckt werden: Ein Stornobeleg fordert nicht zur Zahlung auf (ohne „Zahlung“). */
+export const bausteineFuer = <T extends { typ: string }>(doc: Pick<BelegDokument, 'storno_von'>, bausteine: readonly T[]): T[] =>
+  doc.storno_von ? bausteine.filter((b) => b.typ !== 'zahlung') : [...bausteine];
+
 /* ---------- Platzhalter (§7.0: {kunde}, {nr}, {summe}, {faellig} …) ---------- */
 
 export const PLATZHALTER = [
@@ -263,7 +275,7 @@ export function platzhalterWerte(doc: BelegDokument): Record<PlatzhalterName, st
   return {
     kunde: empfaenger(doc).anzeige,
     nr: doc.nummer ?? '',
-    art: ARTEN[doc.art].label,
+    art: belegTitel(doc),
     datum: datumText(doc.datum),
     leistungsdatum: leistungText(doc),
     faellig: datumText(doc.faellig_am),

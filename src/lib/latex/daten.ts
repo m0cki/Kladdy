@@ -14,6 +14,7 @@ import {
   ARTEN,
   HINWEIS_19,
   belegSumme,
+  belegTitel,
   datumText,
   eigenbelegGrundText,
   empfaenger,
@@ -71,7 +72,7 @@ export function makroWerte(doc: BelegDokument): Record<MakroName, string> {
   const rechnungOffen = doc.art === 'rechnung' && !doc.quittiert;
   const firmaOrt = [F.plz.trim(), F.ort.trim()].filter(Boolean).join(' ');
   return {
-    Belegart: e1(ARTEN[doc.art].label),
+    Belegart: e1(belegTitel(doc)),
     Nummer: e1(doc.nummer),
     Datum: e1(datumText(doc.datum)),
     Leistungsdatum: e1(leistungText(doc)),

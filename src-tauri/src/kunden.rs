@@ -332,28 +332,70 @@ fn und_liste(teile: &[&str]) -> String {
 
 /* ---------- Links (Karte, Telefon, E-Mail) ---------- */
 
-/// Nur diese Links öffnet die App nach außen: Apple Karten mit Suchanfrage, `tel:` mit Ziffern, `mailto:` mit Adresse.
+/// Nur diese Links öffnet die App nach außen: Apple Karten mit Suchanfrage, `tel:` mit Ziffern, `mailto:` mit Adresse
+/// (bei Belegen „Per Mail senden“ zusätzlich Betreff und Text, vollständig prozentkodiert; dann darf die Adresse fehlen).
 /// Keine Leer- oder Steuerzeichen; so kann über die Kundendaten nichts anderes gestartet werden.
 pub fn link_erlaubt(url: &str) -> bool {
-    if url.len() > 2048 || url.chars().any(|c| c.is_whitespace() || c.is_control()) {
+    if url.len() > 8192 || url.chars().any(|c| c.is_whitespace() || c.is_control()) {
         return false;
     }
     if let Some(rest) = url.strip_prefix("https://maps.apple.com/?q=") {
-        return !rest.is_empty();
+        return !rest.is_empty() && rest.len() <= 2048;
     }
     if let Some(rest) = url.strip_prefix("tel:") {
         let ziffern = rest.trim_start_matches('+');
         return ziffern.len() >= 3 && ziffern.chars().all(|c| c.is_ascii_digit());
     }
     if let Some(rest) = url.strip_prefix("mailto:") {
-        let mut teile = rest.splitn(2, '@');
-        let (lokal, domain) = (teile.next().unwrap_or(""), teile.next().unwrap_or(""));
-        return !lokal.is_empty()
-            && domain.contains('.')
-            && !domain.contains('@')
-            && !rest.contains(['?', '&', '<', '>', '"', '\\']);
+        let (adresse, abfrage) = rest.split_once('?').unwrap_or((rest, ""));
+        let adresse_ok = mail_adresse_ok(adresse) || (adresse.is_empty() && !abfrage.is_empty());
+        return adresse_ok && mail_abfrage_ok(abfrage);
     }
     false
+}
+
+/// `anna@example.de`: genau ein @, Domain mit Punkt, keine Zeichen, die den Link verändern könnten.
+fn mail_adresse_ok(adresse: &str) -> bool {
+    let mut teile = adresse.splitn(2, '@');
+    let (lokal, domain) = (teile.next().unwrap_or(""), teile.next().unwrap_or(""));
+    !lokal.is_empty()
+        && domain.contains('.')
+        && !domain.contains('@')
+        && !adresse.contains(['?', '&', '<', '>', '"', '\\'])
+}
+
+/// Nur `subject` und `body`, jeweils vollständig prozentkodiert (wie encodeURIComponent).
+fn mail_abfrage_ok(abfrage: &str) -> bool {
+    if abfrage.is_empty() {
+        return true;
+    }
+    for teil in abfrage.split('&') {
+        match teil.split_once('=') {
+            Some(("subject" | "body", wert)) if prozentkodiert(wert) => {}
+            _ => return false,
+        }
+    }
+    true
+}
+
+/// Nur unreservierte Zeichen und `%` mit zwei Hex-Ziffern.
+fn prozentkodiert(wert: &str) -> bool {
+    let b = wert.as_bytes();
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'%' {
+            let hex = b.get(i + 1..i + 3);
+            if !hex.is_some_and(|h| h.iter().all(u8::is_ascii_hexdigit)) {
+                return false;
+            }
+            i += 3;
+        } else if b[i].is_ascii_alphanumeric() || b"-_.!~*'()".contains(&b[i]) {
+            i += 1;
+        } else {
+            return false;
+        }
+    }
+    true
 }
 
 /* ---------- Tauri-Commands (dünne Hüllen) ---------- */
@@ -789,6 +831,9 @@ mod tests {
             "tel:+491712345678",
             "tel:0301234",
             "mailto:anna@example.de",
+            "mailto:anna@example.de?subject=x",
+            "mailto:anna@example.de?subject=Rechnung%20RE-2026-001&body=Guten%20Tag%2C%0Aanbei%20(PDF)",
+            "mailto:?subject=Quittung%20QU-2026-001",
         ] {
             assert!(link_erlaubt(ok), "{ok}");
         }
@@ -804,7 +849,13 @@ mod tests {
             "tel:0171-234",
             "mailto:anna",
             "mailto:@example.de",
-            "mailto:anna@example.de?subject=x",
+            "mailto:anna@example.de?cc=boss@example.de",
+            "mailto:anna@example.de?subject=x&attach=/etc/passwd",
+            "mailto:anna@example.de?subject=%zz",
+            "mailto:anna@example.de?subject=%4",
+            "mailto:anna@example.de?subject=<b>",
+            "mailto:anna@example.de?subject",
+            "mailto:?",
             "mailto:anna@ex@ample.de",
             "mailto:anna@example.de\n",
             "-a /Applications/Calculator.app",

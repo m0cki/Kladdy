@@ -106,6 +106,12 @@ export async function vorgemerkteAnhaengen(ziel: AnhangZiel): Promise<void> {
   if (await anhaengen(ziel, useErfassen.getState().belege)) belegeLeeren();
 }
 
+/** Eigenes Ziel einer Seite für Datei-Drops aufs Fenster (Beleg-Maske: unterschriebenes Exemplar); null = wie üblich. */
+let dropZiel: ((pfade: string[]) => void) | null = null;
+export function setzeDropZiel(ziel: ((pfade: string[]) => void) | null): void {
+  dropZiel = ziel;
+}
+
 /** Drag & Drop aufs Fenster beobachten (Tauri-Webview-Ereignisse). Gibt eine Abmelde-Funktion zurück. */
 export function watchBelegDrop(): () => void {
   if (!inTauri()) return () => {};
@@ -121,7 +127,9 @@ export function watchBelegDrop(): () => void {
       else if (p.type === 'leave') setZiehen(false);
       else if (p.type === 'drop') {
         setZiehen(false);
-        if (p.paths.length) void belegeUebernehmen(p.paths);
+        if (!p.paths.length) return;
+        if (dropZiel) dropZiel(p.paths);
+        else void belegeUebernehmen(p.paths);
       }
     })
     .then((fn) => {

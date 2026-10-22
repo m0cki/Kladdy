@@ -524,13 +524,14 @@ pub async fn fuellen(
             };
             let erstellt = stempel(&r.datum, heute, jetzt);
             let geaendert = stempel(r.bezahlt_am.as_deref().unwrap_or(&r.datum), heute, jetzt);
+            // Erst ohne Nummer, dann die Positionen, zuletzt die Nummer: Positionen ausgestellter Belege sind per
+            // Trigger festgeschrieben (Migration 0007), genau wie beim Ausstellen in rechnungen.rs.
             let id = sqlx::query(
                 "INSERT INTO rechnungen (art, nummer, status, kunde_id, kunde_name, kunde_adresse, kunde_nummer, datum,
                    faellig_am, betreff, summe_cent, termin_id, bezahlt_am, erstellt_am, geaendert_am)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                 VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             )
             .bind(&r.art)
-            .bind(&r.nummer)
             .bind(&r.status)
             .bind(kunden_ids[r.kunde])
             .bind(name)
@@ -563,6 +564,14 @@ pub async fn fuellen(
                 .execute(&mut *tx)
                 .await
                 .map_err(db_fehler)?;
+            }
+            if r.nummer.is_some() {
+                sqlx::query("UPDATE rechnungen SET nummer = ? WHERE id = ?")
+                    .bind(&r.nummer)
+                    .bind(id)
+                    .execute(&mut *tx)
+                    .await
+                    .map_err(db_fehler)?;
             }
             beleg_ids.push(id);
         }

@@ -135,7 +135,7 @@ pub fn datum_lesen(feld: &str, text: &str) -> Result<(i64, u32, u32), String> {
 }
 
 /// 'YYYY-MM-DD' ⇒ 'TT.MM.JJJJ' für Meldungen.
-fn datum_de(iso: &str) -> String {
+pub(crate) fn datum_de(iso: &str) -> String {
     match datum_lesen("Datum", iso) {
         Ok((j, m, t)) => format!("{t:02}.{m:02}.{j:04}"),
         Err(_) => iso.to_string(),
@@ -201,18 +201,20 @@ fn pruefen(d: &BuchungEingabe) -> Result<Geprueft, String> {
 /* ---------- Prüfen mit Datenbank ---------- */
 
 /// Ende des festgeschriebenen Zeitraums (None = nichts festgeschrieben).
-async fn festgeschrieben_bis(conn: &mut SqliteConnection) -> Result<Option<String>, String> {
+pub(crate) async fn festgeschrieben_bis(
+    conn: &mut SqliteConnection,
+) -> Result<Option<String>, String> {
     sqlx::query_scalar("SELECT max(bis_datum) FROM festschreibungen")
         .fetch_one(conn)
         .await
         .map_err(db_fehler)
 }
 
-fn ist_festgeschrieben(bis: &Option<String>, datum: &str) -> bool {
+pub(crate) fn ist_festgeschrieben(bis: &Option<String>, datum: &str) -> bool {
     bis.as_deref().is_some_and(|b| datum <= b)
 }
 
-fn festgeschrieben_meldung(bis: &Option<String>) -> String {
+pub(crate) fn festgeschrieben_meldung(bis: &Option<String>) -> String {
     format!(
         "Der Zeitraum bis {} ist festgeschrieben.",
         datum_de(bis.as_deref().unwrap_or_default())
@@ -221,7 +223,7 @@ fn festgeschrieben_meldung(bis: &Option<String>) -> String {
 
 /// Kategorie muss existieren, zum Typ passen und darf nicht archiviert sein
 /// (außer sie ist schon die Kategorie der Buchung, die geändert wird: `bisher`).
-async fn kategorie_pruefen(
+pub(crate) async fn kategorie_pruefen(
     conn: &mut SqliteConnection,
     id: i64,
     typ: &str,
@@ -629,7 +631,34 @@ async fn stornieren_in(
     zeitpunkt: &str,
 ) -> Result<BuchungErgebnis, String> {
     let alt = aenderbare_buchung(tx, id, "storniert").await?;
-    let alt_datum = feld_text(&alt, "zahlungsdatum").unwrap_or_default();
+    let (storno_id, nummer) = gegenbuchung_in(tx, id, &alt, heute, jahr_heute, zeitpunkt).await?;
+    let kunde_id = feld_i64(&alt, "kunde_id");
+    let kunde_nummer = match kunde_id {
+        Some(k) => kunden_nummer(tx, k).await?,
+        None => None,
+    };
+    Ok(BuchungErgebnis {
+        id: storno_id,
+        nummer,
+        kunde_id,
+        kunde_nummer,
+        kunde_neu: false,
+        belege_neu: 0,
+    })
+}
+
+/// Gegenbuchung zur Buchung `id` (ganze Zeile `alt`) anlegen und beides protokollieren; liefert (ID, Nummer) der
+/// Gegenbuchung. Ob die Buchung storniert werden darf, prüft der Aufrufer: hier `aenderbare_buchung`, bei Zahlungen zu
+/// einem Beleg rechnungen.rs (dort nur über den Beleg).
+pub(crate) async fn gegenbuchung_in(
+    tx: &mut SqliteConnection,
+    id: i64,
+    alt: &Map<String, Value>,
+    heute: &str,
+    jahr_heute: i64,
+    zeitpunkt: &str,
+) -> Result<(i64, String), String> {
+    let alt_datum = feld_text(alt, "zahlungsdatum").unwrap_or_default();
     let bis = festgeschrieben_bis(tx).await?;
     let datum = if ist_festgeschrieben(&bis, &alt_datum) {
         heute
@@ -683,19 +712,7 @@ async fn stornieren_in(
         Some(&vermerk),
     )
     .await?;
-    let kunde_id = feld_i64(&alt, "kunde_id");
-    let kunde_nummer = match kunde_id {
-        Some(k) => kunden_nummer(tx, k).await?,
-        None => None,
-    };
-    Ok(BuchungErgebnis {
-        id: storno_id,
-        nummer,
-        kunde_id,
-        kunde_nummer,
-        kunde_neu: false,
-        belege_neu: 0,
-    })
+    Ok((storno_id, nummer))
 }
 
 /* ---------- Tauri-Commands (dünne Hüllen) ---------- */
