@@ -2,8 +2,9 @@
  * Mail über Rust `link_oeffnen`), Kennzeile („3 Besuche · zuletzt vor 12 Tagen · Kunde seit März 2025“) und Hinweisen
  * (nächster Termin, nachzutragende Termine, offene Rechnungen) · Notiz (speichert selbst: kurz nach dem Tippen, beim
  * Verlassen des Feldes und beim Schließen) · Stammdaten (einklappbar) · Verlauf neueste zuerst.
- * Fuß: Löschen nur ohne Bezüge, sonst Schloss „Löschen ab JJJJ“; „Neuen Auftrag erfassen“ öffnet die eine
- * Erfassen-Schublade vorbelegt (Einnahme für diesen Kunden). Im Modus „neu“ dieselbe Schublade als Formular.
+ * Fuß: Löschen nur ohne Bezüge, sonst Schloss „Löschen ab JJJJ“; „Termin eintragen“ öffnet die eine Termin-Schublade
+ * und „Neuen Auftrag erfassen“ die eine Erfassen-Schublade, beide vorbelegt mit diesem Kunden. Termin-Hinweise und
+ * Termine im Verlauf führen zur Seite Termine (?t=<id>). Im Modus „neu“ dieselbe Schublade als Formular.
  * Geöffnet nur über lib/kunden-schublade.ts; hängt im AppShell. Geschrieben wird nur über Rust (kunden.rs). */
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type InputHTMLAttributes, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
@@ -11,6 +12,7 @@ import { Link } from 'react-router-dom';
 import {
   ArrowLeftRight,
   CalendarDays,
+  CalendarPlus,
   Check,
   ChevronDown,
   ChevronRight,
@@ -61,6 +63,7 @@ import {
   type VerlaufArt,
 } from '../../lib/kunden';
 import { kundeOeffnen, kundeSchliessen, useKundeSchublade } from '../../lib/kunden-schublade';
+import { terminNeu } from '../../lib/termin-schublade';
 import { formatBetrag } from '../../lib/money';
 import { ladeKundenKurz } from '../../lib/queries/buchungen';
 import { kundeAendern, kundeAnlegen, kundeLoeschen, kundeNotiz, ladeKunde, ladeVerlauf, linkOeffnen } from '../../lib/queries/kunden';
@@ -591,7 +594,11 @@ function KundeAnsicht({ id, open, fuss }: { id: number; open: boolean; fuss: HTM
                 </button>
               )}
               <span className="spacer" />
-              {/* „Termin eintragen“ kommt mit den Terminen (Phase 3): öffnet dann die Termin-Schublade vorbelegt mit diesem Kunden. */}
+              {/* „Termin eintragen“ öffnet die eine Termin-Schublade, vorbelegt mit diesem Kunden (§6.8) */}
+              <button type="button" className="btn subtle" onClick={() => terminNeu({ kunde: kunde.id })}>
+                <CalendarPlus />
+                Termin eintragen
+              </button>
               <button type="button" className="btn-primary sm" onClick={auftragErfassen}>
                 <Plus />
                 Neuen Auftrag erfassen
@@ -688,24 +695,24 @@ function Kopf({ x, h, ergaenzen }: { x: KundenInfo; h: string; ergaenzen: () => 
             </span>
           ))}
         </p>
-        {/* Termine öffnen sich ab Phase 3 (Seite Termine); bis dahin sind die Hinweise reine Anzeige. */}
+        {/* Termine öffnen sich auf der Seite Termine (Termin-Schublade) */}
         {n ? (
-          <div className="ku-hw">
+          <Link className="ku-hw tm-hw" to={`/termine?t=${n.z.id}`} title="Termin öffnen">
             <CalendarDays />
             <span>
               <b>Nächster Termin:</b> {terminLang(n.z, h)} · {n.titel}
             </span>
             {n.z.datum > h ? <small>{vorText(n.z.datum, h)}</small> : null}
-          </div>
+          </Link>
         ) : null}
         {x.nachtragen.map((e) => (
-          <div key={e.z.id} className="ku-hw warn">
+          <Link key={e.z.id} className="ku-hw warn tm-hw" to={`/termine?t=${e.z.id}`} title="Termin öffnen und nachtragen">
             <CalendarDays />
             <span>
               <b>Termin {terminLang(e.z, h)}</b> · {e.titel}, noch nicht erledigt
             </span>
             <small>nachtragen</small>
-          </div>
+          </Link>
         ))}
         {x.offen.map((e) => {
           const ueber = e.status === 'ueberfaellig';
@@ -793,12 +800,12 @@ function VerlaufEintrag({ e, h }: { e: Eintrag; h: string }) {
         </button>
       );
   } else {
-    // Termin: Link auf die Terminansicht kommt mit Phase 3
+    // Termin: öffnet ihn auf der Seite Termine
     nummer = (
-      <span className="ku-nr txt">
+      <Link className="ku-nr" to={`/termine?t=${z.id}`} title="Termin öffnen">
         <CalendarDays />
         Termin{z.von ? ` ${zeitspanne(z.von, z.bis)}` : ''}
-      </span>
+      </Link>
     );
   }
 

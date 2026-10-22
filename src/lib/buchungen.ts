@@ -387,6 +387,8 @@ export interface BuchungDaten {
   heute: string;
   /** Quellpfade von Belegdateien: Rust kopiert und verknüpft sie in derselben Transaktion (nur wenn welche vorgemerkt sind) */
   belege?: string[];
+  /** nur neue Einnahme „Ohne eigenen Beleg“ zu einem Termin: schließt ihn ab (src-tauri/src/termine.rs) */
+  termin_id?: number;
 }
 
 export type FormFeld = 'betrag' | 'kategorie' | 'zahlungsdatum' | 'beschreibung' | 'wer' | 'privat';

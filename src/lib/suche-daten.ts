@@ -7,7 +7,8 @@
  * - Reihenfolge der Zeilen = neueste zuerst (macht die Abfrage); die Suche behält sie bei gleicher Bewertung bei.
  * - Sprungziele: Buchung ⇒ dieselbe Schublade wie ein Klick auf die Zeile (bearbeiten), Kunde ⇒ Kunden-Schublade,
  *   Beleg ⇒ Beleg-Maske /belege/<id> (wie der Beleg-Nr.-Link in Ein- & Ausgänge), Termin ⇒ /termine?t=<id>,
- *   Kennzahl ⇒ /auswertung/kennzahlen?k=<id>. Termine und Kennzahlen werten den Parameter ab Phase 3 bzw. 4 aus. */
+ *   Kennzahl ⇒ /auswertung/kennzahlen?k=<id>. Termine öffnen dort die Termin-Schublade, Kennzahlen werten den
+ *   Parameter ab Phase 4 aus. */
 import { datumKurz, typName, zahlungswegName, type BuchungTyp, type Zahlungsart } from './buchungen';
 import { formatBetrag } from './money';
 import type { SuchEintrag } from './suche';

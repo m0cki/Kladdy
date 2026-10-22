@@ -758,6 +758,7 @@ mod tests {
                     beschreibung: "Rasen mähen".into(),
                     heute: "2026-10-15".into(),
                     belege: vec![],
+                    termin_id: None,
                 },
                 JETZT,
             )

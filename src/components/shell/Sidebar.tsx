@@ -10,6 +10,7 @@ import { datenbankVerfuegbar } from '../../lib/db';
 import { NAV, START } from '../../lib/navigation';
 import { ladeOhneBelegAnzahl } from '../../lib/queries/buchungen';
 import { ladeUeberfaelligAnzahl } from '../../lib/queries/rechnungen';
+import { ladeTerminZaehler } from '../../lib/queries/termine';
 import { heute } from '../../lib/zeitraum';
 import { useUi } from '../../store/ui';
 import { Logo } from '../ui/Logo';
@@ -50,9 +51,27 @@ function useUeberfaellig(): number {
   return n;
 }
 
+/** Zähler an „Termine“ (§6.1): heute; rot die nachzutragenden und die erledigten ohne Beleg. */
+function useTermineZaehler(): { heute: number; offen: number } {
+  const stand = useUi((s) => s.datenStand);
+  const [n, setN] = useState({ heute: 0, offen: 0 });
+  useEffect(() => {
+    if (!datenbankVerfuegbar()) return;
+    let aktiv = true;
+    ladeTerminZaehler(heute())
+      .then((x) => aktiv && setN(x))
+      .catch(() => undefined);
+    return () => {
+      aktiv = false;
+    };
+  }, [stand]);
+  return n;
+}
+
 function Hauptmenue({ pathname }: { pathname: string }) {
   const ohneBeleg = useOhneBeleg();
   const ueberfaellig = useUeberfaellig();
+  const termine = useTermineZaehler();
   return (
     <nav className="sb-scroll sb-swap" data-modus="haupt" aria-label="Hauptmenü">
       <div className="sb-section">
@@ -67,6 +86,15 @@ function Hauptmenue({ pathname }: { pathname: string }) {
                   {to === '/ein-ausgaenge' && ohneBeleg > 0 ? (
                     <span className="sb-badge" title={`${ohneBeleg} ohne Beleg`}>
                       {ohneBeleg}
+                    </span>
+                  ) : null}
+                  {to === '/termine' && termine.offen > 0 ? (
+                    <span className="sb-badge alarm" title={`${termine.offen} nachtragen bzw. ohne Beleg`}>
+                      {termine.offen}
+                    </span>
+                  ) : to === '/termine' && termine.heute > 0 ? (
+                    <span className="sb-badge" title={`${termine.heute} heute`}>
+                      {termine.heute}
                     </span>
                   ) : null}
                   {to === '/belege' && ueberfaellig > 0 ? (

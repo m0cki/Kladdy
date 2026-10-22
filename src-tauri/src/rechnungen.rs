@@ -15,6 +15,9 @@
 //!   des Originals, negativen Positionen und Gegenbuchung der Zahlung. Trigger aus Migration 0007 sichern das ab.
 //! - Ein neuer Kundenname legt den Kunden erst beim Ausstellen an (kunden::anlegen_in). Ob es Namensvettern gibt, klärt
 //!   das Frontend vorher (wie bei buchung_anlegen).
+//! - Termine (termine.rs): für einen Termin vorbereitete Belege sind Entwürfe mit `termin_id`
+//!   (`vorbereitung_schreiben_in`); Ausstellen hakt den Termin ab, „Bezahlt“ mit Termin macht die Rechnung zu seinem
+//!   Beleg (über die Einnahme, `buchungen.termin_id`).
 //!
 //! Die Kernfunktionen nehmen eine Verbindung (Tests gegen eine migrierte Datenbank im Arbeitsspeicher), die
 //! `#[tauri::command]`-Funktionen sind dünne Hüllen.
@@ -35,6 +38,7 @@ use crate::buchungen::{
 use crate::datenbank::{self, db_fehler};
 use crate::kunden;
 use crate::nummern;
+use crate::termine;
 
 /// Belegarten, die man selbst anlegt ('storno' entsteht nur beim Stornieren).
 const ARTEN: &[&str] = &["rechnung", "quittung", "angebot", "eigenbeleg"];
@@ -60,7 +64,7 @@ fn art_name(art: &str) -> &'static str {
 /* ---------- Eingaben ---------- */
 
 /// Eine Position aus der Beleg-Maske (src/lib/rechnungen.ts). Feldnamen exakt so (snake_case).
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct PositionEingabe {
     pub beschreibung: String,
@@ -75,8 +79,9 @@ pub struct PositionEingabe {
     pub kategorie_id: Option<i64>,
 }
 
-/// Ein Beleg, wie ihn die Maske bzw. die Erfassen-Schublade speichert.
-#[derive(Debug, Clone, Deserialize)]
+/// Ein Beleg, wie ihn die Maske bzw. die Erfassen-Schublade speichert. Serialisiert für „Rückgängig“ bei Terminen:
+/// ein verworfener Entwurf geht so an das Frontend und kommt unverändert zurück (termine.rs).
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct EntwurfEingabe {
     /// 'rechnung' | 'quittung' | 'angebot' | 'eigenbeleg'
@@ -508,7 +513,8 @@ async fn kunde_lesen(tx: &mut SqliteConnection, id: i64) -> Result<Empfaenger, S
 }
 
 /// Fehlt dem gewählten Kunden die Anschrift, wird sie aus dem Beleg ergänzt (nur leere Felder, mit Protokoll).
-async fn anschrift_ergaenzen(
+/// Auch für Termine (termine.rs: Adresse des Termins beim Kunden ohne Anschrift).
+pub(crate) async fn anschrift_ergaenzen(
     tx: &mut SqliteConnection,
     id: i64,
     a: &Anschrift,
@@ -946,38 +952,7 @@ pub async fn entwurf_loeschen(
     zeitpunkt: &str,
 ) -> Result<BelegErgebnis, String> {
     in_transaktion(conn, async |tx| {
-        let mut alt = entwurf_lesen(tx, id).await?;
-        let positionen = positionen_lesen(tx, id).await?;
-        alt.insert("positionen".into(), positionen_wert(&positionen));
-        let zusatz: Map<String, Value> = text(&alt, "entwurf_json")
-            .and_then(|t| serde_json::from_str(&t).ok())
-            .unwrap_or_default();
-        if let Some(angebot) = zusatz.get("aus_angebot").and_then(Value::as_i64) {
-            let (a, _) = ausgestellt_lesen(tx, angebot).await?;
-            if text(&a, "status").as_deref() == Some("angenommen") {
-                status_setzen(tx, angebot, &a, "offen", None, None, zeitpunkt).await?;
-            }
-        }
-        sqlx::query("DELETE FROM rechnungspositionen WHERE rechnung_id = ?")
-            .bind(id)
-            .execute(&mut *tx)
-            .await
-            .map_err(db_fehler)?;
-        sqlx::query("DELETE FROM rechnungen WHERE id = ? AND nummer IS NULL")
-            .bind(id)
-            .execute(&mut *tx)
-            .await
-            .map_err(db_fehler)?;
-        protokollieren(
-            tx,
-            zeitpunkt,
-            "rechnungen",
-            id,
-            "geloescht_entwurf",
-            Some(&alt),
-            None,
-        )
-        .await?;
+        entwurf_loeschen_in(tx, id, zeitpunkt).await?;
         Ok(BelegErgebnis {
             id,
             status: "geloescht".into(),
@@ -985,6 +960,117 @@ pub async fn entwurf_loeschen(
         })
     })
     .await
+}
+
+/// Verwirft einen Entwurf in der Transaktion des Aufrufers (auch termine.rs: Absagen, „Ohne Beleg“).
+pub(crate) async fn entwurf_loeschen_in(
+    tx: &mut SqliteConnection,
+    id: i64,
+    zeitpunkt: &str,
+) -> Result<(), String> {
+    let mut alt = entwurf_lesen(tx, id).await?;
+    let positionen = positionen_lesen(tx, id).await?;
+    alt.insert("positionen".into(), positionen_wert(&positionen));
+    let zusatz: Map<String, Value> = text(&alt, "entwurf_json")
+        .and_then(|t| serde_json::from_str(&t).ok())
+        .unwrap_or_default();
+    if let Some(angebot) = zusatz.get("aus_angebot").and_then(Value::as_i64) {
+        let (a, _) = ausgestellt_lesen(tx, angebot).await?;
+        if text(&a, "status").as_deref() == Some("angenommen") {
+            status_setzen(tx, angebot, &a, "offen", None, None, zeitpunkt).await?;
+        }
+    }
+    sqlx::query("DELETE FROM rechnungspositionen WHERE rechnung_id = ?")
+        .bind(id)
+        .execute(&mut *tx)
+        .await
+        .map_err(db_fehler)?;
+    sqlx::query("DELETE FROM rechnungen WHERE id = ? AND nummer IS NULL")
+        .bind(id)
+        .execute(&mut *tx)
+        .await
+        .map_err(db_fehler)?;
+    protokollieren(
+        tx,
+        zeitpunkt,
+        "rechnungen",
+        id,
+        "geloescht_entwurf",
+        Some(&alt),
+        None,
+    )
+    .await
+}
+
+/// Ein Entwurf als Eingabe, wie sie `entwurf_speichern` annimmt – zum Wiederherstellen eines verworfenen Entwurfs
+/// („Rückgängig“ bei Terminen).
+pub(crate) async fn entwurf_eingabe_lesen(
+    tx: &mut SqliteConnection,
+    id: i64,
+) -> Result<EntwurfEingabe, String> {
+    let z = entwurf_lesen(tx, id).await?;
+    let mut positionen = Vec::new();
+    for p in positionen_lesen(tx, id).await? {
+        positionen.push(PositionEingabe {
+            beschreibung: p.beschreibung,
+            menge: p.menge,
+            einheit: p.einheit,
+            einzelpreis_cent: p.einzelpreis_cent,
+            kategorie_id: p.kategorie_id,
+        });
+    }
+    let zusatz: Map<String, Value> = text(&z, "entwurf_json")
+        .and_then(|t| serde_json::from_str(&t).ok())
+        .unwrap_or_default();
+    Ok(EntwurfEingabe {
+        art: text(&z, "art").unwrap_or_default(),
+        kunde_id: zahl(&z, "kunde_id"),
+        kunde_name: text(&z, "kunde_name"),
+        kunde_adresse: text(&z, "kunde_adresse"),
+        datum: text(&z, "datum").unwrap_or_default(),
+        leistung_von: text(&z, "leistung_von"),
+        leistung_bis: text(&z, "leistung_bis"),
+        faellig_am: text(&z, "faellig_am"),
+        betreff: text(&z, "betreff"),
+        einleitung: text(&z, "einleitung"),
+        schlusstext: text(&z, "schlusstext"),
+        zahlungsart: text(&z, "zahlungsart"),
+        bezahlt_am: text(&z, "bezahlt_am"),
+        vorlage_id: zahl(&z, "vorlage_id"),
+        termin_id: zahl(&z, "termin_id"),
+        positionen,
+        zusatz,
+    })
+}
+
+/// Für einen Termin vorbereiteter Beleg (Quittung oder Rechnung als Entwurf ohne Nummer, §6.5): legt ihn an bzw.
+/// gleicht den vorhandenen an. Termin und Kunde kommen vom Termin, nie aus der Eingabe. Gibt (ID, neu?) zurück.
+pub(crate) async fn vorbereitung_schreiben_in(
+    tx: &mut SqliteConnection,
+    termin_id: i64,
+    kunde_id: Option<i64>,
+    daten: &EntwurfEingabe,
+    zeitpunkt: &str,
+) -> Result<(i64, bool), String> {
+    if daten.art != "quittung" && daten.art != "rechnung" {
+        return Err("Vorbereiten lassen sich nur Quittungen und Rechnungen.".into());
+    }
+    let mut d = daten.clone();
+    d.termin_id = Some(termin_id);
+    if kunde_id.is_some() {
+        d.kunde_id = kunde_id;
+        d.kunde_name = None;
+    }
+    let e = pruefen(&d)?;
+    let vorhanden: Option<i64> = sqlx::query_scalar(
+        "SELECT id FROM rechnungen WHERE termin_id = ? AND nummer IS NULL ORDER BY id LIMIT 1",
+    )
+    .bind(termin_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(db_fehler)?;
+    let id = entwurf_schreiben(tx, vorhanden, &e, zeitpunkt).await?;
+    Ok((id, vorhanden.is_none()))
 }
 
 /* ---------- Zahlungen zum Beleg ---------- */
@@ -1010,6 +1096,8 @@ struct NeueZahlung<'a> {
     belegnummer: &'a str,
     beschreibung: &'a str,
     rechnung_id: i64,
+    /// Termin, zu dem die Zahlung gehört („Offene Rechnung zuordnen“ aus der Erfassen-Schublade zum Termin)
+    termin_id: Option<i64>,
 }
 
 async fn zahlung_buchen(
@@ -1026,9 +1114,9 @@ async fn zahlung_buchen(
     let nummer = nummern::vergeben_fortlaufend(tx, "buchung", jahr_heute).await?;
     let id = sqlx::query(
         "INSERT INTO buchungen (nummer, typ, zahlungsdatum, belegdatum, betrag_cent, privatanteil_prozent,
-           kategorie_id, kunde_id, lieferant, art, zahlungsart, belegnummer, beschreibung, rechnung_id, erstellt_am,
-           geaendert_am)
-         VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, 'zahlung', ?, ?, ?, ?, ?, ?)",
+           kategorie_id, kunde_id, lieferant, art, zahlungsart, belegnummer, beschreibung, rechnung_id, termin_id,
+           erstellt_am, geaendert_am)
+         VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, 'zahlung', ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&nummer)
     .bind(z.typ)
@@ -1042,6 +1130,7 @@ async fn zahlung_buchen(
     .bind(z.belegnummer)
     .bind(z.beschreibung)
     .bind(z.rechnung_id)
+    .bind(z.termin_id)
     .bind(zeitpunkt)
     .bind(zeitpunkt)
     .execute(&mut *tx)
@@ -1252,6 +1341,12 @@ async fn ausstellen_in(
         (None, "quittung" | "eigenbeleg") => "bar".to_string(),
         (None, _) => "bank".to_string(),
     };
+    // Beleg zu einem Termin: ein Besuch bekommt höchstens einen gültigen Beleg bzw. eine Einnahme
+    let fuer_termin = art == "quittung" || art == "rechnung";
+    let termin = if fuer_termin { e.termin_id } else { None };
+    if let Some(t) = termin {
+        termine::abschluss_pruefen(tx, t).await?;
+    }
 
     let kunde = kunde_festhalten(tx, e, jahr_heute, zeitpunkt).await?;
     let (jahr_beleg, _, _) = datum_lesen("Belegdatum", &e.datum)?;
@@ -1307,6 +1402,7 @@ async fn ausstellen_in(
                 belegnummer: &nummer,
                 beschreibung: &beschreibung,
                 rechnung_id: id,
+                termin_id: None,
             };
             Some(zahlung_buchen(tx, &neu, jahr_heute, zeitpunkt).await?)
         }
@@ -1399,11 +1495,9 @@ async fn ausstellen_in(
     .await
     .map_err(db_fehler)?;
 
-    // Termin, zu dem der Beleg vorbereitet war: mit dem Ausstellen erledigt
-    if let Some(t) = e.termin_id
-        && (art == "quittung" || art == "rechnung")
-    {
-        termin_erledigen(tx, t, zeitpunkt).await?;
+    // Termin, zu dem der Beleg vorbereitet war: mit dem Ausstellen erledigt (auch nach „Ohne Beleg“ – dann doch mit)
+    if let Some(t) = termin {
+        termine::mit_beleg_erledigen_in(tx, t, zeitpunkt).await?;
     }
 
     let mut neu_zeile = zeile_json(tx, "rechnungen", id).await?.unwrap_or_default();
@@ -1430,40 +1524,6 @@ async fn ausstellen_in(
         buchung_nummer: zahlung.map(|z| z.nummer),
         ..BelegErgebnis::default()
     })
-}
-
-/// Geplanten Termin als erledigt markieren (mit Protokoll); andere Status bleiben.
-async fn termin_erledigen(
-    tx: &mut SqliteConnection,
-    id: i64,
-    zeitpunkt: &str,
-) -> Result<(), String> {
-    let geaendert = sqlx::query(
-        "UPDATE termine SET status = 'erledigt', geaendert_am = ? WHERE id = ? AND status = 'geplant'",
-    )
-    .bind(zeitpunkt)
-    .bind(id)
-    .execute(&mut *tx)
-    .await
-    .map_err(db_fehler)?
-    .rows_affected();
-    if geaendert == 0 {
-        return Ok(());
-    }
-    let mut alt = Map::new();
-    alt.insert("status".into(), "geplant".into());
-    let mut neu = Map::new();
-    neu.insert("status".into(), "erledigt".into());
-    protokollieren(
-        tx,
-        zeitpunkt,
-        "termine",
-        id,
-        "geaendert",
-        Some(&alt),
-        Some(&neu),
-    )
-    .await
 }
 
 /* ---------- Status ---------- */
@@ -1507,12 +1567,16 @@ async fn status_setzen(
 }
 
 /// Offene Rechnung als bezahlt markieren: Einnahme am Tag des Zahlungseingangs (mit `rechnung_id`).
+/// Mit `termin` („Offene Rechnung zuordnen“ in der Erfassen-Schublade zum Termin) wird die Rechnung zum Beleg des
+/// Termins: Die Einnahme verweist auf ihn (die ausgestellte Rechnung selbst bleibt unverändert, GoBD), der Termin ist
+/// erledigt und sein vorbereiteter Entwurf wird verworfen.
 pub async fn bezahlt(
     conn: &mut SqliteConnection,
     id: i64,
     datum: &str,
     zahlungsart: &str,
     heute: &str,
+    termin: Option<i64>,
     zeitpunkt: &str,
 ) -> Result<BelegErgebnis, String> {
     datum_lesen("Zahlungseingang", datum)?;
@@ -1525,6 +1589,11 @@ pub async fn bezahlt(
         }
         if text(&alt, "status").as_deref() != Some("offen") {
             return Err(format!("Die Rechnung {nummer} ist nicht offen."));
+        }
+        // zu genau diesem Termin ausgestellt: der Termin hat seinen Beleg schon
+        let termin = termin.filter(|t| zahl(&alt, "termin_id") != Some(*t));
+        if let Some(t) = termin {
+            termine::abschluss_pruefen(tx, t).await?;
         }
         let positionen = positionen_lesen(tx, id).await?;
         let kategorie = einnahme_kategorie(tx, None, &positionen).await?;
@@ -1543,10 +1612,14 @@ pub async fn bezahlt(
             belegnummer: &nummer,
             beschreibung: &beschreibung,
             rechnung_id: id,
+            termin_id: termin,
         };
         let z = zahlung_buchen(tx, &neu, jahr_heute, zeitpunkt).await?;
         let (am, wie) = (Some(datum), Some(zahlungsart));
         status_setzen(tx, id, &alt, "bezahlt", am, wie, zeitpunkt).await?;
+        if let Some(t) = termin {
+            termine::abschliessen_in(tx, t, false, zeitpunkt).await?;
+        }
         Ok(BelegErgebnis {
             id,
             nummer: Some(nummer),
@@ -1997,7 +2070,7 @@ pub async fn beleg_ausstellen(
     self::ausstellen(&mut c, id, &daten, &ausstellen, &datenbank::zeitstempel()).await
 }
 
-/// Frontend: `invoke('beleg_bezahlt', { id, datum, zahlungsart, heute })`.
+/// Frontend: `invoke('beleg_bezahlt', { id, datum, zahlungsart, heute, termin })` (termin null = ohne Termin).
 #[tauri::command]
 pub async fn beleg_bezahlt(
     instanzen: tauri::State<'_, DbInstances>,
@@ -2005,6 +2078,7 @@ pub async fn beleg_bezahlt(
     datum: String,
     zahlungsart: String,
     heute: String,
+    termin: Option<i64>,
 ) -> Result<BelegErgebnis, String> {
     let mut c = verbindung(&instanzen).await?;
     bezahlt(
@@ -2013,6 +2087,7 @@ pub async fn beleg_bezahlt(
         &datum,
         &zahlungsart,
         &heute,
+        termin,
         &datenbank::zeitstempel(),
     )
     .await
@@ -2418,7 +2493,7 @@ mod tests {
             assert_eq!(s["dokument"]["quittiert"], Value::Null);
             assert_eq!(s["dokument"]["zahlungsweg"], Value::Null);
 
-            let b = bezahlt(&mut c, r.id, "2026-10-20", "bank", HEUTE, SPAETER)
+            let b = bezahlt(&mut c, r.id, "2026-10-20", "bank", HEUTE, None, SPAETER)
                 .await
                 .unwrap();
             assert_eq!(b.status, "bezahlt");
@@ -2426,7 +2501,7 @@ mod tests {
             let buchung = b.buchung_id.unwrap();
             let datum = spalte(&mut c, "buchungen", "zahlungsdatum", buchung).await;
             assert_eq!(datum.as_deref(), Some("2026-10-20"));
-            let f = bezahlt(&mut c, r.id, "2026-10-20", "bank", HEUTE, SPAETER)
+            let f = bezahlt(&mut c, r.id, "2026-10-20", "bank", HEUTE, None, SPAETER)
                 .await
                 .unwrap_err();
             assert!(f.contains("nicht offen"), "{f}");
@@ -2436,7 +2511,7 @@ mod tests {
             assert_eq!(o.gegenbuchung_nummer.as_deref(), Some("2026-0002"));
             assert_eq!(anzahl(&mut c, SALDO).await, 0);
             // noch einmal bezahlt: neue Einnahme, die alte bleibt storniert
-            let b2 = bezahlt(&mut c, r.id, "2026-10-21", "paypal", HEUTE, SPAETER)
+            let b2 = bezahlt(&mut c, r.id, "2026-10-21", "paypal", HEUTE, None, SPAETER)
                 .await
                 .unwrap();
             assert_eq!(b2.buchung_nummer.as_deref(), Some("2026-0003"));
@@ -2631,6 +2706,7 @@ mod tests {
                 beschreibung: "Rasen".into(),
                 heute: HEUTE.into(),
                 belege: vec![],
+                termin_id: None,
             };
             let b = buchungen::anlegen(&mut c, ohne, &einnahme, JETZT)
                 .await

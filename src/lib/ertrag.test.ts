@@ -19,7 +19,7 @@ import {
   type ErtragKontext,
 } from './ertrag';
 import type { Nummernkreis } from './numbering';
-import type { BelegZeile, KundeAnschrift } from './rechnungen';
+import { neuesFormular, type BelegFormular, type BelegZeile, type KundeAnschrift } from './rechnungen';
 import { BEISPIEL_FIRMA } from './vorlagen/beispiel';
 import { standardVorlage } from './vorlagen/standard';
 
@@ -203,5 +203,56 @@ describe('Beleg aus der Schublade', () => {
     );
     expect(maskenPfad('eigenbeleg', { betrag: null, datum: '', name: 'Aral', bezahlt: false })).toBe('/belege/neu?art=eigenbeleg&name=Aral');
     expect(maskenPfad('rechnung', { bezahlt: true })).toBe('/belege/neu?art=rechnung&bezahlt=1');
+  });
+});
+
+describe('zum Termin bzw. mit vorbereitetem Entwurf (§6.5)', () => {
+  const termin = { id: 5, datum: '2026-10-20' };
+  const entwurf = (x: Partial<BelegFormular> = {}): BelegFormular => ({
+    ...neuesFormular({ art: 'quittung', betrag: 6_000, datum: '2026-10-20', text: 'Rasen mähen' }, { heute: HEUTE, zielTage: {} }),
+    vorlageId: null,
+    terminId: 5,
+    ...x,
+  });
+  const zwei = entwurf({
+    positionen: [
+      { beschreibung: 'Rasen mähen', menge: '1', einheit: 'Std.', preis: '40,00', kategorieId: null },
+      { beschreibung: 'Grünschnitt', menge: '1', einheit: 'pausch.', preis: '20,00', kategorieId: null },
+    ],
+    mehrere: true,
+    schlusstext: 'Danke!',
+  });
+
+  it('nach einem Termin ist eine Rechnung zuerst „noch offen“', () => {
+    expect(ertragStart({ termin: 5 }, 'rechnung')).toMatchObject({ weg: 'beleg', bezahlt: false });
+    expect(ertragStart({ entwurf: 9, beleg: 'quittung' }, 'rechnung')).toMatchObject({ art: 'quittung', bezahlt: false });
+  });
+
+  it('Positionen und Texte des Entwurfs bleiben, solange der Betrag passt; Leistungsdatum = Termin', () => {
+    const f = belegFormular(formular(), ertrag(), 6_000, ctx, { termin, entwurf: zwei });
+    expect(f).toMatchObject({ art: 'quittung', kunde: 'Anna Schmidt · K-0001', datum: HEUTE, leistungVon: '2026-10-20', schlusstext: 'Danke!', terminId: 5, mehrere: true });
+    expect(f.positionen.map((p) => p.beschreibung)).toEqual(['Rasen mähen', 'Grünschnitt']);
+    // anderer Betrag ⇒ eine Position über den neuen Betrag
+    const g = belegFormular(formular({ betrag: '75,00' }), ertrag(), 7_500, ctx, { termin, entwurf: zwei });
+    expect(g.positionen).toHaveLength(1);
+    expect(g.positionen[0]).toMatchObject({ beschreibung: 'Rasen mähen', preis: '75,00' });
+    // eine Position: die Leistung aus der Schublade ersetzt nur deren Text
+    const e = belegFormular(formular(), ertrag({ leistung: 'Rasen mähen, 120 m²' }), 6_000, ctx, { termin, entwurf: entwurf() });
+    expect(e.positionen).toEqual([{ beschreibung: 'Rasen mähen, 120 m²', menge: '1', einheit: 'Stk.', preis: '60,00', kategorieId: null }]);
+  });
+
+  it('Art gewechselt: Rechnung mit deren Texten und Zahlungsziel, Entwurf wird ausgestellt', () => {
+    const r = belegFormular(formular(), ertrag({ art: 'rechnung', bezahlt: false }), 6_000, ctx, { termin, entwurf: zwei });
+    expect(r).toMatchObject({ art: 'rechnung', bezahltAm: null, zielTage: '14', terminId: 5, vorlageId: 7, mehrere: false });
+    expect(r.einleitung).toMatch(/vielen Dank für Ihren Auftrag/);
+    const v = belegVorbereiten(formular(), ertrag({ art: 'rechnung', bezahlt: false }), 6_000, ctx, { termin, entwurf: zwei });
+    expect(v.daten).toMatchObject({ art: 'rechnung', termin_id: 5, leistung_von: '2026-10-20', faellig_am: '2026-11-05', bezahlt_am: null });
+  });
+
+  it('zum Termin ohne Entwurf: neuer Beleg mit Termin', () => {
+    const v = belegVorbereiten(formular(), ertrag(), 6_000, ctx, { termin, entwurf: null });
+    expect(v.fehlt).toEqual([]);
+    expect(v.daten).toMatchObject({ art: 'quittung', termin_id: 5, leistung_von: '2026-10-20', datum: HEUTE });
+    expect(belegVorbereiten(formular(), ertrag(), 6_000, ctx).daten).toMatchObject({ termin_id: null, leistung_von: HEUTE });
   });
 });

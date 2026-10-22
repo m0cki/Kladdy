@@ -21,6 +21,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { alsEntwurfKopieren, angebotStatus, pdfOeffnenFuer, umwandeln } from '../../lib/belegaktionen';
+import { erfassen } from '../../lib/erfassen';
 import { ladeBeleg } from '../../lib/queries/rechnungen';
 import { STATUS_BADGE, istVorbereitet, statusMenue, statusSchluessel, type BelegZeile, type StatusAktion } from '../../lib/rechnungen';
 import { belegDialog } from './BelegDialog';
@@ -80,8 +81,11 @@ export function statusAktionAusfuehren(aktion: StatusAktion, z: BelegZeile, navi
       void angebotStatus(z, 'abgelehnt');
       break;
     case 'oeffnen':
-    case 'ausstellen':
       navigate(`/belege/${z.id}`);
+      break;
+    case 'ausstellen':
+      // vorbereiteter Beleg: ausgestellt wird nur über die eine Erfassen-Schublade (§6.5)
+      erfassen({ typ: 'einnahme', entwurf: z.id, termin: z.termin_id ?? undefined, beleg: z.art === 'rechnung' ? 'rechnung' : 'quittung' });
       break;
     case 'zum-termin':
       if (z.termin_id != null) navigate(`/termine?t=${z.termin_id}`);

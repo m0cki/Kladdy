@@ -48,6 +48,7 @@ import { setzeDropZiel } from '../lib/belegablage';
 import { ausgestellterBeleg, entwurfOeffnen, mailText, type Schnappschuss } from '../lib/belegpdf';
 import { ZAHLUNGSWEGE, kundenLabel, nameSchluessel, type KategorieWahl } from '../lib/buchungen';
 import { datenbankVerfuegbar } from '../lib/db';
+import { erfassen } from '../lib/erfassen';
 import { fehlerText } from '../lib/fehler';
 import type { Firma } from '../lib/firma';
 import { ibanFormat } from '../lib/firma';
@@ -455,6 +456,30 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
     }
   };
 
+  // Für einen Termin vorbereitet: Ausstellen nur über die eine Erfassen-Schublade (§6.5 – kein zweiter Ausstell-Weg).
+  // Ungespeicherte Änderungen am Entwurf werden vorher gespeichert; die Schublade liest ihn dann frisch.
+  const vorbereitet = editierbar && !!beleg && beleg.termin_id != null && (art === 'quittung' || art === 'rechnung');
+  const vorbereitetAusstellen = async () => {
+    if (!beleg || laeuft) return;
+    if (dirty) {
+      const d = daten();
+      if (!d) return;
+      setLaeuft(true);
+      try {
+        await belegEntwurfSpeichern(beleg.id, d);
+        arbeit = null;
+        setStart(formularSchluessel(form));
+        ui().datenGeaendert();
+      } catch (e) {
+        ui().showToast({ text: `Speichern ging nicht: ${fehlerText(e)}`, icon: 'warn', sticky: true });
+        return;
+      } finally {
+        setLaeuft(false);
+      }
+    }
+    erfassen({ typ: 'einnahme', entwurf: beleg.id, termin: beleg.termin_id ?? undefined, beleg: art === 'rechnung' ? 'rechnung' : 'quittung' });
+  };
+
   const drucken = async () => {
     if (!editierbar && beleg) return pdfOeffnenFuer(beleg.id);
     try {
@@ -658,7 +683,10 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
               <CalendarDays />
               <div>
                 <b>Vorbereitet für den Termin am {datumMitTag(beleg.termin_datum)}{beleg.termin_von ? ` · ${beleg.termin_von}` : ''}</b>
-                <span>Die Nummer{art === 'quittung' ? ' und die Einnahme entstehen' : ' entsteht'} erst beim Ausstellen.</span>
+                <span>
+                  Die Nummer{art === 'quittung' ? ' und die Einnahme entstehen' : ' entsteht'} erst beim Ausstellen
+                  {vorbereitet ? ` – über „${art === 'rechnung' ? 'Rechnung schreiben' : 'Quittung ausstellen'}“ (Erfassen), dabei wird der Termin abgehakt` : ''}.
+                </span>
               </div>
               <Link className="link" to={`/termine?t=${beleg.termin_id}`}>
                 Zum Termin
@@ -690,16 +718,29 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
                 <button type="button" className="btn subtle" title="Als Entwurf speichern (⌘S)" disabled={laeuft} onClick={() => void speichern()}>
                   Als Entwurf speichern
                 </button>
-                <button
-                  type="button"
-                  className="btn-primary sm"
-                  title={naechste ? `Nummer ${naechste} vergeben und festschreiben` : 'Nummer vergeben und festschreiben'}
-                  disabled={laeuft}
-                  onClick={() => void ausstellen()}
-                >
-                  {art === 'eigenbeleg' ? <Stamp /> : <Lock />}
-                  {art === 'quittung' || (art === 'rechnung' && form.bezahltAm) ? 'Finalisieren & buchen' : art === 'eigenbeleg' ? 'Buchen' : 'Finalisieren'}
-                </button>
+                {vorbereitet ? (
+                  <button
+                    type="button"
+                    className="btn-primary sm"
+                    title="Öffnet „Erfassen“: Nummer vergeben, Einnahme buchen bzw. Rechnung offen lassen, Termin abhaken"
+                    disabled={laeuft}
+                    onClick={() => void vorbereitetAusstellen()}
+                  >
+                    {art === 'rechnung' ? <FileText /> : <Receipt />}
+                    {art === 'rechnung' ? 'Rechnung schreiben' : 'Quittung ausstellen'}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn-primary sm"
+                    title={naechste ? `Nummer ${naechste} vergeben und festschreiben` : 'Nummer vergeben und festschreiben'}
+                    disabled={laeuft}
+                    onClick={() => void ausstellen()}
+                  >
+                    {art === 'eigenbeleg' ? <Stamp /> : <Lock />}
+                    {art === 'quittung' || (art === 'rechnung' && form.bezahltAm) ? 'Finalisieren & buchen' : art === 'eigenbeleg' ? 'Buchen' : 'Finalisieren'}
+                  </button>
+                )}
               </>
             ) : beleg && zeile ? (
               <AusgestelltAktionen beleg={beleg} zeile={zeile} mailen={() => void mailen()} />

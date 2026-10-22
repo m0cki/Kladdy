@@ -3,8 +3,8 @@
  * die ersten vier Befehle und „Springen zu“ (die fünf Menüpunkte). Tastatur: ↑ ↓ wählen, ↵ öffnen, Esc schließen.
  * Die Daten werden beim Öffnen einmal geladen (lib/queries/suche.ts), solange die Liste offen ist wiederverwendet und
  * beim nächsten Öffnen frisch geholt; ein Fehler leert nur die betroffene Quelle. Logik: lib/suche.ts, lib/suche-daten.ts.
- * Quittung/Rechnung schreiben öffnen bis Phase 3 die Erfassen-Schublade als Einnahme (Vorbelegung kennt noch keinen
- * Beleg); Termin, Angebot und Eigenbeleg führen zu ihren Seiten, die das ab Phase 3 auswerten. */
+ * Quittung/Rechnung schreiben öffnen die Erfassen-Schublade mit vorgewähltem Beleg; „Termin eintragen“ öffnet die
+ * Termin-Schublade über /termine?neu=1, Angebot und Eigenbeleg die Beleg-Maske. */
 import { forwardRef, useEffect, useMemo, useState, type ForwardedRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -106,7 +106,7 @@ const BEFEHLE: Ziel[] = [
   // Quittung und Rechnung: dieselbe Erfassen-Schublade, Beleg vorgewählt (Beleg und Einnahme in einem Schritt)
   befehl('quittung', 'Quittung schreiben', 'Einnahme mit Quittung erfassen · nächste Nummer', Receipt, () => erfassen({ typ: 'einnahme', beleg: 'quittung' }), ['Beleg', 'Neu']),
   befehl('rechnung', 'Rechnung schreiben', 'Einnahme mit Rechnung – bezahlt oder offen', ReceiptText, () => erfassen({ typ: 'einnahme', beleg: 'rechnung' }), ['Beleg', 'Neu']),
-  befehl('termin', 'Termin eintragen', 'Kundentermin, auf Wunsch mit vorbereiteter Quittung · kommt mit Phase 3', CalendarPlus, go('/termine?neu=1'), ['Neu', 'Kalender']),
+  befehl('termin', 'Termin eintragen', 'Kundentermin, auf Wunsch mit vorbereiteter Quittung', CalendarPlus, go('/termine?neu=1'), ['Neu', 'Kalender']),
   befehl('angebot', 'Angebot schreiben', 'Angebot an einen Kunden – noch keine Einnahme', FileText, go('/belege/neu?art=angebot'), ['Beleg', 'Neu']),
   befehl('eigenbeleg', 'Eigenbeleg erstellen', 'Wenn der Originalbeleg einer Ausgabe fehlt', Stamp, go('/belege/neu?art=eigenbeleg'), ['Beleg', 'Neu']),
   befehl('vorlagen', 'Vorlagen bearbeiten', 'Quittung & Rechnung aus Bausteinen gestalten', Blocks, go('/belege/vorlagen'), ['Baukasten', 'Layout']),

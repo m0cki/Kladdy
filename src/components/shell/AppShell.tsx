@@ -18,6 +18,7 @@ import { Topbar } from './Topbar';
 import { UpdateNotesDrawer } from './UpdateNotesDrawer';
 import { ErfassenSchublade } from '../erfassen/ErfassenSchublade';
 import { KundeSchublade } from '../kunden/KundeSchublade';
+import { TerminSchublade } from '../termine/TerminSchublade';
 import { BelegDropOverlay } from '../belege/BelegDropOverlay';
 import { BelegDialog } from '../belege/BelegDialog';
 
@@ -103,6 +104,7 @@ export function AppShell() {
       <UpdateNotesDrawer />
       <ErfassenSchublade />
       <KundeSchublade />
+      <TerminSchublade />
       <BelegDialog />
       <BelegDropOverlay />
       <Toasts />
