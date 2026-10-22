@@ -132,10 +132,12 @@ pub fn run() {
     let builder = builder.plugin(demo::modus_plugin());
     builder
         // Datenbank (§5): erst sichern, dann darf das SQL-Plugin migrieren – Reihenfolge nicht vertauschen.
+        // Scheitert die Sicherung, bleibt die Datei zu (`datenbank_url`); die Meldung liefert `sicherung_status`.
         .plugin(datenbank::sicherungs_plugin())
         .plugin(datenbank::sql_plugin())
         .invoke_handler(tauri::generate_handler![
             datenbank::datenbank_url,
+            datenbank::sicherung_status,
             ist_entwicklerversion,
             buchungen::buchung_anlegen,
             buchungen::buchung_aendern,

@@ -1932,8 +1932,7 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
   (scharf, wie in der Vorschau); Rechnung ausstellen, danach Logo wechseln bzw. zurücksetzen ⇒ die ausgestellte Rechnung
   zeigt in der Maske weiter das alte Logo, neue Belege das neue; „Zurücksetzen“ ⇒ App-Symbol, „Rückgängig“ holt das Logo
   zurück; Einträge `firmenlogo` im Protokoll; im Demo-Modus eigenes Logo, „Demo-Daten entfernen“ räumt es weg.
-- **Offen aus Phase 1 (Teil 1+2):** sichtbare Fehlermeldung statt stillem Abbruch, wenn die Sicherung vor einer
-  Migration fehlschlägt, Regelbesteuerung wirkt noch nicht auf Buchungen/Belege.
+- **Offen aus Phase 1 (Teil 1+2):** Regelbesteuerung wirkt noch nicht auf Buchungen/Belege.
 - **Aus Phase 1 nachgeholt:** Kategorien bearbeiten, optionale Kategorien und EÜR-Zuordnung pro Jahr – **erledigt (Branch
   `kategorien-euer`, auf dem Ende der Phase-3-Kette)**: Migration `0008_kategorien` (Katalog Abschreibungen (AfA), Bewirtung 70 %, Geschenke, Homeoffice,
   ausgeblendet = `archiviert = 1` wie vom Nutzer Ausgeblendetes, kein eigenes Katalog-Kennzeichen; Tabelle
@@ -1958,6 +1957,10 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
 - **Installation per Terminal** statt Download-Seite (eigener kleiner PR): `README.md` mit Befehl,
   `scripts/installieren.sh` (§3.2). Die Download-Seite (GitHub Pages) ist nach Phase 7 verschoben (optional,
   vielleicht später).
+- **Sicherung vor Migration: Fehler sichtbar** (eigener kleiner PR, aus „Offen aus Phase 1“): Statt still abzubrechen
+  startet die App, öffnet die Datenbank aber nicht (`datenbank_url` verweigert sie ⇒ keine Migration ohne Sicherung) und
+  zeigt die Meldung aus `sicherung_status` (Schritt, Pfad, Systemfehler, was tun, Ort der Datenbank) als bleibenden
+  Toast mit „Neu starten“ und als Ladefehler auf den Seiten.
 
 ### Phase 0 – Grundgerüst & Design
 > Setze Phase 0 aus `ANLEITUNG.md` um: `git init`; Tauri-2-Projekt mit React + TypeScript + Vite (`npm create tauri-app@latest`);

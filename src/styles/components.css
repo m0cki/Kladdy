@@ -421,7 +421,7 @@ input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 7px; }
 .drop-card small { color: var(--muted); font-size: .84rem; }
 
 /* Leerer Zustand */
-.empty { display: grid; place-items: center; gap: 10px; padding: 44px 16px; color: var(--muted); text-align: center; font-size: .88rem; }
+.empty { display: grid; place-items: center; gap: 10px; padding: 44px 16px; color: var(--muted); text-align: center; font-size: .88rem; overflow-wrap: anywhere; }
 .empty > .ic { width: 32px; height: 32px; color: var(--accent); }
 .empty b { color: var(--text); font-size: 1rem; }
 
@@ -505,7 +505,7 @@ input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 7px; }
 .toast.out { opacity: 0; transform: translateY(8px); transition: opacity .3s, transform .3s; }
 .toast[data-icon="info"] .ic, .toast[data-icon="download"] .ic { color: var(--bg); }
 .toast[data-icon="warn"] .ic { color: var(--warn); }
-.toast > span:not(.toast-prog) { max-width: 52ch; }
+.toast > span:not(.toast-prog) { max-width: 52ch; overflow-wrap: anywhere; }
 .toast .toast-x { display: inline-grid; place-items: center; padding: 4px; background: transparent; opacity: .7; }
 .toast .toast-x:hover { opacity: 1; }
 .toast .toast-x .ic { width: 14px; height: 14px; color: var(--bg); }

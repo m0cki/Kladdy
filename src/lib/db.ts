@@ -1,6 +1,9 @@
 /* Datenbank-Zugriff (ANLEITUNG §3, §5) über @tauri-apps/plugin-sql.
  * - Welche Datei geöffnet wird, entscheidet allein Rust (src-tauri/src/datenbank.rs, Command `datenbank_url`):
  *   Release „kladdy.db“, Debug „kladdy-dev.db“, beide im App-Verzeichnis. Beim ersten Öffnen laufen die Migrationen.
+ * - Ist die Sicherung vor diesen Migrationen beim Start fehlgeschlagen, liefert `datenbank_url` statt der URL die
+ *   Meldung: Die Datei bleibt zu (nichts wird ohne Sicherung migriert), Seiten zeigen die Meldung als Ladefehler,
+ *   AppShell zusätzlich als bleibenden Toast (`sicherungsFehler`).
  * - Platzhalter in SQL: $1, $2, … (SQLite-Syntax des Plugins).
  * - Das Plugin bindet JS-Zahlen als Float (REAL). In INTEGER-Spalten speichert SQLite ganzzahlige Werte trotzdem als
  *   INTEGER, und Geld ist bei uns immer ganzzahlig (money.ts). Für TEXT-Spalten deshalb Strings übergeben, nie Zahlen
@@ -34,6 +37,10 @@ export function zeitstempel(d: Date = new Date()): string {
 
 /** Gibt es hier eine Datenbank? Nein im Browser (npm run dev): Seiten zeigen dann einen Hinweis statt Daten. */
 export const datenbankVerfuegbar = (): boolean => isTauri();
+
+/** Meldung aus Rust, wenn die Sicherung vor Migrationen beim Start fehlgeschlagen ist (was, wo, was tun), sonst null. */
+export const sicherungsFehler = (): Promise<string | null> =>
+  isTauri() ? invoke<string | null>('sicherung_status') : Promise.resolve(null);
 
 /**
  * Schreibvorgänge nacheinander ausführen (eine gemeinsame Warteschlange). Ersetzt keine Transaktion, verhindert aber,
