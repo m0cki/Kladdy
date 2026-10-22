@@ -15,6 +15,7 @@
   --akz: color-mix(in oklab, var(--accent) 86%, #000);
   --ink: #16181d; --grau: #6b7280; --haar: #d5d8de; --papier: #fff;
   --leer: #9ca3af; --marke: #a3a8b1; --strich: #c4c8cf; --slot: #c7cad1; --slot-text: #a0a5ae; --kasten: #f3f4f6;
+  --qr: #111111; /* GiroCode-Module, wie girocode.png im PDF (lib/girocode/png.ts) */
   --wm: rgb(17 24 39 / .055); --wm-rand: rgb(17 24 39 / .05); --wm-storno: rgb(220 38 38 / .13); --wm-storno-rand: rgb(220 38 38 / .11);
   position: relative; box-sizing: border-box; display: flex; flex-direction: column;
   width: 210mm; min-height: 297mm; padding: 18mm 20mm 10mm 22mm; overflow: hidden;
@@ -99,15 +100,20 @@
 .sheet .blk-positionen + .blk-summe { margin-top: 0; }
 .sheet .blk-positionen + .blk-summe .blk-summe-row { border-top: 0; }
 .sheet .blk-summe + .blk { margin-top: 5mm; }
-/* Zahlung (GiroCode folgt mit Phase 3 Teil 6) */
+/* Zahlung & GiroCode (ohne Bankverbindung schiebt .blk-pay-sp den Code nach rechts) */
 .sheet .blk-zahlung { break-inside: avoid; }
 .sheet .blk-pay { display: flex; align-items: center; gap: 6mm; margin-top: 3mm; }
 .sheet .blk-pay.box { padding: 3.5mm 4.5mm; border-radius: 2.5mm; background: var(--kasten); }
+.sheet .blk-pay-sp { flex: 1; }
 .sheet .blk-bank { flex: 1; min-width: 0; font-size: 8.5pt; }
 .sheet .blk-bank > b { display: block; margin-bottom: 1.2mm; font-size: 9pt; }
 .sheet .blk-bank dl { display: grid; grid-template-columns: max-content 1fr; gap: .6mm 5mm; }
 .sheet .blk-bank dt { color: var(--grau); }
 .sheet .blk-iban { letter-spacing: .02em; white-space: nowrap; }
+.sheet .blk-qr { display: flex; flex-direction: column; align-items: center; gap: 1.2mm; flex: none; }
+.sheet .blk-qr-code { box-sizing: content-box; padding: 2mm; border-radius: 1.2mm; background: var(--papier); color: var(--qr); }
+.sheet .blk-qr-code svg { display: block; width: 100%; height: 100%; }
+.sheet .blk-qr figcaption { font-size: 6.5pt; line-height: 1.3; color: var(--grau); text-align: center; }
 /* Quittung / Eigenbeleg */
 .sheet .blk-titel + .blk-quittung_felder, .sheet .blk-titel + .blk-eigenbeleg_felder { margin-top: 3.5mm; }
 .sheet .blk-sub { margin: -1mm 0 3mm; font-size: 8pt; color: var(--grau); }
