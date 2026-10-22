@@ -10,8 +10,9 @@
 //! - Migrationen laufen beim ersten `Database.load` aus dem Frontend, nur vorwärts, jede in einer Transaktion.
 //!   sqlx merkt sich je Version eine Prüfsumme: ausgelieferte Dateien NIE ändern, sondern eine neue anhängen.
 //! - Vorher (§3.2 „vorher Backup“): Hat eine vorhandene Datenbank noch offene Migrationen, legt das Plugin
-//!   `db-sicherung` beim Start eine Kopie per `VACUUM INTO` an. Schlägt das fehl, startet die App nicht
-//!   (lieber kein Start als eine Migration ohne Sicherung).
+//!   `db-sicherung` beim Start eine Kopie per `VACUUM INTO` an. Schlägt das fehl, startet die App trotzdem, öffnet
+//!   die Datei aber nicht (lieber keine Daten als eine Migration ohne Sicherung): `SicherungsStatus` merkt sich die
+//!   Meldung, `datenbank_url` gibt die Datei nicht heraus, `sicherung_status` liefert die Meldung fürs Frontend.
 
 #[cfg(any(test, debug_assertions))]
 use std::future::Future;
@@ -106,11 +107,32 @@ pub fn db_url() -> String {
     url_zu(DB_DATEI)
 }
 
+/// Ergebnis der Sicherung vor Migrationen beim Start (Tauri-State, angelegt von `sicherungs_plugin`).
+/// `Some(meldung)`: fehlgeschlagen, die echte Datei bleibt in diesem Programmlauf zu (`url_freigeben`).
+#[derive(Debug)]
+pub struct SicherungsStatus(pub Option<String>);
+
 /// Für das Frontend (src/lib/db.ts): welche Datenbank geladen wird. Muss exakt der URL entsprechen,
-/// unter der die Migrationen registriert sind.
+/// unter der die Migrationen registriert sind. Nach fehlgeschlagener Sicherung kommt die Meldung statt der URL.
 #[tauri::command]
-pub fn datenbank_url() -> String {
-    db_url()
+pub fn datenbank_url(status: tauri::State<'_, SicherungsStatus>) -> Result<String, String> {
+    url_freigeben(db_url(), status.0.as_deref())
+}
+
+/// Für das Frontend (src/lib/db.ts): Meldung, wenn die Sicherung vor Migrationen beim Start fehlgeschlagen ist.
+#[tauri::command]
+pub fn sicherung_status(status: tauri::State<'_, SicherungsStatus>) -> Option<String> {
+    status.0.clone()
+}
+
+/// Darf das Frontend `url` laden? Das SQL-Plugin migriert beim ersten Laden; ist die Sicherung fehlgeschlagen,
+/// bleibt die echte Datei (`DB_DATEI`) deshalb zu, bis ein Neustart sie sichern kann. Die Demo-Datei (nur Debug)
+/// wird nie gesichert (siehe `sicherungs_plugin`) und bleibt erreichbar.
+fn url_freigeben(url: String, sicherungs_fehler: Option<&str>) -> Result<String, String> {
+    match sicherungs_fehler {
+        Some(meldung) if url == url_zu(DB_DATEI) => Err(meldung.to_string()),
+        _ => Ok(url),
+    }
 }
 
 fn plugin_migrationen() -> Vec<Migration> {
@@ -170,6 +192,8 @@ impl MigrationSource<'static> for MigrationsQuelle {
 /// Gesichert wird immer die echte Datei `DB_DATEI`, auch im Demo-Modus: Sie wird dann erst nach dem Entfernen der
 /// Demo-Daten (oder beim nächsten Start) geladen und migriert, und bis dahin sichert jeder Start erneut, solange
 /// Migrationen offen sind. Die Demo-Datei braucht keine Sicherung (wird frisch angelegt, siehe src/demo.rs).
+/// Schlägt die Sicherung fehl, startet die App trotzdem (ein Fehler hier hieße: stiller Abbruch ohne Fenster).
+/// `SicherungsStatus` hält dann die Meldung, und die Datei wird weder geöffnet noch migriert.
 pub fn sicherungs_plugin<R: Runtime>() -> TauriPlugin<R> {
     PluginBuilder::new("db-sicherung")
         .setup(|app, _api| {
@@ -177,17 +201,39 @@ pub fn sicherungs_plugin<R: Runtime>() -> TauriPlugin<R> {
             let db = ordner.join(DB_DATEI);
             let ziel = ordner.join(SICHERUNGS_ORDNER);
             let versionen: Vec<i64> = MIGRATIONEN.iter().map(|m| m.version).collect();
-            match sichern_vor_migration(&db, &ziel, &versionen, jetzt_sekunden()) {
-                Ok(Some(kopie)) => eprintln!("Sicherung vor Migration: {}", kopie.display()),
-                Ok(None) => {}
-                Err(e) => {
-                    eprintln!("Sicherung vor Migration fehlgeschlagen: {e}");
-                    return Err(e.into());
-                }
-            }
+            let fehler = sicherung_beim_start(&db, &ziel, &versionen, jetzt_sekunden());
+            app.manage(SicherungsStatus(fehler));
             Ok(())
         })
         .build()
+}
+
+/// Sicherung beim Start: `None`, wenn gesichert wurde oder nichts zu sichern war, sonst die Meldung fürs Frontend.
+fn sicherung_beim_start(db: &Path, ziel: &Path, bekannt: &[i64], sekunden: u64) -> Option<String> {
+    match sichern_vor_migration(db, ziel, bekannt, sekunden) {
+        Ok(Some(kopie)) => {
+            eprintln!("Sicherung vor Migration: {}", kopie.display());
+            None
+        }
+        Ok(None) => None,
+        Err(e) => {
+            eprintln!("Sicherung vor Migration fehlgeschlagen: {e}");
+            Some(sicherungs_meldung(db, &e))
+        }
+    }
+}
+
+/// Meldung, wenn die Sicherung vor Migrationen fehlschlägt: was passiert ist, was zu tun ist und wo die Datenbank
+/// liegt. `fehler` (aus `sichern_vor_migration`) nennt den Schritt, den Pfad und den Fehler des Systems.
+fn sicherungs_meldung(db: &Path, fehler: &str) -> String {
+    let ordner = db.parent().unwrap_or(db).display();
+    let datei = db.display();
+    format!(
+        "Sicherung vor dem Datenbank-Update fehlgeschlagen: {fehler}. Damit nichts ungesichert \
+         umgestellt wird, hat Kladdy die Datenbank nicht geöffnet – deine Daten sind unverändert. \
+         Bitte Speicherplatz freigeben und die Schreibrechte für den Ordner {ordner} prüfen, dann \
+         Kladdy neu starten. Datenbank: {datei}"
+    )
 }
 
 /// Die geladene Datenbank des SQL-Plugins (Schlüssel = URL aus `db_url()`, wie im Frontend geladen).
@@ -274,6 +320,7 @@ pub fn sicherungs_name(db_datei: &str, erste_offene: i64, sekunden: u64) -> Stri
 /// Legt eine Kopie von `db` in `ordner` an, wenn die Datei existiert, nicht leer ist und noch Migrationen
 /// aus `bekannt` offen sind. Gibt den Pfad der Kopie zurück, sonst `None`.
 /// `VACUUM INTO` statt Dateikopie: liefert einen konsistenten Stand, auch wenn noch ein Journal herumliegt.
+/// Fehler nennen den Schritt, den Pfad und den Fehler des Systems (für `sicherungs_meldung`).
 pub fn sichern_vor_migration(
     db: &Path,
     ordner: &Path,
@@ -283,7 +330,7 @@ pub fn sichern_vor_migration(
     let groesse = match std::fs::metadata(db) {
         Ok(m) => m.len(),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(e) => return Err(format!("{}: {e}", db.display())),
+        Err(e) => return Err(format!("Datenbank lesen ({}): {e}", db.display())),
     };
     if groesse == 0 {
         return Ok(None);
@@ -294,7 +341,7 @@ pub fn sichern_vor_migration(
             .create_if_missing(false)
             .connect()
             .await
-            .map_err(|e| format!("Datenbank öffnen: {e}"))?;
+            .map_err(|e| format!("Datenbank öffnen ({}): {e}", db.display()))?;
         let ergebnis = sichern_mit(&mut verbindung, db, ordner, bekannt, sekunden).await;
         let _ = verbindung.close().await;
         ergebnis
@@ -326,7 +373,8 @@ async fn sichern_mit(
     let Some(&erste) = offen.first() else {
         return Ok(None);
     };
-    std::fs::create_dir_all(ordner).map_err(|e| format!("{}: {e}", ordner.display()))?;
+    std::fs::create_dir_all(ordner)
+        .map_err(|e| format!("Ordner anlegen ({}): {e}", ordner.display()))?;
     let name = db.file_name().and_then(|n| n.to_str()).unwrap_or(DB_DATEI);
     let ziel = ordner.join(sicherungs_name(name, erste, sekunden));
     let ziel_text = ziel
@@ -336,7 +384,7 @@ async fn sichern_mit(
         .bind(ziel_text)
         .execute(&mut *verbindung)
         .await
-        .map_err(|e| format!("Sicherung nach {}: {e}", ziel.display()))?;
+        .map_err(|e| format!("Kopie schreiben ({}): {e}", ziel.display()))?;
     Ok(Some(ziel))
 }
 
@@ -1048,6 +1096,61 @@ mod tests {
         assert!(erste.is_some());
         // gleicher Zeitstempel ⇒ VACUUM INTO verweigert, statt die Kopie zu ersetzen
         assert!(sichern_vor_migration(&db, &ziel, &versionen(), 5).is_err());
+        let _ = std::fs::remove_dir_all(&ordner);
+    }
+
+    #[test]
+    fn echte_datei_nur_nach_sicherung_freigeben() {
+        let echt = url_zu(DB_DATEI);
+        assert_eq!(url_freigeben(echt.clone(), None), Ok(echt.clone()));
+        assert_eq!(url_freigeben(echt, Some("kaputt")), Err("kaputt".into()));
+        // andere Dateien (die Demo-Datei im Debug-Build) werden nicht gesichert und bleiben erreichbar
+        let andere = "sqlite:andere.db".to_string();
+        assert_eq!(url_freigeben(andere.clone(), Some("kaputt")), Ok(andere));
+    }
+
+    /// Statt still abzubrechen startet die App mit Meldung; die echte Datei gibt `datenbank_url` dann nicht heraus,
+    /// ohne Laden migriert das SQL-Plugin nicht. Nach einem Neustart mit genug Platz geht es normal weiter.
+    #[test]
+    fn fehlgeschlagene_sicherung_sperrt_die_datenbank() {
+        let ordner = testordner("sicherung-fehlt");
+        let db = ordner.join(DB_DATEI);
+        // Ziel unter einer Datei statt in einem Ordner: Anlegen scheitert (wie bei fehlenden Schreibrechten)
+        let sperre = ordner.join("kein-ordner");
+        std::fs::write(&sperre, b"x").unwrap();
+        let ziel = sperre.join("sicherungen");
+        tauri::async_runtime::block_on(migrieren(&db, 1));
+
+        let meldung = sicherung_beim_start(&db, &ziel, &versionen(), 0).unwrap();
+        let teile = [
+            format!("fehlgeschlagen: Ordner anlegen ({}): ", ziel.display()),
+            "os error".to_string(),
+            "Speicherplatz freigeben".to_string(),
+            format!("Schreibrechte für den Ordner {} prüfen", ordner.display()),
+            "Kladdy neu starten".to_string(),
+            format!("Datenbank: {}", db.display()),
+        ];
+        for teil in &teile {
+            assert!(meldung.contains(teil), "„{teil}“ fehlt in: {meldung}");
+        }
+        assert_eq!(
+            url_freigeben(url_zu(DB_DATEI), Some(meldung.as_str())),
+            Err(meldung.clone())
+        );
+        tauri::async_runtime::block_on(async {
+            let mut c = verbinden(&db).await;
+            let stand: i64 = sqlx::query_scalar("SELECT max(version) FROM _sqlx_migrations")
+                .fetch_one(&mut c)
+                .await
+                .unwrap();
+            assert_eq!(stand, 1, "ohne Sicherung keine Migration");
+            c.close().await.unwrap();
+        });
+
+        // Platz geschaffen, neu gestartet: jetzt wird gesichert, keine Meldung mehr
+        std::fs::remove_file(&sperre).unwrap();
+        assert_eq!(sicherung_beim_start(&db, &ziel, &versionen(), 0), None);
+        assert!(ziel.join(sicherungs_name(DB_DATEI, 2, 0)).is_file());
         let _ = std::fs::remove_dir_all(&ordner);
     }
 

@@ -1,10 +1,13 @@
-/* App-Rahmen: Aurora, Seitenleiste, Kopfzeile, Inhalt, Schubladen, Toasts, Update-Prüfung beim Start.
+/* App-Rahmen: Aurora, Seitenleiste, Kopfzeile, Inhalt, Schubladen, Toasts, beim Start Update-Prüfung
+ * und Meldung, wenn die Sicherung vor einem Datenbank-Update fehlgeschlagen ist.
  * Datei-Drop aufs Fenster: lib/belegablage.ts (Overlay „Beleg hier ablegen“).
  * Globale Kürzel: In der Mac-App gehören ⌘N, ⌘O, ⇧⌘L und ⌘\ dem nativen Menü (Events über lib/menu.ts);
  * im Browser (npm run dev) übernimmt sie der Tastatur-Handler hier. ⌘K (Suche) ist immer Sache der Oberfläche. */
 import { useEffect, useRef } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { relaunch } from '@tauri-apps/plugin-process';
 import { watchBelegDrop } from '../../lib/belegablage';
+import { sicherungsFehler } from '../../lib/db';
 import { demoStatusLaden } from '../../lib/demo';
 import { runCommand } from '../../lib/commands';
 import { watchFenster } from '../../lib/fenster';
@@ -41,6 +44,21 @@ export function AppShell() {
   useEffect(() => watchBelegDrop(), []);
   // Update-Prüfung beim Start: höchstens einmal am Tag, nur wenn eingeschaltet (§3.2)
   useEffect(() => autoCheckOnStart(), []);
+  // Sicherung vor einem Datenbank-Update fehlgeschlagen? Die Datenbank bleibt dann zu (§5) – Toast bleibt stehen
+  useEffect(() => {
+    void sicherungsFehler()
+      .then((text) => {
+        if (!text) return;
+        useUi.getState().showToast({
+          key: 'sicherung',
+          text,
+          icon: 'warn',
+          sticky: true,
+          actions: [{ label: 'Neu starten', run: () => void relaunch().catch((e: unknown) => console.error('Neustart fehlgeschlagen', e)) }],
+        });
+      })
+      .catch(() => undefined);
+  }, []);
   // Nur Entwicklerversion: Ist die Demo-Datenbank offen? (Hinweis in der Kopfzeile)
   useEffect(() => {
     if (import.meta.env.DEV) void demoStatusLaden().catch(() => undefined);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { datenbank, datenbankVerfuegbar, nacheinander, sqlWert, sqlWerte, zeitstempel } from './db';
+import { datenbank, datenbankVerfuegbar, nacheinander, sicherungsFehler, sqlWert, sqlWerte, zeitstempel } from './db';
 
 describe('sqlWert', () => {
   it('wandelt Wahrheitswerte und undefined', () => {
@@ -38,6 +38,10 @@ describe('datenbank', () => {
   it('außerhalb der App mit klarer Meldung abgelehnt', async () => {
     await expect(datenbank()).rejects.toThrow(/nur in der App/);
     expect(datenbankVerfuegbar()).toBe(false);
+  });
+
+  it('außerhalb der App gibt es keine Sicherung und keine Meldung dazu', async () => {
+    await expect(sicherungsFehler()).resolves.toBeNull();
   });
 });
 
