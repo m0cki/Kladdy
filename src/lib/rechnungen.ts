@@ -9,7 +9,6 @@ import { formatBetrag, parseBetrag } from './money';
 import type { UstModus } from './queries/einstellungen';
 import { normalize } from './suche';
 import {
-  ARTEN,
   EIGENBELEG_GRUENDE,
   STANDARD_TEXTE,
   belegSumme,

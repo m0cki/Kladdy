@@ -65,7 +65,6 @@ Kleine, risikoarme Dinge, die kein eigenes Issue mehr brauchen:
 | Was | Wo | Warum |
 |---|---|---|
 | **Migration 0009:** Trigger schützen `protokoll` (nie löschen; nur `alt_json`/`neu_json` änderbar – für die spätere Anonymisierung) und `festschreibungen` (nie löschen, nie ändern) | `src-tauri/migrations/0009_protokoll_schutz.sql`, registriert in `datenbank.rs`, Test `trigger_schuetzen_protokoll_und_festschreibungen` | Die Buchungs-Trigger aus 0004 bauen auf `max(bis_datum)` auf; ein `DELETE FROM festschreibungen` hätte alle festgeschriebenen Buchungen wieder änderbar gemacht. Das Protokoll war nicht append-only. |
-| pdf.js: `isEvalSupported: false` | `src/lib/erkennung/pdftext.ts` | PostScript-Funktionen in fremden PDFs nie über `new Function` auswerten. |
 | Updater: Toast „Sicherung vor dem Update …“ entfernt | `src/lib/updates.ts` | Die Funktion dahinter war leer – der Nutzer bekam eine Sicherung angezeigt, die es nicht gab. Das TODO für Phase 5 steht jetzt an der Stelle, an der die Sicherung hinkommt. |
 | Tote Exporte entfernt: `artLabel`, `istErtragsArt`, `ladeTectonicPfad`, `pfadAusWert`, `MAX_BELEG_BYTES` | `src/lib/rechnungen.ts`, `ertrag.ts`, `tectonic.ts`, `belege.ts` | Nirgends referenziert (auch nicht in Tests); `noUnusedLocals` fängt Exporte nicht. |
 | Wöchentlicher Abhängigkeits-Audit (`npm audit --audit-level=high`, `cargo audit`) | `.github/workflows/audit.yml` | Läuft montags und von Hand, blockiert keine PRs, legt keine Issues an. Ein roter Lauf heißt: Update einplanen. |
@@ -568,7 +567,6 @@ I-63–I-65.
 
 - CI grün (Typecheck, Vitest, Build, `cargo fmt/clippy/test` – der Rust-Job läuft, weil `src-tauri/` geändert ist).
 - App startet; beim ersten Start wird vor Migration 0009 eine Sicherung angelegt (`sicherungen/vor-migration`).
-- Beleg-Drop mit einem PDF erkennt Betrag/Datum weiterhin (pdf.js mit `isEvalSupported: false`).
 - Einstellungen › Updates: „Jetzt aktualisieren“ zeigt direkt „Version … wird geladen …“, keine „Sicherung …“-Meldung mehr.
 - Von Hand in der Dev-DB (`sqlite3 kladdy-dev.db`): `DELETE FROM protokoll;` ⇒ Fehler „Das Protokoll wird nie
   gelöscht (GoBD).“; `UPDATE festschreibungen SET bis_datum='2000-01-01';` ⇒ Fehler.
