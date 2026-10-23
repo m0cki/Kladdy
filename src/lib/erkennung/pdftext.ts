@@ -65,6 +65,8 @@ async function seitenLesen(pdfjs: PdfJs, daten: Uint8Array, maxSeiten: number, a
     disableFontFace: true,
     useSystemFonts: false,
     useWasm: false,
+    // PostScript-Funktionen nie über new Function auswerten – die Datei kommt von außen
+    isEvalSupported: false,
     stopAtErrors: false,
     verbosity: pdfjs.VerbosityLevel.ERRORS,
   });

@@ -802,9 +802,6 @@ export function betragSetzen(f: BelegFormular, eingabe: string): BelegFormular {
 /** Summe des Formulars in Cent (Vorschau, Hinweise). */
 export const formularSumme = (f: BelegFormular): number => belegSumme({ positionen: positionenAus(f) });
 
-/** Nächste Nummer für die Anzeige „wird RE-2026-015“ (vergeben wird nur in Rust). */
-export const artLabel = (art: Belegart): string => ARTEN[art].label;
-
 /** Ausgestellter Beleg ⇒ Formular, nur zum Anzeigen in der gesperrten Maske (so steht es auf dem Beleg). */
 export function formularAusDokument(d: BelegDokument, extra: { vorlageId: number | null; terminId: number | null }): BelegFormular {
   const k = d.kunde;

@@ -32,8 +32,6 @@ import { istDatum } from './zeitraum';
 export type Ertragsweg = 'beleg' | 'offen' | 'ohne';
 export type ErtragsArt = 'quittung' | 'rechnung';
 
-export const istErtragsArt = (x: unknown): x is ErtragsArt => x === 'quittung' || x === 'rechnung';
-
 export interface Ertrag {
   weg: Ertragsweg;
   /** Art des eigenen Belegs (Vorauswahl aus Einstellungen › Belege) */

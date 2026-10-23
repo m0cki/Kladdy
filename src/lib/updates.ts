@@ -219,15 +219,6 @@ function schliesseUpdateToast(): void {
   if (t) ui.dismissToast(t.id);
 }
 
-/**
- * TODO(Phase 5): Vor jedem Update automatisch eine Datensicherung anlegen (§3.2 Punkt 5, §6.10 Datensicherung):
- * Rust-Command `backup_erstellen` (VACUUM INTO + Belege als ZIP) aufrufen und bei Fehler das Update abbrechen.
- * Bis es eine Datenbank gibt (Phase 1) bzw. die Sicherung gebaut ist (Phase 5), gibt es nichts zu sichern.
- */
-async function vorUpdateSichern(): Promise<void> {
-  return Promise.resolve();
-}
-
 /** Update laden und installieren. Neu gestartet wird erst über `neuStarten()` (Klick im Toast oder in den Einstellungen). */
 export async function installUpdate(): Promise<void> {
   const update = pending;
@@ -244,9 +235,10 @@ export async function installUpdate(): Promise<void> {
     useUi.getState().showToast({ key: UPDATE_TOAST, text, icon: 'download', sticky: true, progress, actions: [] });
 
   try {
+    // TODO(Phase 5): Vor dem Laden eine Datensicherung anlegen (§3.2 Punkt 5, §6.10): Rust-Command `backup_erstellen`
+    // (VACUUM INTO + Belege als ZIP) aufrufen und bei Fehler abbrechen. Bis dahin wird hier bewusst keine
+    // „Sicherung …“-Meldung gezeigt – es gibt noch keine.
     useUpdates.setState({ status: 'downloading', progress: null });
-    zeige('Sicherung vor dem Update …', null);
-    await vorUpdateSichern();
 
     let gesamt: number | undefined;
     let geladen = 0;

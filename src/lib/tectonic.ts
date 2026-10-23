@@ -3,7 +3,7 @@
  * einstellungen['tectonic_pfad'] (JSON-Text, null = automatisch). */
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
-import { einstellungLesen, einstellungSchreiben } from './queries/einstellungen';
+import { einstellungSchreiben } from './queries/einstellungen';
 
 export type TectonicQuelle = 'mitgeliefert' | 'homebrew' | 'einstellung';
 
@@ -30,12 +30,6 @@ export const QUELLE_TEXT: Readonly<Record<TectonicQuelle, string>> = {
 
 export const tectonicSuchen = (): Promise<TectonicStand> => invoke<TectonicStand>('tectonic_suchen');
 export const tectonicPruefen = (): Promise<TectonicPruefung> => invoke<TectonicPruefung>('tectonic_pruefen');
-
-/** Gespeicherter eigener Pfad (null = automatisch). */
-export function pfadAusWert(v: unknown): string | null {
-  return typeof v === 'string' && v.trim() ? v.trim() : null;
-}
-export const ladeTectonicPfad = async (): Promise<string | null> => pfadAusWert(await einstellungLesen('tectonic_pfad'));
 
 /** Prüft den Pfad in Rust (vorhanden, Datei, ausführbar) und speichert ihn. Wirft die Meldung bei ungültigem Pfad. */
 export async function tectonicPfadSetzen(pfad: string): Promise<boolean> {
