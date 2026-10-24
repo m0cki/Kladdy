@@ -25,7 +25,7 @@ import type { KennwerteJahr } from './steuer-kennwerte';
 import { istBausteinTyp, type Baustein } from './vorlagen/bausteine';
 import { bausteineFuer, type BelegDokument, type Belegart } from './vorlagen/dokument';
 import { KLEINBETRAG_STANDARD_CENT, pflichtCheck } from './vorlagen/pflicht';
-import { standardVorlage } from './vorlagen/standard';
+import { STANDARD_DESIGN, standardVorlage } from './vorlagen/standard';
 import { istDatum } from './zeitraum';
 
 /** Die drei Wege (Beschriftung wie im Prototyp). */
@@ -38,8 +38,9 @@ export interface Ertrag {
   art: ErtragsArt;
   /** nur Rechnung: „bereits bezahlt“ (Einnahme gleich mit) oder „noch offen“ (Einnahme erst beim Zahlungseingang) */
   bezahlt: boolean;
-  /** selbst gewählte Vorlage (id null = Standard); null = die aktive der Art */
-  vorlage: { id: number | null } | null;
+  /** selbst gewählte Vorlage: Design (lib/vorlagen/standard.ts) und eigene Kopie (id null = Design aus dem Code);
+   *  ohne `design` zählt die id (fehlt sie: 'klassisch'); null = die aktive der Art */
+  vorlage: { id: number | null; design?: string } | null;
   /** Anschrift eines neuen Kunden bzw. eines Kunden ohne Anschrift in der Kartei, Zeilen mit \n */
   adresse: string;
   /** Text der Position auf dem Beleg; leer = die Beschreibung */
@@ -147,14 +148,27 @@ export function karteiAnschrift(f: Pick<Formular, 'wer' | 'kundeBewusstNeu'>, ku
   return x && (x.strasse || x.ort) ? x : null;
 }
 
-/** Gewählte Vorlage der Art; sonst die aktive, sonst der Standard. */
+/** Gewählte Vorlage der Art (nach Design, sonst nach eigener Kopie); sonst die aktive, sonst der Standard. */
 export function vorlageFuer(e: Pick<Ertrag, 'art' | 'vorlage'>, vorlagen: ErtragKontext['vorlagen']): VorlagenWahl {
   const liste = vorlagen[e.art];
-  const gewaehlt = e.vorlage;
+  const g = e.vorlage;
+  const gewaehlt = !g
+    ? undefined
+    : g.design !== undefined
+      ? liste.find((v) => v.design === g.design)
+      : g.id != null
+        ? liste.find((v) => v.id === g.id)
+        : liste.find((v) => v.design === STANDARD_DESIGN);
   return (
-    (gewaehlt ? liste.find((v) => v.id === gewaehlt.id) : undefined) ??
+    gewaehlt ??
     liste.find((v) => v.aktiv) ??
-    liste[0] ?? { id: null, name: e.art === 'rechnung' ? 'Standard-Rechnung' : 'Standard-Quittung', bausteine: standardVorlage(e.art), aktiv: true }
+    liste[0] ?? {
+      id: null,
+      design: STANDARD_DESIGN,
+      name: e.art === 'rechnung' ? 'Standard-Rechnung' : 'Standard-Quittung',
+      bausteine: standardVorlage(e.art),
+      aktiv: true,
+    }
   );
 }
 
@@ -195,6 +209,7 @@ export function belegFormular(
     { heute: ctx.heute, zielTage: { rechnung: ctx.zahlungszielTage } },
   );
   const leistung = e.leistung.trim();
+  const vorlage = vorlageFuer(e, ctx.vorlagen);
   const form: BelegFormular = {
     ...basis,
     // wie in der Schublade gebunden („Name · K-0012“ bzw. bewusst neuer Kunde mit gleichem Namen)
@@ -204,7 +219,8 @@ export function belegFormular(
     // Leistungsdatum eines Termins ist sein Tag, nicht der Zahlungstag
     leistungVon: bezug?.termin?.datum ?? basis.leistungVon,
     positionen: basis.positionen.map((p, i) => (i === 0 && leistung ? { ...p, beschreibung: leistung } : p)),
-    vorlageId: vorlageFuer(e, ctx.vorlagen).id,
+    vorlageId: vorlage.id,
+    vorlageDesign: vorlage.design,
   };
   const entwurf = bezug?.entwurf;
   if (!entwurf) return form;
@@ -225,6 +241,7 @@ export function belegFormular(
     positionen,
     mehrere: e.art === 'quittung' && positionen.length > 1,
     vorlageId: form.vorlageId,
+    vorlageDesign: form.vorlageDesign,
     terminId: w.terminId ?? form.terminId,
     buchungId: null,
   };

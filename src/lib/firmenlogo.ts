@@ -48,9 +48,9 @@ export function zielMass(breite: number, hoehe: number): { breite: number; hoehe
   };
 }
 
-/** Zeigt ein sichtbarer Baustein „Kopf mit Logo“ das Logo (Einstellung `logo`)? */
+/** Zeigt ein sichtbarer Baustein „Kopf mit Logo“ bzw. „Firmenkopf (Text)“ das Logo (Einstellung `logo`)? */
 export const vorlageZeigtLogo = (bausteine: readonly Baustein[]): boolean =>
-  sichtbare(bausteine).some(({ b }) => b.typ === 'kopf' && b.an('logo'));
+  sichtbare(bausteine).some(({ b }) => (b.typ === 'kopf' || b.typ === 'firmenblock') && b.an('logo'));
 
 /** Welche Datei von mehreren gezogenen das Logo wird: das erste Bild, sonst die erste (sie wird dann abgelehnt). */
 export const logoAusPfaden = (pfade: readonly string[]): string | null => pfade.find((p) => logoTyp(p) !== null) ?? pfade[0] ?? null;

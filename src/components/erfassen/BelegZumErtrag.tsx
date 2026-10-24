@@ -169,11 +169,14 @@ function BelegKasten({
           <select
             id="bf-vorlage"
             className="select"
-            value={vorlage.id ?? ''}
-            onChange={(e) => setErtrag({ vorlage: { id: e.target.value === '' ? null : Number(e.target.value) } })}
+            value={vorlage.design}
+            onChange={(e) => {
+              const v = vorlagen.find((x) => x.design === e.target.value);
+              if (v) setErtrag({ vorlage: { id: v.id, design: v.design } });
+            }}
           >
             {vorlagen.map((v) => (
-              <option key={v.id ?? 'standard'} value={v.id ?? ''}>
+              <option key={v.design} value={v.design}>
                 {v.name}
               </option>
             ))}

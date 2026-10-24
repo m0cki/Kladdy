@@ -5,6 +5,7 @@
  * Tests: baukasten.test.ts */
 import { BAUSTEINE, BAUSTEIN_TYPEN, aufloesen, type Baustein, type BausteinTyp, type Einstellung } from './bausteine';
 import type { Belegart } from './dokument';
+import { STANDARD_DESIGN, designFuer } from './standard';
 
 /** Name der eigenen Kopie je Art (Tabelle `vorlagen`, lib/queries/vorlagen.ts). */
 export const EIGENER_NAME: Readonly<Record<Belegart, string>> = {
@@ -15,6 +16,10 @@ export const EIGENER_NAME: Readonly<Record<Belegart, string>> = {
 };
 
 export const STANDARD_NAME = 'Standardvorlage';
+
+/** Name der eigenen Kopie eines Designs: „Meine Quittung“ (klassisch), „Meine Quittung (Formular)“ (andere). */
+export const eigenerName = (art: Belegart, design: string = STANDARD_DESIGN): string =>
+  design === STANDARD_DESIGN ? EIGENER_NAME[art] : `${EIGENER_NAME[art]} (${designFuer(art, design).name})`;
 
 /** Bausteine, die es für die Art gibt (Palette „+ Baustein hinzufügen“), in Katalog-Reihenfolge. */
 export const erlaubteTypen = (art: Belegart): BausteinTyp[] => BAUSTEIN_TYPEN.filter((t) => BAUSTEINE[t].arten.includes(art));

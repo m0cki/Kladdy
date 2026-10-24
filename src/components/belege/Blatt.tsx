@@ -2,6 +2,7 @@
  * Gleiche Bausteine und Daten wie das PDF (src/lib/latex/vorlage.ts + daten.ts), damit Vorschau und PDF übereinstimmen.
  * - Leere Bausteine fallen weg (im Editor: grauer Platzhalter), ausgeblendete (`aus`) immer.
  * - Fußzeile und Unterschrift „am Seitenende“ sitzen unten (.sh-unten), Wasserzeichen ENTWURF/STORNIERT.
+ * - Rahmen: liegt um das Blatt (.sh-rahmen, SVG), unabhängig von seiner Stelle in der Liste.
  * - GiroCode im Baustein „Zahlung“: dieselbe Modulmatrix wie girocode.png im PDF (lib/girocode).
  * - Firmenlogo im Baustein „Kopf“: die Datei aus `doc.logo` (ausgestellte Belege: die aus dem Schnappschuss), im Editor
  *   ohne Logo ein Platzhalter.
@@ -9,7 +10,7 @@
  * Stile: src/styles/blatt.css */
 import { Fragment, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react';
 import { formatBetrag } from '../../lib/money';
-import { BAUSTEINE, istUnten, sichtbare, type Aufgeloest, type Baustein, type BausteinTyp } from '../../lib/vorlagen/bausteine';
+import { BAUSTEINE, istUmrandet, istUnten, sichtbare, type Aufgeloest, type Baustein, type BausteinTyp } from '../../lib/vorlagen/bausteine';
 import {
   ARTEN,
   belegSumme,
@@ -18,6 +19,7 @@ import {
   empfaenger,
   formatVon,
   gebuchtText,
+  gedruckterZahlungsweg,
   istEntwurf,
   leistungLabel,
   leistungText,
@@ -29,6 +31,7 @@ import {
   unterschriftDatum,
   zahlungswegText,
   zerlegen,
+  ZAHLUNGSWEGE,
   type BelegDokument,
   type BelegPosition,
   type Empfaenger,
@@ -39,6 +42,7 @@ import { ibanFormat } from '../../lib/firma';
 import { girocodeFuer, qrGroesseMm } from '../../lib/girocode/girocode';
 import { qrPfad } from '../../lib/girocode/qr';
 import { useLogoUrl } from '../../lib/logoablage';
+import { sichtbareZeilen } from '../../lib/vorlagen/firmenblock';
 
 /** Markiert die fehlende Nummer im Text (wird zum grauen „Entwurf“). */
 const ENTWURF = '\u0000';
@@ -95,6 +99,25 @@ function Feld({ label, children }: { label: ReactNode; children: ReactNode }) {
   );
 }
 
+/** Ankreuzfeld (Quittung „Formular“): angekreuzt mit einem Kreuz – nie nur über Farbe. */
+function Kaestchen({ an }: { an: boolean }) {
+  return (
+    <svg className="blk-box" viewBox="0 0 12 12" aria-hidden="true">
+      <rect x="0.5" y="0.5" width="11" height="11" />
+      {an && <path d="M3 3 9 9M9 3 3 9" />}
+    </svg>
+  );
+}
+
+/** „Bezeichnung: Wert“ (Quittung „Formular“) */
+function FormZeile({ label, children }: { label: ReactNode; children: ReactNode }) {
+  return (
+    <div className="blk-form-z">
+      <b>{label}:</b> {children}
+    </div>
+  );
+}
+
 function PosMini({ positionen }: { positionen: readonly BelegPosition[] }) {
   return (
     <table className="blk-posmini">
@@ -124,6 +147,24 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
         <div className="blk-kopf-l">
           <div className="blk-firma">{x.doc.firma.name}</div>
           {claim && <div className="blk-claim">{claim}</div>}
+        </div>
+        {logo && <div className="blk-logo">{logo}</div>}
+      </div>
+    );
+  },
+  firmenblock(b, x) {
+    const name = ph(b.text('name'), x);
+    const zeilenVon = (key: string) => sichtbareZeilen(b.text(key), x.werte).map((z, i) => <div key={i}>{ph(z.text, x)}</div>);
+    const untertitel = zeilenVon('untertitel');
+    const kontakt = zeilenVon('zeilen');
+    const logo = !b.an('logo') ? null : x.logoUrl ? <img src={x.logoUrl} alt="" /> : x.editable ? <span className="blk-logo-slot">Logo</span> : null;
+    if (!name && !untertitel.length && !kontakt.length && !logo) return null;
+    return (
+      <div className={`blk-fk${b.an('linie') ? ' linie' : ''}`}>
+        <div className="blk-fk-l">
+          {name && <div className={`blk-fk-name${b.an('versal') ? ' versal' : ''}`}>{name}</div>}
+          {untertitel.length > 0 && <div className="blk-fk-sub">{untertitel}</div>}
+          {kontakt.length > 0 && <div className="blk-fk-z">{kontakt}</div>}
         </div>
         {logo && <div className="blk-logo">{logo}</div>}
       </div>
@@ -165,7 +206,7 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
     const rechts = b.text('rechts') ? ph(b.text('rechts'), x) : null;
     return (
       <>
-        <div className={`blk-titel-row${b.text('stil') === 'akzent' ? ' akzent' : ''}`}>
+        <div className={`blk-titel-row${b.text('stil') === 'akzent' ? ' akzent' : ''}${b.an('versal') ? ' versal' : ''}`}>
           <h1>{ph(b.text('text'), x)}</h1>
           {rechts && <div className="blk-titel-r">{rechts}</div>}
         </div>
@@ -329,6 +370,40 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
         zeilen(quittungFuer(doc))
       );
     const za = b.an('zahlungsart');
+    if (b.text('stil') === 'formular') {
+      const weg = gedruckterZahlungsweg(doc);
+      return (
+        <div className="blk-form">
+          <div className="blk-form-kopf">
+            <FormZeile label="Datum">{datumText(doc.datum)}</FormZeile>
+            <FormZeile label="Nr.">{doc.nummer || <span className="blk-leer">Entwurf</span>}</FormZeile>
+          </div>
+          <FormZeile label={ph(b.text('von'), x)}>
+            {e.anzeige}
+            {e.zeilen.length ? `, ${e.zeilen.join(', ')}` : ''}
+          </FormZeile>
+          <FormZeile label={ph(b.text('fuer'), x)}>{fuer}</FormZeile>
+          {za && (
+            <FormZeile label="Zahlungsart">
+              {ZAHLUNGSWEGE.map((z) => (
+                <span key={z} className="blk-kreuz">
+                  <Kaestchen an={weg === z} />
+                  {zahlungswegText(z)}
+                </span>
+              ))}
+            </FormZeile>
+          )}
+          <div className="blk-form-summe">
+            <b>Gesamtbetrag:</b> <b>{formatBetrag(x.summe)}</b>
+          </div>
+          {b.an('worte') && (
+            <p className="blk-form-worte">
+              <span>in Worten:</span> {betragInWorten(x.summe)}
+            </p>
+          )}
+        </div>
+      );
+    }
     return (
       <>
         <div className={`blk-grid ${za ? 'c3' : 'c2'}`}>
@@ -336,7 +411,7 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
             <b className="blk-big">{formatBetrag(x.summe)}</b>
           </Feld>
           <Feld label="Datum">{datumText(doc.datum)}</Feld>
-          {za && <Feld label="Zahlungsart">{zahlungswegText(doc.quittiert?.zahlungsweg ?? doc.zahlungsweg)}</Feld>}
+          {za && <Feld label="Zahlungsart">{zahlungswegText(gedruckterZahlungsweg(doc))}</Feld>}
         </div>
         {b.an('worte') && <Feld label="Betrag in Worten">{betragInWorten(x.summe)}</Feld>}
         <Feld label={ph(b.text('von'), x)}>
@@ -381,6 +456,14 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
     );
   },
   unterschrift(b, x) {
+    if (b.text('stil') === 'eine') {
+      return (
+        <div className="blk-sign1">
+          <b>{ph(b.text('rechts'), x)}</b>
+          <i />
+        </div>
+      );
+    }
     const ort = x.doc.firma.ort.trim();
     const datum = unterschriftDatum(x.doc);
     const vor = b.an('vorbelegen') && datum ? [ort, datum].filter(Boolean).join(', ') : '';
@@ -401,6 +484,8 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
   },
   trennlinie: (b) => <hr className={`blk-hr ${b.text('farbe') || 'grau'}`} />,
   abstand: (b) => <div className={`blk-space ${b.text('groesse') || 'mittel'}`} />,
+  // liegt um das Blatt (Blatt ⇒ .sh-rahmen), nicht im Fluss
+  rahmen: () => null,
   fusszeile(b, x) {
     const F = x.doc.firma;
     const z = (l: (string | false)[]) => {
@@ -448,7 +533,19 @@ export function Blatt({ doc, bausteine, editable = false, ausgewaehlt = null, on
   const format = formatVon(doc.art);
   const oben: ReactNode[] = [];
   const unten: ReactNode[] = [];
+  const rahmen: ReactNode[] = [];
   for (const { index, b } of sichtbare(bausteine)) {
+    if (istUmrandet(b)) {
+      // Rahmen wie im PDF 4 mm außerhalb des Satzspiegels; Klick auf die Linie wählt den Baustein
+      const sel = ausgewaehlt === index ? ' sel' : '';
+      rahmen.push(
+        <svg key={index} className={`sh-rahmen ${b.text('linie') === 'durchgezogen' ? 'voll' : 'strich'}${sel}`} data-blk={index} aria-hidden="true">
+          <rect width="100%" height="100%" />
+          {onWaehle && <rect className="sh-rahmen-griff" width="100%" height="100%" onClick={() => onWaehle(index)} />}
+        </svg>,
+      );
+      continue;
+    }
     let inhalt: ReactNode | null = null;
     try {
       inhalt = BLOCK[b.typ](b, x);
@@ -459,7 +556,8 @@ export function Blatt({ doc, bausteine, editable = false, ausgewaehlt = null, on
       if (!editable) continue;
       inhalt = <div className="blk-platz">{BAUSTEINE[b.typ].name} – leer</div>;
     }
-    const klasse = `blk blk-${b.typ}${ausgewaehlt === index ? ' blk-sel' : ''}`;
+    const stil = BAUSTEINE[b.typ].felder.some((f) => f.key === 'stil') ? ` stil-${b.text('stil')}` : '';
+    const klasse = `blk blk-${b.typ}${stil}${ausgewaehlt === index ? ' blk-sel' : ''}`;
     const knoten = (
       <div key={index} className={klasse} data-blk={index} onClick={onWaehle ? () => onWaehle(index) : undefined}>
         {inhalt}
@@ -485,6 +583,7 @@ export function Blatt({ doc, bausteine, editable = false, ausgewaehlt = null, on
           <i className="sh-mark loch" />
         </>
       )}
+      {rahmen}
       {wm && (
         <div className="sh-wm" aria-hidden="true">
           <span>{wm}</span>

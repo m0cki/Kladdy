@@ -165,6 +165,10 @@ export function tageZwischen(von: string, bis: string): number {
 
 const ZAHLUNGSWEG_TEXT: Readonly<Record<Zahlungsart, string>> = { bar: 'Bar', bank: 'Überweisung', paypal: 'PayPal' };
 export const zahlungswegText = (z: Zahlungsart | null | undefined): string => (z ? ZAHLUNGSWEG_TEXT[z] : '');
+/** Alle Zahlungswege in Druckreihenfolge (Ankreuzfelder der Quittung „Formular“: Bar · Überweisung · PayPal). */
+export const ZAHLUNGSWEGE: readonly Zahlungsart[] = ['bar', 'bank', 'paypal'];
+/** Zahlungsweg, der auf Quittung bzw. Eigenbeleg steht (bei einer quittierten Rechnung der dort festgehaltene). */
+export const gedruckterZahlungsweg = (doc: Pick<BelegDokument, 'zahlungsweg' | 'quittiert'>): Zahlungsart | null => doc.quittiert?.zahlungsweg ?? doc.zahlungsweg;
 
 /** Empfänger wie er gedruckt wird: Name (Quittung ohne Namen: „Barverkauf“) und Anschriftzeilen. */
 export interface Empfaenger {

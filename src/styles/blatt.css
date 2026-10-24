@@ -59,6 +59,16 @@
 .sheet .blk-logo-slot { width: 30mm; height: 16mm; display: grid; place-items: center; border: .3mm dashed var(--slot); border-radius: 2mm; color: var(--slot-text); font-size: 7pt; letter-spacing: .12em; text-transform: uppercase; }
 .sheet.sh-a5q .blk-kopf { min-height: 10mm; }
 .sheet.sh-a5q .blk-logo, .sheet.sh-a5q .blk-logo-slot { height: 10mm; }
+/* Firmenkopf (Text): Name groß und dunkel, darunter Untertitel und Kontaktzeilen, feine Linie (wie vorlage.ts) */
+.sheet .blk-fk { display: flex; justify-content: space-between; align-items: flex-start; gap: 8mm; }
+.sheet .blk-fk.linie { padding-bottom: 2.5mm; border-bottom: .25mm solid var(--haar); }
+.sheet .blk-fk-l { min-width: 0; }
+.sheet .blk-fk-name { font-size: 17pt; font-weight: 700; line-height: 1.15; }
+.sheet .blk-fk-name.versal { text-transform: uppercase; }
+.sheet .blk-fk-sub { margin-top: 1mm; font-size: 9pt; line-height: 1.4; }
+.sheet .blk-fk-z { margin-top: .6mm; font-size: 8.5pt; line-height: 1.4; }
+.sheet .blk-fk-name + .blk-fk-z { margin-top: 1mm; }
+.sheet.sh-a5q .blk-fk .blk-logo, .sheet.sh-a5q .blk-fk .blk-logo-slot { height: 12mm; }
 /* Absenderzeile & Anschrift */
 .sheet .blk-absender { font-size: 7.5pt; color: var(--grau); }
 .sheet .blk-absender.linie { display: inline-block; max-width: 85mm; font-size: 7pt; padding-bottom: .8mm; border-bottom: .2mm solid var(--haar); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -77,11 +87,13 @@
 .sheet .blk-titel-r { font-size: 10.5pt; font-weight: 700; white-space: nowrap; }
 .sheet .blk-akzentlinie { height: .45mm; margin-top: 1.8mm; background: var(--akz); }
 .sheet.sh-a5q .blk-titel-row h1 { font-size: 18pt; }
+.sheet .blk-titel-row.versal h1 { text-transform: uppercase; }
 .sheet .blk-titel + .blk-betreff { margin-top: 1.5mm; }
 .sheet .blk-betreff { font-weight: 700; }
 .sheet .blk-betreff + .blk-text { margin-top: 4.5mm; }
 .sheet .blk-text.klein { font-size: 8.5pt; }
 .sheet .blk-text.grau { font-size: 8pt; color: var(--grau); }
+.sheet .blk-text.mini { font-size: 6.5pt; color: var(--grau); }
 .sheet .blk-worte { font-size: 9.5pt; font-style: italic; }
 .sheet .blk-worte span { color: var(--grau); }
 /* Positionen & Summe */
@@ -130,6 +142,19 @@
 .sheet .blk-posmini td:first-child { padding-right: 2.5mm; color: var(--grau); white-space: nowrap; }
 .sheet .blk-posmini td:last-child { padding-left: 3mm; text-align: right; white-space: nowrap; }
 .sheet .blk-quittung_felder + .blk, .sheet .blk-eigenbeleg_felder + .blk { margin-top: 0; }
+/* Quittung „Formular“: Bezeichnung: Wert, Ankreuzfelder (Kreuz, nicht nur Farbe) */
+.sheet .blk-form-z { margin-bottom: 2mm; font-size: 10.5pt; line-height: 1.35; overflow-wrap: anywhere; }
+.sheet .blk-form-z > b { font-weight: 700; }
+.sheet .blk-form-kopf { display: grid; grid-template-columns: 1fr 1fr; gap: 0 8mm; margin-bottom: 3mm; border-bottom: .25mm solid var(--haar); }
+.sheet .blk-form-z .blk-posmini { font-size: 9pt; }
+.sheet .blk-kreuz { display: inline-flex; align-items: center; gap: 1.5mm; margin-right: 5mm; white-space: nowrap; }
+.sheet .blk-kreuz:last-child { margin-right: 0; }
+.sheet .blk-box { width: 3mm; height: 3mm; flex: none; overflow: visible; }
+.sheet .blk-box rect { fill: none; stroke: var(--ink); stroke-width: 1; }
+.sheet .blk-box path { fill: none; stroke: var(--ink); stroke-width: 1.2; }
+.sheet .blk-form-summe { margin: 1mm 0; font-size: 13pt; line-height: 1.3; }
+.sheet .blk-form-worte { margin-bottom: 1mm; font-size: 9pt; }
+.sheet .blk-form-worte span { color: var(--grau); }
 /* Unterschrift, Linie, Fußzeile */
 .sheet .blk-sign { display: grid; grid-template-columns: 1fr 1fr; gap: 14mm; padding-top: 2mm; }
 .sheet .blk-sign > div { display: flex; flex-direction: column; justify-content: flex-end; }
@@ -137,6 +162,9 @@
 .sheet .blk-sign i { display: block; border-top: .25mm solid var(--ink); }
 .sheet .blk-sign small { margin-top: 1mm; font-size: 7.5pt; color: var(--grau); }
 .sheet .sh-main .blk-unterschrift { margin-top: 10mm; }
+.sheet .sh-main .blk-unterschrift.stil-eine { margin-top: 6mm; }
+.sheet .blk-sign1 b { display: block; font-size: 9pt; line-height: 1.42; }
+.sheet .blk-sign1 i { display: block; margin-top: 11mm; border-top: .25mm solid var(--ink); }
 .sheet .blk-hr { height: 0; margin: 0; border: 0; border-top: .2mm solid var(--haar); }
 .sheet .blk-hr.akzent { border-top: .45mm solid var(--akz); }
 .sheet .blk-hr.schwarz { border-top: .3mm solid var(--ink); }
@@ -144,6 +172,15 @@
 .sheet .blk-fuss.n1 { grid-template-columns: minmax(0, 1fr); }
 .sheet .blk-fuss.n2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .sheet .blk-fuss b { color: var(--ink); font-weight: 600; }
+
+/* Rahmen um den Inhalt, 4 mm außerhalb des Satzspiegels (gleiche Werte wie RAHMEN_MM in lib/latex/vorlage.ts).
+ * SVG statt border: Strichlänge 2 mm, Lücke 1,5 mm wie im PDF (1 mm = 3,7795 px). */
+.sheet .sh-rahmen { position: absolute; z-index: 0; top: 14mm; left: 18mm; width: calc(100% - 34mm); height: calc(100% - 22mm); overflow: visible; pointer-events: none; }
+.sheet.sh-a5q .sh-rahmen { top: 7mm; left: 10mm; width: calc(100% - 20mm); height: calc(100% - 13mm); }
+.sheet .sh-rahmen rect { fill: none; stroke: var(--marke); stroke-width: .945; }
+.sheet .sh-rahmen.strich rect:not(.sh-rahmen-griff) { stroke-dasharray: 7.56 5.67; }
+.sheet .sh-rahmen.sel rect:not(.sh-rahmen-griff) { stroke: var(--accent); }
+.sheet .sh-rahmen .sh-rahmen-griff { stroke: transparent; stroke-width: 12; stroke-dasharray: none; pointer-events: stroke; cursor: pointer; }
 
 /* ---------- Testbeleg (Einstellungen › Daten) ---------- */
 .tb-fehler { margin: 6px 0 0; padding-left: 18px; }

@@ -227,7 +227,7 @@ function Maske({ belegId, params, schluessel }: { belegId: number | null; params
           { heute: h, zielTage: { rechnung: stamm.einstellungen.zahlungsziel_tage, angebot: stamm.einstellungen.angebot_tage } },
         );
         const aktiv = stamm.vorlagen[f.art].find((v) => v.aktiv);
-        const form = { ...f, vorlageId: aktiv?.id ?? null };
+        const form = { ...f, vorlageId: aktiv?.id ?? null, vorlageDesign: aktiv?.design ?? f.vorlageDesign };
         setGeladen({ status: 'ok', stamm, beleg: null, ausgestellt: null, form: arbeit?.schluessel === schluessel ? arbeit.form : form });
         return;
       }
@@ -330,7 +330,8 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
   /* ---------- abgeleitet ---------- */
   const doc: BelegDokument = ausgestellt ? ausgestellt.dokument : formularZuDokument(form, { kunden: stamm.kunden, firma: stamm.firma, ustModus: stamm.ustModus, logo: stamm.logo });
   const vorlagen = stamm.vorlagen[art];
-  const gewaehlt = vorlagen.find((v) => v.id === form.vorlageId) ?? vorlagen.find((v) => v.aktiv) ?? vorlagen[0];
+  // nach Design (alte Entwürfe ohne Design: 'klassisch'); dessen eigene Kopie, sonst das Design aus dem Code
+  const gewaehlt = vorlagen.find((v) => v.design === form.vorlageDesign) ?? vorlagen.find((v) => v.aktiv) ?? vorlagen[0];
   const bausteine: Baustein[] = ausgestellt ? ausgestellt.bausteine : (gewaehlt?.bausteine ?? standardVorlage(art));
   const gedruckt = useMemo(() => bausteineFuer(doc, bausteine).filter((b) => istBausteinTyp(b.typ)), [doc, bausteine]);
   const summe = ausgestellt ? (beleg?.summe_cent ?? 0) : formularSumme(form);
@@ -550,7 +551,8 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
     const ziel = { rechnung: stamm.einstellungen.zahlungsziel_tage, angebot: stamm.einstellungen.angebot_tage };
     setForm((f) => {
       const n = artWechseln(f, a, ziel);
-      return { ...n, vorlageId: stamm.vorlagen[a].find((v) => v.aktiv)?.id ?? null };
+      const aktiv = stamm.vorlagen[a].find((v) => v.aktiv);
+      return { ...n, vorlageId: aktiv?.id ?? null, vorlageDesign: aktiv?.design ?? n.vorlageDesign };
     });
     setZeitraum(false);
     setFehler({});
@@ -763,11 +765,14 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
                   <select
                     className="select sm"
                     aria-label="Vorlage"
-                    value={gewaehlt?.id == null ? '' : String(gewaehlt.id)}
-                    onChange={(e) => set('vorlageId', e.target.value ? Number(e.target.value) : null)}
+                    value={gewaehlt?.design ?? ''}
+                    onChange={(e) => {
+                      const v = vorlagen.find((x) => x.design === e.target.value);
+                      if (v) setForm((f) => ({ ...f, vorlageId: v.id, vorlageDesign: v.design }));
+                    }}
                   >
                     {vorlagen.map((v) => (
-                      <option key={v.id ?? 'standard'} value={v.id == null ? '' : String(v.id)}>
+                      <option key={v.design} value={v.design}>
                         {v.name}
                       </option>
                     ))}
@@ -780,7 +785,7 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
                 </span>
               )}
               {editierbar ? (
-                <Link className="icon-btn sm" to={`/belege/vorlagen?art=${art}`} title="Vorlagen bearbeiten" aria-label="Vorlagen bearbeiten">
+                <Link className="icon-btn sm" to={`/belege/vorlagen?art=${art}${gewaehlt ? `&design=${gewaehlt.design}` : ''}`} title="Vorlagen bearbeiten" aria-label="Vorlagen bearbeiten">
                   <Pencil />
                 </Link>
               ) : null}

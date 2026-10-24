@@ -42,10 +42,15 @@ export async function einstellungLesen(schluessel: string): Promise<unknown> {
   return z ? wertLesen(z.wert) : undefined;
 }
 
-/** Speichert eine Einstellung und protokolliert sie. false = keine Änderung. Läuft in der Schreib-Warteschlange. */
-export function einstellungSchreiben(schluessel: string, neu: unknown): Promise<boolean> {
+/**
+ * Ändert eine Einstellung aus ihrem gespeicherten Wert (`aendern(alt)`, alt = undefined, wenn es sie nie gab) und
+ * protokolliert sie. Lesen und Schreiben im selben Auftrag der Schreib-Warteschlange: zwei schnelle Änderungen an
+ * verschiedenen Teilen eines Objekts (z. B. 'vorlagen_design' je Art) überschreiben sich nicht. false = keine Änderung.
+ */
+export function einstellungAendern(schluessel: string, aendern: (alt: unknown) => unknown): Promise<boolean> {
   return nacheinander(async () => {
     const alt = await einstellungLesen(schluessel);
+    const neu = aendern(alt);
     const eintrag = protokollFuerEinstellung(schluessel, alt, neu);
     if (!eintrag) return false;
     await ausfuehren(SPEICHERN_SQL, [schluessel, JSON.stringify(neu)]);
@@ -53,6 +58,9 @@ export function einstellungSchreiben(schluessel: string, neu: unknown): Promise<
     return true;
   });
 }
+
+/** Speichert eine Einstellung und protokolliert sie. false = keine Änderung. Läuft in der Schreib-Warteschlange. */
+export const einstellungSchreiben = (schluessel: string, neu: unknown): Promise<boolean> => einstellungAendern(schluessel, () => neu);
 
 /* ---------- Firma ---------- */
 

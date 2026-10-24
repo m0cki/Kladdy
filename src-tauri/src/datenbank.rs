@@ -96,6 +96,11 @@ pub const MIGRATIONEN: &[MigrationsDatei] = &[
         beschreibung: "protokoll_schutz",
         sql: include_str!("../migrations/0009_protokoll_schutz.sql"),
     },
+    MigrationsDatei {
+        version: 10,
+        beschreibung: "vorlagen_basis",
+        sql: include_str!("../migrations/0010_vorlagen_basis.sql"),
+    },
 ];
 
 /// Verbindungs-URL zu einer Datei im App-Verzeichnis, wie sie das Plugin und `Database.load` erwarten.
@@ -945,6 +950,77 @@ mod tests {
             .await
             .unwrap();
             assert_eq!(tabellen, 0);
+            c.close().await.unwrap();
+        });
+        let _ = std::fs::remove_dir_all(&ordner);
+    }
+
+    /// 0010: vorhandene eigene Vorlagen bleiben und gelten als Kopie des Designs 'klassisch'; neue Zeilen ohne
+    /// `basis` ebenso, mit `basis` je Design eine.
+    #[test]
+    fn migration_vorlagen_basis() {
+        let ordner = testordner("vorlagen-basis");
+        let db = ordner.join("kladdy.db");
+        let davor = MIGRATIONEN
+            .iter()
+            .position(|m| m.beschreibung == "vorlagen_basis")
+            .unwrap();
+        tauri::async_runtime::block_on(async {
+            migrieren(&db, davor).await;
+            let mut c = verbinden(&db).await;
+            sqlx::query(
+                "INSERT INTO vorlagen (id, name, art, bloecke_json, ist_standard, geaendert_am)
+                 VALUES (1, 'Meine Quittung', 'quittung', '[{\"typ\":\"titel\"}]', 1, 'jetzt')",
+            )
+            .execute(&mut c)
+            .await
+            .unwrap();
+            c.close().await.unwrap();
+
+            migrieren(&db, MIGRATIONEN.len()).await;
+            let mut c = verbinden(&db).await;
+            let alt: (String, String, String, i64) = sqlx::query_as(
+                "SELECT name, basis, bloecke_json, ist_standard FROM vorlagen WHERE id = 1",
+            )
+            .fetch_one(&mut c)
+            .await
+            .unwrap();
+            assert_eq!(
+                alt,
+                (
+                    "Meine Quittung".into(),
+                    "klassisch".into(),
+                    "[{\"typ\":\"titel\"}]".into(),
+                    1
+                )
+            );
+            sqlx::query(
+                "INSERT INTO vorlagen (name, art, bloecke_json, ist_standard, geaendert_am, basis)
+                 VALUES ('Meine Quittung (Formular)', 'quittung', '[]', 1, 'jetzt', 'formular')",
+            )
+            .execute(&mut c)
+            .await
+            .unwrap();
+            sqlx::query(
+                "INSERT INTO vorlagen (name, art, bloecke_json, ist_standard, geaendert_am)
+                 VALUES ('Meine Rechnung', 'rechnung', '[]', 1, 'jetzt')",
+            )
+            .execute(&mut c)
+            .await
+            .unwrap();
+            let basen: Vec<(String, String)> =
+                sqlx::query_as("SELECT art, basis FROM vorlagen ORDER BY id")
+                    .fetch_all(&mut c)
+                    .await
+                    .unwrap();
+            assert_eq!(
+                basen,
+                vec![
+                    ("quittung".into(), "klassisch".into()),
+                    ("quittung".into(), "formular".into()),
+                    ("rechnung".into(), "klassisch".into()),
+                ]
+            );
             c.close().await.unwrap();
         });
         let _ = std::fs::remove_dir_all(&ordner);

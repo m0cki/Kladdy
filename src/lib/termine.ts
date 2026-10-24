@@ -12,6 +12,7 @@ import { isoWoche, wochenStart } from './liquiditaet';
 import { formatBetrag, parseBetrag } from './money';
 import { artWechseln, formularSumme, formularZuDaten, neuesFormular, preisEingabe, type BelegDaten, type BelegFormular } from './rechnungen';
 import { normalize } from './suche';
+import { designSchluessel } from './vorlagen/standard';
 import { istDatum, plusTage } from './zeitraum';
 
 /* ================= Zeilen aus der Datenbank ================= */
@@ -638,15 +639,18 @@ export function vorbereitungFormular(o: {
   /** Leistung vor der Änderung (ein eigener Betreff bleibt stehen) */
   altLeistung: string;
   zielTage: number;
-  /** aktive Vorlage der Art (null = Standard) */
+  /** aktive Vorlage der Art (null = Design aus dem Code) */
   vorlageId: number | null;
+  /** aktives Design der Art (fehlt: 'klassisch') */
+  vorlageDesign?: string;
   heute: string;
 }): BelegFormular {
   const { art, termin } = o;
   const neu = neuesFormular({ art, datum: termin.datum, text: termin.leistung }, { heute: o.heute, zielTage: { rechnung: o.zielTage } });
   const position = { ...neu.positionen[0], beschreibung: termin.leistung, menge: '1', einheit: 'pausch.', preis: termin.betrag ? preisEingabe(termin.betrag) : '' };
-  if (!o.vorhanden) return { ...neu, kunde: '', positionen: [position], vorlageId: o.vorlageId };
-  const w = o.vorhanden.art === art ? o.vorhanden : { ...artWechseln(o.vorhanden, art, { rechnung: o.zielTage }), vorlageId: o.vorlageId };
+  const vorlage = { vorlageId: o.vorlageId, vorlageDesign: designSchluessel(art, o.vorlageDesign) };
+  if (!o.vorhanden) return { ...neu, kunde: '', positionen: [position], ...vorlage };
+  const w = o.vorhanden.art === art ? o.vorhanden : { ...artWechseln(o.vorhanden, art, { rechnung: o.zielTage }), ...vorlage };
   const eigenerBetreff = !!w.betreff.trim() && w.betreff.trim() !== o.altLeistung.trim();
   const einzeln = w.positionen.length <= 1;
   return {
@@ -772,11 +776,11 @@ export function vorbelegungMitBezug(v: Vorbelegung, b: ErfassenBezug | null): Vo
 }
 
 /** Beleg-Angaben aus dem Entwurf: Text der einzigen Position (wenn er vom Betreff abweicht), Anschrift, Vorlage. */
-export function ertragAusEntwurf(e: ErfassenBezug['entwurf']): { leistung: string; adresse: string; vorlage: { id: number | null } | null } {
+export function ertragAusEntwurf(e: ErfassenBezug['entwurf']): { leistung: string; adresse: string; vorlage: { id: number | null; design: string } | null } {
   if (!e) return { leistung: '', adresse: '', vorlage: null };
   const f = e.formular;
   const pos = f.positionen.length === 1 ? f.positionen[0].beschreibung.trim() : '';
-  return { leistung: pos && pos !== f.betreff.trim() ? pos : '', adresse: f.adresse, vorlage: { id: f.vorlageId } };
+  return { leistung: pos && pos !== f.betreff.trim() ? pos : '', adresse: f.adresse, vorlage: { id: f.vorlageId, design: f.vorlageDesign } };
 }
 
 /** Bezug für belegVorbereiten (lib/ertrag.ts): Termin (Leistungsdatum) und Formular des Entwurfs. */
