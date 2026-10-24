@@ -1678,7 +1678,7 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
      (ohne Protokoll je Zeile, nichts festgeschrieben). Tectonic: `src-tauri/src/tectonic.rs` (`tectonic_finden` in der
      Reihenfolge aus §3.1, für `compile_latex` wiederverwendbar; `tectonic_suchen`, `tectonic_pfad_pruefen`,
      `tectonic_pruefen` mit `--version` und Zeitlimit), eigener Pfad in `einstellungen['tectonic_pfad']`
-- **Nächste Migration:** `0009` (`0007` und `0008` sind vergeben; ausgelieferte Migrationen nie ändern).
+- **Nächste Migration:** `0010` (`0009` schützt Protokoll und Festschreibungen per Trigger; ausgelieferte Migrationen nie ändern).
 - **Phase 1 abgeschlossen.** Weiter mit **Phase 2** in Teilen (je ein PR): 1. Diagramm-Komponenten (§9.6, §9.5) ·
   2. Auswertung mit großem Umschalter + Überblick (§6.9.1) · 3. Liquidität (§6.9.2) · 4. Suche/Befehlspalette ⌘K (§6.2)
 - **Phase 2 in Teilen:**

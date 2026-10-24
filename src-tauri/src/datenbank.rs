@@ -91,6 +91,11 @@ pub const MIGRATIONEN: &[MigrationsDatei] = &[
         beschreibung: "kategorien",
         sql: include_str!("../migrations/0008_kategorien.sql"),
     },
+    MigrationsDatei {
+        version: 9,
+        beschreibung: "protokoll_schutz",
+        sql: include_str!("../migrations/0009_protokoll_schutz.sql"),
+    },
 ];
 
 /// Verbindungs-URL zu einer Datei im App-Verzeichnis, wie sie das Plugin und `Database.load` erwarten.
@@ -765,6 +770,74 @@ mod tests {
                     .await
                     .unwrap();
             assert_eq!((pfad.as_str(), bis.as_str()), ("2026/ab.pdf", "2035-12-31"));
+        });
+    }
+
+    /// 0009: Protokoll und Festschreibungen sind nur anfügbar. Nur alt_json/neu_json dürfen sich
+    /// ändern (Anonymisierung nach Fristablauf), alles andere und jedes Löschen bricht ab.
+    #[test]
+    fn trigger_schuetzen_protokoll_und_festschreibungen() {
+        tauri::async_runtime::block_on(async {
+            let mut c = testhilfe::test_db().await;
+            sqlx::query("INSERT INTO festschreibungen (bis_datum, am) VALUES ('2025-12-31', 'x')")
+                .execute(&mut c)
+                .await
+                .unwrap();
+            sqlx::query(
+                "INSERT INTO protokoll (id, zeitpunkt, tabelle, datensatz_id, aktion, alt_json, neu_json, schluessel)
+                 VALUES (1, 'jetzt', 'kunden', 3, 'neu', NULL, '{\"name\":\"Anna\"}', NULL)",
+            )
+            .execute(&mut c)
+            .await
+            .unwrap();
+            let meldung = |e: sqlx::Error| db_fehler(e);
+
+            let f = sqlx::query("DELETE FROM festschreibungen")
+                .execute(&mut c)
+                .await
+                .map_err(meldung)
+                .unwrap_err();
+            assert_eq!(f, "Festschreibungen werden nie aufgehoben (GoBD).");
+            let f = sqlx::query("UPDATE festschreibungen SET bis_datum = '2024-12-31'")
+                .execute(&mut c)
+                .await
+                .map_err(meldung)
+                .unwrap_err();
+            assert_eq!(f, "Festschreibungen werden nie geändert (GoBD).");
+
+            let f = sqlx::query("DELETE FROM protokoll")
+                .execute(&mut c)
+                .await
+                .map_err(meldung)
+                .unwrap_err();
+            assert_eq!(f, "Das Protokoll wird nie gelöscht (GoBD).");
+            let gesperrt = "Protokolleinträge werden nie geändert (GoBD). Nur alt_json/neu_json dürfen anonymisiert werden.";
+            for sql in [
+                "UPDATE protokoll SET id = 2",
+                "UPDATE protokoll SET zeitpunkt = 'spaeter'",
+                "UPDATE protokoll SET tabelle = 'buchungen'",
+                "UPDATE protokoll SET datensatz_id = 4",
+                "UPDATE protokoll SET aktion = 'geaendert'",
+                "UPDATE protokoll SET schluessel = 'firma'",
+                "UPDATE protokoll SET neu_json = NULL, aktion = 'geaendert'",
+            ] {
+                let f = sqlx::query(sql)
+                    .execute(&mut c)
+                    .await
+                    .map_err(meldung)
+                    .unwrap_err();
+                assert_eq!(f, gesperrt, "{sql}");
+            }
+            // anonymisieren geht
+            sqlx::query("UPDATE protokoll SET neu_json = '{\"name\":\"***\"}', alt_json = NULL")
+                .execute(&mut c)
+                .await
+                .unwrap();
+            let neu: String = sqlx::query_scalar("SELECT neu_json FROM protokoll WHERE id = 1")
+                .fetch_one(&mut c)
+                .await
+                .unwrap();
+            assert_eq!(neu, "{\"name\":\"***\"}");
         });
     }
 

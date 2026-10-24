@@ -8,8 +8,6 @@ import { datumKurz } from './buchungen';
 
 /** Endungen, die Rust annimmt (beleg_pruefen). */
 export const BELEG_ENDUNGEN = ['pdf', 'png', 'jpg', 'jpeg', 'heic', 'heif', 'webp', 'tif', 'tiff', 'xml'] as const;
-/** Höchstgröße je Datei (50 MB). */
-export const MAX_BELEG_BYTES = 50 * 1024 * 1024;
 
 /** Filter für den nativen Datei-Dialog (@tauri-apps/plugin-dialog, `extensions` ohne Punkt). */
 export const DIALOG_FILTER = { name: 'Belege (PDF, Bilder, E-Rechnung)', extensions: [...BELEG_ENDUNGEN] };
