@@ -96,6 +96,8 @@ Was der Workflow (`.github/workflows/release.yml`) tut:
 4. **Bauen & veröffentlichen** mit `tauri-apps/tauri-action@v1` für `aarch64-apple-darwin` (Apple Silicon), signiert mit
    dem Update-Schlüssel. Das Release enthält:
    - `Kladdy_X.Y.Z_aarch64.dmg` – zum Herunterladen und Installieren,
+   - `Kladdy.dmg` – dieselbe Datei unter festem Namen, damit `…/releases/latest/download/Kladdy.dmg` immer die neueste
+     Version lädt (Link in der README; Vorabversionen zählen nicht als `latest`),
    - `Kladdy_X.Y.Z_aarch64.app.tar.gz` + `.sig` – das Update-Paket mit Signatur
      (seit tauri-action v1 steht die Version im Dateinamen),
    - `latest.json` – die Versionsdatei, die die App abfragt.

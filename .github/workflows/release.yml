@@ -212,3 +212,15 @@ jobs:
           prerelease: ${{ inputs.prerelease }}
           uploadUpdaterJson: true
           args: --target aarch64-apple-darwin
+
+      # Dieselbe .dmg zusätzlich als „Kladdy.dmg“: Der Name bleibt gleich, deshalb lädt
+      # …/releases/latest/download/Kladdy.dmg immer die neueste Version (Link in der README).
+      - name: Feste Download-Datei (Kladdy.dmg)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release download "$TAG" --pattern "Kladdy_${VERSION}_aarch64.dmg" --dir "$RUNNER_TEMP/dl"
+          cp "$RUNNER_TEMP/dl/Kladdy_${VERSION}_aarch64.dmg" "$RUNNER_TEMP/dl/Kladdy.dmg"
+          gh release upload "$TAG" "$RUNNER_TEMP/dl/Kladdy.dmg" --clobber
