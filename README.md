@@ -21,10 +21,27 @@ fragt macOS nicht nach einer Freigabe. Wer das Skript vorher lesen will:
 Derselbe Befehl installiert eine neuere Version über eine vorhandene. Deine Daten liegen nicht in der App und
 bleiben dabei erhalten.
 
-**Ohne Terminal:** [Kladdy.dmg](https://github.com/m0cki/Kladdy/releases/latest/download/Kladdy.dmg) laden (immer die
-neueste Version), Kladdy in den Programme-Ordner ziehen und einmal öffnen. macOS blockiert den ersten Start, weil die
-App nicht von Apple notarisiert ist. Dann **Systemeinstellungen → Datenschutz & Sicherheit → „Dennoch öffnen“** wählen
-und mit dem Passwort bestätigen.
+### Ohne Terminal
+
+1. [Kladdy.dmg](https://github.com/m0cki/Kladdy/releases/latest/download/Kladdy.dmg) laden (immer die neueste
+   Version).
+2. Die geladene `Kladdy.dmg` doppelklicken. Im Fenster, das sich öffnet, **Kladdy** auf den Ordner **Programme**
+   ziehen.
+3. Das Fenster schließen und das Laufwerk „Kladdy“ im Finder auswerfen (⏏).
+4. Kladdy im Programme-Ordner (oder über Launchpad/Spotlight) doppelklicken. macOS blockiert diesen ersten Start,
+   weil die App nicht von Apple notarisiert ist, und zeigt die Meldung „Kladdy“ wurde nicht geöffnet. Mit
+   **Fertig** schließen, **nicht** „In den Papierkorb legen“ wählen.
+5. **Systemeinstellungen** öffnen (Apple-Menü oben links → Systemeinstellungen …) und links **Datenschutz &
+   Sicherheit** wählen.
+6. Rechts nach unten bis zum Abschnitt **Sicherheit** scrollen. Dort steht ein Hinweis, dass „Kladdy“ blockiert
+   wurde. Daneben auf **Dennoch öffnen** klicken.
+7. Im folgenden Dialog erneut **Dennoch öffnen** wählen und mit Passwort oder Touch ID bestätigen.
+
+Kladdy startet. Die Freigabe ist nur einmal nötig, danach öffnet sich die App normal. Der Hinweis in Schritt 6
+erscheint nur kurz nach dem Startversuch; fehlt er, Schritt 4 wiederholen.
+
+Unter macOS 14 Sonoma geht es auch kürzer: Kladdy im Programme-Ordner mit **Rechtsklick → Öffnen** starten und im
+Dialog **Öffnen** wählen. Ab macOS 15 Sequoia ist nur noch der Weg über die Systemeinstellungen möglich.
 
 ## Updates
 
