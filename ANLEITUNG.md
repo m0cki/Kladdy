@@ -1868,7 +1868,14 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
      Bausteine in den Schnappschuss einfrieren. Im Browser ohne Datenbank: Standardvorlagen, nichts wird gespeichert.
      **Auf dem Mac prüfen:** Ziehen in der Liste, erste Änderung ⇒ „Meine …“ und „gespeichert“, nach Neustart noch da,
      Zurücksetzen mit Rückgängig, Steuerhinweis entfernen ⇒ Check rot, „PDF“ von der Vorlagen-Seite, Einträge im
-     Protokoll. **Offen:** Vorschau mit einem echten Beleg statt Beispieldaten (nach der Beleg-Maske). Keine Migration nötig
+     Protokoll. **Vorschau mit einem echten Beleg – erledigt (Branch `vorlagen-echter-beleg`, #32):** Umschalter
+     „Beispiel · Letzter Beleg“ über dem Blatt (nur, wenn es einen Beleg der Art gibt; Auswahl je Art in localStorage
+     `kladdy.vorlagen.v1`, Standard Beispiel). Logik in `src/lib/vorlagen/vorschau.ts`: `letzterBeleg` = neuester
+     ausgestellter Beleg der Art (Belegdatum, dann ID; Stornobelege zählen nicht), sonst der neueste Entwurf; geladen wie in
+     der Beleg-Maske (`ladeBeleg` ⇒ `ausgestellterBeleg` bzw. `formularAusEntwurf` ⇒ `formularZuDokument`), gezeigt mit den
+     aktuellen Bausteinen, dem aktuellen Logo und der aktuellen Akzentfarbe. GoBD: nur gelesen, ohne Nummer (Wasserzeichen
+     ENTWURF, `{nr}` = „Entwurf“), „PDF“ landet wie bisher nur im Cache, nichts wird abgelegt; Schnappschuss und abgelegtes
+     PDF des Belegs bleiben unverändert. Pflichtangaben-Check prüft mit denselben Daten. Keine Migration nötig
   6. GiroCode (EPC-QR, §6.6) – **erledigt (Branch `phase-3-girocode`, auf Teil 1)**: `src/lib/girocode/` –
      `qr.ts` (TS-Port des Encoders aus `prototyp/js/qr.js`: Byte-Modus UTF-8, Version 1–40, Reed-Solomon, acht Masken
      mit Strafpunkten ⇒ Modulmatrix + SVG mit `crispEdges`), `epc.ts` (EPC069-12 Version 002: BIC optional, Name max. 70,
