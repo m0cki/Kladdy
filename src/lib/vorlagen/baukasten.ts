@@ -5,6 +5,7 @@
  * Tests: baukasten.test.ts */
 import { BAUSTEINE, BAUSTEIN_TYPEN, aufloesen, type Baustein, type BausteinTyp, type Einstellung } from './bausteine';
 import type { Belegart } from './dokument';
+import { klartext } from './formatierung';
 import { STANDARD_DESIGN, designFuer } from './standard';
 
 /** Name der eigenen Kopie je Art (Tabelle `vorlagen`, lib/queries/vorlagen.ts). */
@@ -27,12 +28,13 @@ export const erlaubteTypen = (art: Belegart): BausteinTyp[] => BAUSTEIN_TYPEN.fi
 /** Nur Bausteine, die zur Art passen (z. B. keine „Zahlung & GiroCode“ auf der Quittung). */
 export const nurErlaubte = (liste: readonly Baustein[], art: Belegart): Baustein[] => liste.filter((b) => BAUSTEINE[b.typ].arten.includes(art));
 
-/** Kurzinfo in der Bausteinliste: erster gefüllter Text (Zeilenumbrüche als „ · “), sonst die Beschreibung. */
+/** Kurzinfo in der Bausteinliste: erster gefüllter Text ohne Formatierung (Zeilenumbrüche als „ · “), sonst die Beschreibung. */
 export function zusammenfassung(b: Baustein): string {
   const def = BAUSTEINE[b.typ];
   const r = aufloesen(b);
-  const feld = def.felder.find((f) => (f.typ === 'text' || f.typ === 'textarea') && r.text(f.key).trim());
-  return feld ? r.text(feld.key).trim().replace(/\s*\n\s*/g, ' · ') : def.beschreibung;
+  const texte = def.felder.filter((f) => f.typ === 'text' || f.typ === 'textarea').map((f) => klartext(r.text(f.key)).trim());
+  const text = texte.find(Boolean);
+  return text ? text.replace(/\s*\n\s*/g, ' · ') : def.beschreibung;
 }
 
 /** Neuen Baustein (nur Typ, Einstellungen = Standard) unter dem ausgewählten einfügen; ohne Auswahl ans Ende. */

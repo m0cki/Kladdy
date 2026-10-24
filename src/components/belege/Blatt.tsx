@@ -6,11 +6,17 @@
  * - GiroCode im Baustein „Zahlung“: dieselbe Modulmatrix wie girocode.png im PDF (lib/girocode).
  * - Firmenlogo im Baustein „Kopf“: die Datei aus `doc.logo` (ausgestellte Belege: die aus dem Schnappschuss), im Editor
  *   ohne Logo ein Platzhalter.
+ * - Texte aus den Einstellungen tragen ihre Formatierung (<b>/<i>/<u> ⇒ <strong>/<em>/<u>, lib/vorlagen/formatierung.ts);
+ *   gelesen wird sie im Vorlagentext vor dem Ersetzen der Platzhalter, Werte bleiben immer Text.
+ * - Vorlagen-Seite (`bearbeitung`): Ein Text aus einer Einstellung (.blk-tx, data-feld = Schlüssel, im .blk mit
+ *   data-blk = Index) wird per Klick an derselben Stelle zum FormatEditor. Feste Texte („Rechnungs-Nr.“ usw.) nicht.
  * - BlattVorschau skaliert das Blatt auf die verfügbare Breite (wie mount() im Prototyp).
  * Stile: src/styles/blatt.css */
 import { Fragment, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react';
 import { formatBetrag } from '../../lib/money';
-import { BAUSTEINE, istUmrandet, istUnten, sichtbare, type Aufgeloest, type Baustein, type BausteinTyp } from '../../lib/vorlagen/bausteine';
+import { BAUSTEINE, istTextFeld, istUmrandet, istUnten, sichtbare, type Aufgeloest, type Baustein, type BausteinTyp } from '../../lib/vorlagen/bausteine';
+import { ersetzteZeilen, type Segment } from '../../lib/vorlagen/formatierung';
+import { FormatEditor } from './FormatEditor';
 import {
   ARTEN,
   belegSumme,
@@ -30,7 +36,6 @@ import {
   quittungFuer,
   unterschriftDatum,
   zahlungswegText,
-  zerlegen,
   ZAHLUNGSWEGE,
   type BelegDokument,
   type BelegPosition,
@@ -44,23 +49,35 @@ import { qrPfad } from '../../lib/girocode/qr';
 import { useLogoUrl } from '../../lib/logoablage';
 import { sichtbareZeilen } from '../../lib/vorlagen/firmenblock';
 
-/** Markiert die fehlende Nummer im Text (wird zum grauen „Entwurf“). */
-const ENTWURF = '\u0000';
-
 /** Text mit Zeilenumbrüchen ⇒ Knoten mit <br>. */
 function zeilen(text: string): ReactNode {
   const z = text.split('\n');
   return z.map((zeile, i) => (
     <Fragment key={i}>
-      {zeile.split(ENTWURF).map((teil, j) => (
-        <Fragment key={j}>
-          {j > 0 && <span className="blk-leer">Entwurf</span>}
-          {teil}
-        </Fragment>
-      ))}
+      {zeile}
       {i < z.length - 1 && <br />}
     </Fragment>
   ));
+}
+
+/** Ein Stück Text mit Formatierung; fehlende Nummer grau „Entwurf“. */
+function segment(s: Segment, key: number): ReactNode {
+  let n: ReactNode = s.entwurf ? <span className="blk-leer">Entwurf</span> : s.text;
+  if (s.unterstrichen) n = <u>{n}</u>;
+  if (s.kursiv) n = <em>{n}</em>;
+  if (s.fett) n = <strong>{n}</strong>;
+  return <Fragment key={key}>{n}</Fragment>;
+}
+
+/** Bearbeiten im Blatt (Vorlagen-Seite): welcher Text gerade bearbeitet wird und wohin Änderungen gehen. */
+export interface BlattBearbeitung {
+  /** Baustein-Index und Schlüssel der Einstellung im Editor; null = keiner */
+  aktiv: { index: number; key: string } | null;
+  /** Klickpunkt beim Öffnen (Schreibmarke dorthin) */
+  klick: { x: number; y: number } | null;
+  starten: (index: number, key: string, klick: { x: number; y: number }) => void;
+  ende: () => void;
+  setze: (index: number, key: string, wert: string) => void;
 }
 
 interface Ctx {
@@ -71,21 +88,55 @@ interface Ctx {
   editable: boolean;
   /** Blob-URL des Firmenlogos (null = keins oder noch nicht geladen) */
   logoUrl: string | null;
+  /** Index des Bausteins in der Vorlage */
+  index: number;
+  bearbeitung: BlattBearbeitung | null;
 }
 
-/** Platzhalter ersetzen wie `ersetzen` (Ränder getrimmt), fehlende Nummer grau; null = nichts zu drucken. */
+/** Platzhalter ersetzen wie `ersetzen` (Ränder getrimmt), mit Formatierung, fehlende Nummer grau; null = nichts zu drucken. */
 function ph(text: string, x: Ctx): ReactNode | null {
-  const roh = zerlegen(text)
-    .map((t) => {
-      if (t.art === 'text') return t.text.split(ENTWURF).join('');
-      if (t.name === 'nr' && !x.werte.nr) return ENTWURF;
-      return x.werte[t.name].split(ENTWURF).join('');
-    })
-    .join('')
-    .replace(/\r\n?/g, '\n')
-    .replace(/[ \t]+\n/g, '\n')
-    .replace(/^\n+|\n+$/g, '');
-  return roh.trim() ? zeilen(roh) : null;
+  const z = ersetzteZeilen(text, x.werte);
+  if (!z) return null;
+  return z.map((zeile, i) => (
+    <Fragment key={i}>
+      {zeile.map(segment)}
+      {i < z.length - 1 && <br />}
+    </Fragment>
+  ));
+}
+
+/**
+ * Text einer Einstellung. Ohne Bearbeitung wie `ph`; auf der Vorlagen-Seite anklickbar (.blk-tx) bzw. – wenn gerade
+ * dieser bearbeitet wird – der Editor an derselben Stelle (auch bei leerem Text, damit er beim Tippen nicht verschwindet).
+ * `inhalt`: eigene Darstellung (Firmenkopf: nur sichtbare Zeilen), `block`: als div statt span.
+ */
+function feld(b: Aufgeloest, x: Ctx, key: string, inhalt: ReactNode | null = ph(b.text(key), x), block = false): ReactNode | null {
+  const bt = x.bearbeitung;
+  const f = bt ? istTextFeld(b.typ, key) : null;
+  if (!bt || !f) return inhalt;
+  if (bt.aktiv?.index === x.index && bt.aktiv.key === key) {
+    return (
+      <FormatEditor
+        wert={b.text(key)}
+        onChange={(w) => bt.setze(x.index, key, w)}
+        mehrzeilig={f.typ === 'textarea'}
+        leiste="schwebend"
+        onEnde={bt.ende}
+        autoFokus
+        klick={bt.klick}
+        als={block ? 'div' : 'span'}
+        label={`${BAUSTEINE[b.typ].name}: ${f.label}`}
+        className="blk-edit"
+      />
+    );
+  }
+  if (inhalt == null) return null;
+  const Tag = block ? 'div' : 'span';
+  return (
+    <Tag className="blk-tx" data-feld={key} title={`${f.label} bearbeiten`} onClick={(e) => bt.starten(x.index, key, { x: e.clientX, y: e.clientY })}>
+      {inhalt}
+    </Tag>
+  );
 }
 
 const mitText = (s: string): ReactNode | null => (s.trim() ? zeilen(s.replace(/\r\n?/g, '\n')) : null);
@@ -139,7 +190,7 @@ function PosMini({ positionen }: { positionen: readonly BelegPosition[] }) {
 
 const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode | null>> = {
   kopf(b, x) {
-    const claim = b.text('claim') ? ph(b.text('claim'), x) : null;
+    const claim = feld(b, x, 'claim');
     // Firmenlogo wie \LogoDatei im PDF; ohne Logo im Editor nur der Platzhalter
     const logo = !b.an('logo') ? null : x.logoUrl ? <img src={x.logoUrl} alt="" /> : x.editable ? <span className="blk-logo-slot">Logo</span> : null;
     return (
@@ -153,25 +204,28 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
     );
   },
   firmenblock(b, x) {
-    const name = ph(b.text('name'), x);
-    const zeilenVon = (key: string) => sichtbareZeilen(b.text(key), x.werte).map((z, i) => <div key={i}>{ph(z.text, x)}</div>);
+    const name = feld(b, x, 'name');
+    const zeilenVon = (key: string) => {
+      const z = sichtbareZeilen(b.text(key), x.werte).map((zeile, i) => <div key={i}>{ph(zeile.text, x)}</div>);
+      return feld(b, x, key, z.length ? z : null, true);
+    };
     const untertitel = zeilenVon('untertitel');
     const kontakt = zeilenVon('zeilen');
     const logo = !b.an('logo') ? null : x.logoUrl ? <img src={x.logoUrl} alt="" /> : x.editable ? <span className="blk-logo-slot">Logo</span> : null;
-    if (!name && !untertitel.length && !kontakt.length && !logo) return null;
+    if (!name && !untertitel && !kontakt && !logo) return null;
     return (
       <div className={`blk-fk${b.an('linie') ? ' linie' : ''}`}>
         <div className="blk-fk-l">
           {name && <div className={`blk-fk-name${b.an('versal') ? ' versal' : ''}`}>{name}</div>}
-          {untertitel.length > 0 && <div className="blk-fk-sub">{untertitel}</div>}
-          {kontakt.length > 0 && <div className="blk-fk-z">{kontakt}</div>}
+          {untertitel && <div className="blk-fk-sub">{untertitel}</div>}
+          {kontakt && <div className="blk-fk-z">{kontakt}</div>}
         </div>
         {logo && <div className="blk-logo">{logo}</div>}
       </div>
     );
   },
   absenderzeile(b, x) {
-    const h = ph(b.text('text'), x);
+    const h = feld(b, x, 'text');
     return h && <div className={`blk-absender${b.an('linie') ? ' linie' : ''}`}>{h}</div>;
   },
   anschrift_meta(b, x) {
@@ -203,11 +257,11 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
     );
   },
   titel(b, x) {
-    const rechts = b.text('rechts') ? ph(b.text('rechts'), x) : null;
+    const rechts = feld(b, x, 'rechts');
     return (
       <>
         <div className={`blk-titel-row${b.text('stil') === 'akzent' ? ' akzent' : ''}${b.an('versal') ? ' versal' : ''}`}>
-          <h1>{ph(b.text('text'), x)}</h1>
+          <h1>{feld(b, x, 'text')}</h1>
           {rechts && <div className="blk-titel-r">{rechts}</div>}
         </div>
         {b.an('linie') && <div className="blk-akzentlinie" />}
@@ -215,23 +269,23 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
     );
   },
   betreff(b, x) {
-    const h = ph(b.text('text'), x);
+    const h = feld(b, x, 'text');
     return h && <p className="blk-betreff">{h}</p>;
   },
   text(b, x) {
-    const h = ph(b.text('text'), x);
+    const h = feld(b, x, 'text');
     return h && <p className={`blk-text ${b.text('groesse') || 'normal'}`}>{h}</p>;
   },
   datenschutz(b, x) {
-    const h = ph(b.text('text'), x);
+    const h = feld(b, x, 'text');
     return h && <p className="blk-text grau blk-ds">{h}</p>;
   },
   steuerhinweis(b, x) {
-    const h = ph(b.text('text'), x);
+    const h = feld(b, x, 'text');
     return h && <p className={`blk-text ${b.text('groesse') || 'normal'}`}>{h}</p>;
   },
   gruss(b, x) {
-    const h = ph(b.text('text'), x);
+    const h = feld(b, x, 'text');
     return h && <p className="blk-text">{h}</p>;
   },
   positionen(b, x) {
@@ -278,13 +332,13 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
   summe(b, x) {
     return (
       <div className="blk-summe-row">
-        <span>{ph(b.text('label'), x)}</span>
+        <span>{feld(b, x, 'label')}</span>
         <b>{formatBetrag(x.summe)}</b>
       </div>
     );
   },
   betrag_worte(b, x) {
-    const label = b.text('label') ? ph(b.text('label'), x) : null;
+    const label = feld(b, x, 'label');
     return (
       <p className="blk-worte">
         {label && <span>{label}:</span>} {betragInWorten(x.summe)}
@@ -297,7 +351,7 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
     // Schon bei Ausstellung bezahlt: kein Zahlungsaufruf, keine Bankverbindung, kein GiroCode
     const q = quittiertText(doc);
     if (q) return <p className="blk-text">{q}</p>;
-    const txt = b.text('text') ? ph(b.text('text'), x) : null;
+    const txt = feld(b, x, 'text');
     const bank = b.an('bank') ? (
       <div className="blk-bank">
         <b>Bankverbindung</b>
@@ -378,11 +432,11 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
             <FormZeile label="Datum">{datumText(doc.datum)}</FormZeile>
             <FormZeile label="Nr.">{doc.nummer || <span className="blk-leer">Entwurf</span>}</FormZeile>
           </div>
-          <FormZeile label={ph(b.text('von'), x)}>
+          <FormZeile label={feld(b, x, 'von')}>
             {e.anzeige}
             {e.zeilen.length ? `, ${e.zeilen.join(', ')}` : ''}
           </FormZeile>
-          <FormZeile label={ph(b.text('fuer'), x)}>{fuer}</FormZeile>
+          <FormZeile label={feld(b, x, 'fuer')}>{fuer}</FormZeile>
           {za && (
             <FormZeile label="Zahlungsart">
               {ZAHLUNGSWEGE.map((z) => (
@@ -414,17 +468,17 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
           {za && <Feld label="Zahlungsart">{zahlungswegText(gedruckterZahlungsweg(doc))}</Feld>}
         </div>
         {b.an('worte') && <Feld label="Betrag in Worten">{betragInWorten(x.summe)}</Feld>}
-        <Feld label={ph(b.text('von'), x)}>
+        <Feld label={feld(b, x, 'von')}>
           {e.anzeige}
           {e.zeilen.length ? `, ${e.zeilen.join(', ')}` : ''}
         </Feld>
-        <Feld label={ph(b.text('fuer'), x)}>{fuer}</Feld>
+        <Feld label={feld(b, x, 'fuer')}>{fuer}</Feld>
       </>
     );
   },
   eigenbeleg_felder(b, x) {
     const { doc, empf: e } = x;
-    const sub = b.text('untertitel') ? ph(b.text('untertitel'), x) : null;
+    const sub = feld(b, x, 'untertitel');
     const gebucht = gebuchtText(doc);
     return (
       <>
@@ -459,7 +513,7 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
     if (b.text('stil') === 'eine') {
       return (
         <div className="blk-sign1">
-          <b>{ph(b.text('rechts'), x)}</b>
+          <b>{feld(b, x, 'rechts')}</b>
           <i />
         </div>
       );
@@ -472,12 +526,12 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
         <div>
           <span>{vor}</span>
           <i />
-          <small>{ph(b.text('links'), x)}</small>
+          <small>{feld(b, x, 'links')}</small>
         </div>
         <div>
           <span />
           <i />
-          <small>{ph(b.text('rechts'), x)}</small>
+          <small>{feld(b, x, 'rechts')}</small>
         </div>
       </div>
     );
@@ -521,15 +575,26 @@ export interface BlattProps {
   editable?: boolean;
   ausgewaehlt?: number | null;
   onWaehle?: (index: number) => void;
+  /** Vorlagen-Seite: Texte der Einstellungen direkt im Blatt bearbeiten (nur mit `editable`) */
+  bearbeitung?: BlattBearbeitung;
   /** Skalierung in der Vorschau (0 = noch nicht gemessen ⇒ unsichtbar), ohne = Originalgröße */
   skala?: number;
   ref?: Ref<HTMLElement>;
 }
 
 /** Das Blatt in Originalgröße (210 mm breit). */
-export function Blatt({ doc, bausteine, editable = false, ausgewaehlt = null, onWaehle, skala, ref }: BlattProps) {
+export function Blatt({ doc, bausteine, editable = false, ausgewaehlt = null, onWaehle, bearbeitung, skala, ref }: BlattProps) {
   const logoUrl = useLogoUrl(doc.logo);
-  const x: Ctx = { doc, werte: platzhalterWerte(doc), empf: empfaenger(doc), summe: belegSumme(doc), editable, logoUrl };
+  const basis: Ctx = {
+    doc,
+    werte: platzhalterWerte(doc),
+    empf: empfaenger(doc),
+    summe: belegSumme(doc),
+    editable,
+    logoUrl,
+    index: -1,
+    bearbeitung: editable ? (bearbeitung ?? null) : null,
+  };
   const format = formatVon(doc.art);
   const oben: ReactNode[] = [];
   const unten: ReactNode[] = [];
@@ -548,7 +613,7 @@ export function Blatt({ doc, bausteine, editable = false, ausgewaehlt = null, on
     }
     let inhalt: ReactNode | null = null;
     try {
-      inhalt = BLOCK[b.typ](b, x);
+      inhalt = BLOCK[b.typ](b, { ...basis, index });
     } catch (e) {
       console.warn('Baustein', b.typ, e);
     }

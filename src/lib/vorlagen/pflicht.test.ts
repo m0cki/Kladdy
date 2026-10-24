@@ -165,4 +165,20 @@ describe('Design „Formular“ der Quittung', () => {
     const v = formular().map((b) => (b.typ === 'quittung_felder' ? { ...b, stil: 'kacheln' } : b));
     expect(punkt(pflichtCheck({ ...beispiel(), nummer: 'QU-1' }, v), 'Fortlaufende Nummer').ok).toBe(false);
   });
+
+  it('Formatierung zählt nicht: § 19-Hinweis und Platzhalter auch fett, kursiv oder unterstrichen', () => {
+    const v = standardVorlage('rechnung').map((b) =>
+      b.typ === 'steuerhinweis'
+        ? { ...b, text: '<b>Umsatzsteuerfrei</b> aufgrund der Kleinunternehmerregelung gemäß <u>§ <i>19</i></u> UStG.' }
+        : b,
+    );
+    expect(punkt(pflichtCheck(rechnung(), v), 'Entgelt und § 19-Hinweis').ok).toBe(true);
+    const ohneFuss = standardVorlage('rechnung')
+      .filter((b) => b.typ !== 'fusszeile')
+      .map((b) => (b.typ === 'absenderzeile' ? { ...b, text: '<b>{firma}</b> · <i>{inhaber}</i> · <u>{strasse}</u> · {plz} {ort} · {steuernummer}' } : b));
+    const l = pflichtCheck(rechnung(), ohneFuss);
+    expect(punkt(l, 'Name und Anschrift (Aussteller)').ok).toBe(true);
+    expect(punkt(l, 'Vollständiger Name (Inhaber)').ok).toBe(true);
+    expect(punkt(l, 'Steuernummer').ok).toBe(true);
+  });
 });
