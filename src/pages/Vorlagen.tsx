@@ -1,6 +1,10 @@
 /* Vorlagen-Baukasten (ANLEITUNG §7.0, §6.7; Prototyp js/pages/vorlagen.js): Belege aus Bausteinen zusammenstellen.
  * - Art-Umschalter Rechnung · Quittung · Angebot · Eigenbeleg, auch aus der Adresse (?art=rechnung), damit die
  *   Beleg-Maske direkt hierher verlinken kann. Ohne ?art= gilt die zuletzt gewählte Art.
+ * - Designs (Vorlagen-Galerie, lib/vorlagen/standard.ts): Hat die Art mehrere (Quittung: Klassisch · Formular), wählt
+ *   eine Leiste über dem Baukasten, welches gezeigt und bearbeitet wird (?design=formular; sonst das zuletzt gezeigte
+ *   je Art, sonst das aktive). Zeigen und Bearbeiten ändern nie, was neue Belege nehmen – das tut nur „Diese
+ *   verwenden“ (Einstellung 'vorlagen_design'). „angepasst“ = es gibt eine eigene Kopie des Designs.
  * - Links: Bausteinliste (Griff zum Ziehen per Zeiger, ↑/↓ auf dem Griff; Auge = ausblenden, × = entfernen mit
  *   Rückgängig), „+ Baustein hinzufügen“ (Palette mit allen Bausteinen der Art, eingefügt unter dem ausgewählten),
  *   darunter die Einstellungen des gewählten Bausteins mit Platzhalter-Chips (fügen {name} an der Schreibmarke ein) und
@@ -10,8 +14,9 @@
  *   (lib/vorlagen/vorschau.ts: nur gelesen, ohne Nummer ⇒ Wasserzeichen ENTWURF). Klick ins Blatt wählt den
  *   Baustein. „PDF“ setzt das Blatt mit Tectonic wie der Testbeleg (Entwurf, keine Nummer, nichts wird abgelegt) und
  *   öffnet es, Fehler mit Baustein und Zeile. „LaTeX“ zeigt die erzeugte main.tex (nur lesen).
- * - Speichern: Die erste Änderung an der Standardvorlage legt die eigene Kopie an, danach automatisch (entprellt, beim
- *   Verlassen sofort). „Zurücksetzen“ kehrt zum Standard zurück (mit Rückgängig). Bedeutung der Tabelle `vorlagen`:
+ * - Speichern: Die erste Änderung an einem Design legt dessen eigene Kopie an, danach automatisch (entprellt, beim
+ *   Verlassen sofort). „Zurücksetzen“ kehrt beim gezeigten Design zum Original zurück (mit Rückgängig), andere Designs
+ *   bleiben. Bedeutung der Tabelle `vorlagen`:
  *   lib/queries/vorlagen.ts. Im Browser ohne Datenbank: Standardvorlagen, Änderungen nur auf dieser Seite.
  * Logik in lib/vorlagen/baukasten.ts, Stile in styles/vorlagen.css. */
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
@@ -20,6 +25,7 @@ import {
   ArrowDown,
   ArrowUp,
   Blocks,
+  Building2,
   Check,
   CircleCheck,
   Clock,
@@ -48,6 +54,7 @@ import {
   Sigma,
   Signature,
   SlidersHorizontal,
+  SquareDashed,
   Stamp,
   TriangleAlert,
   Type,
@@ -70,11 +77,19 @@ import { useFirmenlogo } from '../lib/logoablage';
 import { inTauri } from '../lib/menu';
 import { UST_MODUS_STANDARD, ladeFirma, ladeUstModus, type UstModus } from '../lib/queries/einstellungen';
 import { ladeBelege } from '../lib/queries/rechnungen';
-import { ladeEigeneVorlage, speichereVorlage, vorlageZuruecksetzen, type EigeneVorlage } from '../lib/queries/vorlagen';
+import {
+  ladeAktivesDesign,
+  ladeEigeneVorlagen,
+  speichereAktivesDesign,
+  speichereVorlage,
+  vorlageZuruecksetzen,
+  type EigeneVorlage,
+} from '../lib/queries/vorlagen';
 import type { BelegZeile } from '../lib/rechnungen';
 import { BAUSTEINE, aufloesen, type Baustein, type BausteinTyp, type Einstellung } from '../lib/vorlagen/bausteine';
 import {
-  EIGENER_NAME,
+  STANDARD_NAME,
+  eigenerName,
   einfuegen,
   einstellen,
   entfernen,
@@ -91,8 +106,16 @@ import {
 import { BEISPIEL_FIRMA, beispielbeleg, firmaOderBeispiel } from '../lib/vorlagen/beispiel';
 import { ARTEN, BELEGARTEN, PLATZHALTER, istBelegart, type BelegDokument, type Belegart } from '../lib/vorlagen/dokument';
 import { pflichtCheck, type Pflichtangabe } from '../lib/vorlagen/pflicht';
-import { standardVorlage } from '../lib/vorlagen/standard';
-import { ladeQuellen, ladeVorschauBeleg, letzterBeleg, speichereQuelle, type Vorschauquelle } from '../lib/vorlagen/vorschau';
+import { STANDARD_DESIGN, designFuer, designSchluessel, designsFuer, istDesign, standardVorlage } from '../lib/vorlagen/standard';
+import {
+  ladeGezeigteDesigns,
+  ladeQuellen,
+  ladeVorschauBeleg,
+  letzterBeleg,
+  speichereGezeigtesDesign,
+  speichereQuelle,
+  type Vorschauquelle,
+} from '../lib/vorlagen/vorschau';
 import { heute } from '../lib/zeitraum';
 import { useUi } from '../store/ui';
 import { Ladeansicht } from './einstellungen/Laden';
@@ -118,6 +141,8 @@ const ICON: Readonly<Record<BausteinTyp, LucideIcon>> = {
   abstand: MoveVertical,
   fusszeile: Landmark,
   datenschutz: Lock,
+  firmenblock: Building2,
+  rahmen: SquareDashed,
 };
 
 const ART_OPTIONEN: readonly SegOption<Belegart>[] = BELEGARTEN.map((a) => ({ value: a, label: ARTEN[a].label }));
@@ -152,6 +177,8 @@ const RUECKGAENGIG = 'vorlage-rueckgaengig';
 const GRUNDLAGE: Readonly<Record<Belegart, string>> = { rechnung: '§ 34a UStDV', quittung: '§ 33/§ 34a UStDV', angebot: '', eigenbeleg: '' };
 const KEINE_OPTIONEN: readonly (readonly [string, string])[] = [];
 const TX_KLASSE: Readonly<Record<TexTeilArt, string>> = { kommentar: 'tx-c', befehl: 'tx-k', klammer: 'tx-b', text: '' };
+/** „Neue Quittungen verwenden …“ */
+const MEHRZAHL: Readonly<Record<Belegart, string>> = { rechnung: 'Rechnungen', quittung: 'Quittungen', angebot: 'Angebote', eigenbeleg: 'Eigenbelege' };
 const QUELLEN: readonly SegOption<Vorschauquelle>[] = [
   { value: 'beispiel', label: 'Beispiel' },
   { value: 'beleg', label: 'Letzter Beleg' },
@@ -180,17 +207,25 @@ type Basis = { firma: Firma; ust: UstModus };
 /** Letzter Beleg je Art (null = keiner); ohne Datenbank oder bei Fehler: keiner, dann gibt es nur Beispieldaten */
 type Letzte = Record<Belegart, BelegZeile | null>;
 const KEINE: Letzte = { rechnung: null, quittung: null, angebot: null, eigenbeleg: null };
-type Stand = { art: Belegart; status: 'ok'; eigene: EigeneVorlage | null } | { art: Belegart; status: 'fehler'; fehler: string };
+/** Gelesen für eine Art und ein gewünschtes Design (`fuer`, '' = keins gewünscht ⇒ das aktive):
+ *  eigene Kopien je Design und das aktive Design der Art */
+type Stand =
+  | { art: Belegart; fuer: string; status: 'ok'; eigene: ReadonlyMap<string, EigeneVorlage>; aktiv: string }
+  | { art: Belegart; fuer: string; status: 'fehler'; fehler: string };
 
 export default function Vorlagen() {
   const [params, setParams] = useSearchParams();
   const roh = params.get('art');
   const art: Belegart = istBelegart(roh) ? roh : zuletzt;
+  // gewünschtes Design: aus der Adresse, sonst das zuletzt gezeigte der Art; '' = das aktive
+  const dRoh = params.get('design');
+  const wunsch = istDesign(art, dRoh) ? dRoh : (ladeGezeigteDesigns(speicher())[art] ?? '');
   const [basis, setBasis] = useState<Basis | null>(null);
   const [stand, setStand] = useState<Stand | null>(null);
   const [versuch, setVersuch] = useState(0);
   /** null = wird noch gelesen (ein gemerktes „Letzter Beleg“ soll nicht erst die Beispieldaten zeigen) */
   const [letzte, setLetzte] = useState<Letzte | null>(() => (datenbankVerfuegbar() ? null : KEINE));
+  const [aktiviert, setAktiviert] = useState(false);
 
   useEffect(() => {
     zuletzt = art;
@@ -230,34 +265,80 @@ export default function Vorlagen() {
     };
   }, []);
 
-  // Eigene Kopie der Art (null = Standard), erst nach dem letzten Schreibauftrag dieser Seite gelesen
+  // Eigene Kopien und aktives Design der Art, erst nach dem letzten Schreibauftrag dieser Seite gelesen – auch beim
+  // Designwechsel, damit eine eben gespeicherte Kopie nicht veraltet zurückkommt
   useEffect(() => {
     void versuch; // „Erneut versuchen“
     let weg = false;
-    schreibt.then(() => ladeEigeneVorlage(art)).then(
-      (eigene) => {
-        if (!weg) setStand({ art, status: 'ok', eigene });
-      },
-      (e: unknown) => {
-        if (!weg) setStand({ art, status: 'fehler', fehler: fehlerText(e) });
-      },
-    );
+    schreibt
+      .then(() => Promise.all([ladeEigeneVorlagen(art), ladeAktivesDesign(art)]))
+      .then(
+        ([eigene, aktiv]) => {
+          if (!weg) setStand({ art, fuer: wunsch, status: 'ok', eigene, aktiv });
+        },
+        (e: unknown) => {
+          if (!weg) setStand({ art, fuer: wunsch, status: 'fehler', fehler: fehlerText(e) });
+        },
+      );
     return () => {
       weg = true;
     };
-  }, [art, versuch]);
+  }, [art, wunsch, versuch]);
 
-  const artWaehlen = (v: Belegart) =>
+  const bereit = basis && stand?.art === art && stand.fuer === wunsch ? stand : null;
+  const gezeigt = bereit?.status === 'ok' ? designSchluessel(art, wunsch || bereit.aktiv) : null;
+
+  // Design aus der Adresse (z. B. aus der Beleg-Maske) als gezeigtes merken; ohne Wunsch bleibt es beim aktiven
+  useEffect(() => {
+    if (gezeigt && wunsch) speichereGezeigtesDesign(speicher(), art, gezeigt);
+  }, [art, gezeigt, wunsch]);
+
+  const adresse = (n: { art?: Belegart; design?: string | null }) =>
     setParams(
       (p) => {
-        const n = new URLSearchParams(p);
-        n.set('art', v);
-        return n;
+        const x = new URLSearchParams(p);
+        if (n.art) x.set('art', n.art);
+        if (n.design) x.set('design', n.design);
+        else if (n.design === null) x.delete('design');
+        return x;
       },
       { replace: true },
     );
+  // andere Art ⇒ deren zuletzt gezeigtes (sonst aktives) Design
+  const artWaehlen = (v: Belegart) => adresse({ art: v, design: null });
+  const designWaehlen = (d: string) => {
+    if (d === gezeigt) return;
+    speichereGezeigtesDesign(speicher(), art, d);
+    adresse({ design: d });
+  };
 
-  const bereit = basis && stand?.art === art ? stand : null;
+  /** Eigene Kopie angelegt bzw. zurückgesetzt: Markierung „angepasst“ der Leiste nachziehen (ohne neu zu laden). */
+  const angepasst = (design: string, v: EigeneVorlage | null) =>
+    setStand((st) => {
+      if (st?.status !== 'ok' || st.art !== art) return st;
+      const eigene = new Map(st.eigene);
+      if (v) eigene.set(design, v);
+      else eigene.delete(design);
+      return { ...st, eigene };
+    });
+
+  const verwenden = () => {
+    if (!gezeigt || bereit?.status !== 'ok') return;
+    const d = gezeigt;
+    setAktiviert(true);
+    merkeSchreiben(speichereAktivesDesign(art, d)).then(
+      () => {
+        setAktiviert(false);
+        setStand((st) => (st?.status === 'ok' && st.art === art ? { ...st, aktiv: d } : st));
+        useUi.getState().toast(`Neue ${MEHRZAHL[art]} verwenden jetzt „${designFuer(art, d).name}“`);
+      },
+      (e: unknown) => {
+        setAktiviert(false);
+        useUi.getState().showToast({ text: `Design nicht übernommen: ${fehlerText(e)}`, icon: 'warn', sticky: true });
+      },
+    );
+  };
+
   return (
     <div className="page vl-page">
       <PageHead
@@ -280,8 +361,85 @@ export default function Vorlagen() {
           }}
         />
       ) : (
-        <Baukasten key={art} art={art} basis={basis} start={bereit.eigene} letzter={letzte[art]} />
+        <>
+          {designsFuer(art).length > 1 && gezeigt && (
+            <DesignLeiste
+              art={art}
+              gezeigt={gezeigt}
+              aktiv={bereit.aktiv}
+              angepasst={bereit.eigene}
+              waehlen={designWaehlen}
+              verwenden={verwenden}
+              laeuft={aktiviert}
+            />
+          )}
+          <Baukasten
+            key={`${art}-${gezeigt ?? STANDARD_DESIGN}`}
+            art={art}
+            design={gezeigt ?? STANDARD_DESIGN}
+            basis={basis}
+            start={bereit.eigene.get(gezeigt ?? STANDARD_DESIGN) ?? null}
+            letzter={letzte[art]}
+            angepasst={angepasst}
+          />
+        </>
       )}
+    </div>
+  );
+}
+
+/* ================= Designs der Art (nur wenn es mehrere gibt) ================= */
+
+interface DesignLeisteProps {
+  art: Belegart;
+  gezeigt: string;
+  aktiv: string;
+  angepasst: ReadonlyMap<string, EigeneVorlage>;
+  waehlen: (design: string) => void;
+  verwenden: () => void;
+  laeuft: boolean;
+}
+
+function DesignLeiste({ art, gezeigt, aktiv, angepasst, waehlen, verwenden, laeuft }: DesignLeisteProps) {
+  const mitDb = datenbankVerfuegbar();
+  const designs = designsFuer(art);
+  const optionen: SegOption<string>[] = designs.map((d) => ({
+    value: d.schluessel,
+    label: (
+      <>
+        {d.schluessel === aktiv && <CircleCheck aria-label="für neue Belege" />}
+        {d.name}
+        {angepasst.has(d.schluessel) && <small className="vl-design-tag">angepasst</small>}
+      </>
+    ),
+  }));
+  const d = designFuer(art, gezeigt);
+  return (
+    <div className="vl-designs reveal" style={reveal(1)}>
+      <Seg options={optionen} value={gezeigt} onChange={waehlen} ariaLabel="Design der Vorlage" />
+      <div className="vl-design-info">
+        <span className="vl-design-desc">{d.beschreibung}</span>
+        {gezeigt === aktiv ? (
+          <span className="vl-design-aktiv">
+            <CircleCheck />
+            Neue {MEHRZAHL[art]} verwenden dieses Design
+          </span>
+        ) : (
+          <span className="vl-design-aktiv">
+            Neue {MEHRZAHL[art]} verwenden „{designFuer(art, aktiv).name}“ ·
+            <button
+              type="button"
+              className="btn subtle vl-design-btn"
+              disabled={laeuft || !mitDb}
+              title={mitDb ? `Neue ${MEHRZAHL[art]} mit „${d.name}“ ausstellen – bestehende Belege bleiben, wie sie sind` : 'Nur in der Mac-App'}
+              onClick={verwenden}
+            >
+              {laeuft ? <LoaderCircle className="ic spin" /> : <Check />}
+              Diese verwenden
+            </button>
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -300,7 +458,7 @@ function Skelett() {
 
 /* ================= Speichern: entprellt, beim Verlassen sofort ================= */
 
-function useAutosave(art: Belegart, gespeichert: (v: EigeneVorlage) => void) {
+function useAutosave(art: Belegart, design: string, gespeichert: (v: EigeneVorlage) => void) {
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const offen = useRef<Baustein[] | null>(null);
   const melden = useRef(gespeichert);
@@ -315,14 +473,14 @@ function useAutosave(art: Belegart, gespeichert: (v: EigeneVorlage) => void) {
       const liste = offen.current;
       offen.current = null;
       if (!liste || !datenbankVerfuegbar()) return;
-      merkeSchreiben(speichereVorlage(art, liste)).then(
+      merkeSchreiben(speichereVorlage(art, liste, design)).then(
         (v) => melden.current(v),
         (e: unknown) => {
           useUi.getState().showToast({ text: `Vorlage nicht gespeichert: ${fehlerText(e)}`, icon: 'warn', sticky: true });
         },
       );
     },
-    [art],
+    [art, design],
   );
 
   useEffect(() => () => jetzt(), [jetzt]);
@@ -355,18 +513,24 @@ type Echt = { id: number; doc: BelegDokument };
 
 interface BaukastenProps {
   art: Belegart;
+  /** gezeigtes Design (Schlüssel) */
+  design: string;
   basis: Basis;
   start: EigeneVorlage | null;
   letzter: BelegZeile | null;
+  /** eigene Kopie gespeichert (v) bzw. zurückgesetzt (null) – für die Markierung „angepasst“ */
+  angepasst: (design: string, v: EigeneVorlage | null) => void;
 }
 
-function Baukasten({ art, basis, start, letzter }: BaukastenProps) {
+function Baukasten({ art, design, basis, start, letzter, angepasst }: BaukastenProps) {
   const accent = useUi((s) => s.settings.accent);
   const motion = useUi((s) => s.settings.motion);
   const showToast = useUi((s) => s.showToast);
   const mitDb = datenbankVerfuegbar();
-  const [bausteine, setBausteine] = useState<Baustein[]>(() => start?.bausteine ?? standardVorlage(art));
-  /** Name der eigenen Kopie; null = Standardvorlage */
+  const [bausteine, setBausteine] = useState<Baustein[]>(() => start?.bausteine ?? standardVorlage(art, design));
+  /** „Standardvorlage“ bzw. „Design „Formular““ (Art mit mehreren Designs) */
+  const original = designsFuer(art).length > 1 ? `Design „${designFuer(art, design).name}“` : STANDARD_NAME;
+  /** Name der eigenen Kopie; null = Original des Designs */
   const [eigenName, setEigenName] = useState<string | null>(start?.name ?? null);
   const [sel, setSel] = useState(0);
   const [palette, setPalette] = useState(false);
@@ -387,10 +551,11 @@ function Baukasten({ art, basis, start, letzter }: BaukastenProps) {
     aktuell.current = { bausteine, eigenName };
   });
 
-  const { jetzt, vormerken, sofort } = useAutosave(art, (v) => {
+  const { jetzt, vormerken, sofort } = useAutosave(art, design, (v) => {
     // nach „Zurücksetzen“ nicht wieder als eigene Vorlage anzeigen
     setEigenName((n) => (n ? v.name : n));
     setGespeichert((n) => n + 1);
+    if (aktuell.current.eigenName) angepasst(design, v);
   });
 
   useEffect(() => {
@@ -462,7 +627,7 @@ function Baukasten({ art, basis, start, letzter }: BaukastenProps) {
   const aendern = (liste: Baustein[], auswahl?: number) => {
     setBausteine(liste);
     if (auswahl !== undefined) setSel(auswahl);
-    setEigenName((n) => n ?? EIGENER_NAME[art]);
+    setEigenName((n) => n ?? eigenerName(art, design));
     vormerken(liste);
   };
 
@@ -498,7 +663,7 @@ function Baukasten({ art, basis, start, letzter }: BaukastenProps) {
   const zuruecksetzen = () => {
     const vorher = { bausteine, eigenName, sel };
     jetzt(); // ausstehende Änderung zuerst schreiben: „Rückgängig“ stellt genau diesen Stand wieder her
-    setBausteine(standardVorlage(art));
+    setBausteine(standardVorlage(art, design));
     setEigenName(null);
     setSel(0);
     const wiederherstellen = () => {
@@ -509,7 +674,7 @@ function Baukasten({ art, basis, start, letzter }: BaukastenProps) {
     const fertig = () => {
       showToast({
         key: RUECKGAENGIG,
-        text: 'Standardvorlage wiederhergestellt',
+        text: `${original} wiederhergestellt`,
         actions: [
           {
             label: 'Rückgängig',
@@ -528,7 +693,10 @@ function Baukasten({ art, basis, start, letzter }: BaukastenProps) {
       fertig();
       return;
     }
-    merkeSchreiben(vorlageZuruecksetzen(art)).then(fertig, (e: unknown) => {
+    merkeSchreiben(vorlageZuruecksetzen(art, design)).then(() => {
+      angepasst(design, null);
+      fertig();
+    }, (e: unknown) => {
       if (lebt.current) wiederherstellen();
       showToast({ text: `Zurücksetzen ging nicht: ${fehlerText(e)}`, icon: 'warn', sticky: true });
     });
@@ -630,12 +798,12 @@ function Baukasten({ art, basis, start, letzter }: BaukastenProps) {
                     )}
                   </>
                 ) : (
-                  'Standardvorlage · die erste Änderung legt eine eigene Kopie an'
+                  `${original} · die erste Änderung legt eine eigene Kopie an`
                 )}
               </div>
             </div>
             {eigenName && (
-              <button type="button" className="btn subtle vl-reset" title="Zur Standardvorlage zurückkehren (mit Rückgängig)" onClick={zuruecksetzen}>
+              <button type="button" className="btn subtle vl-reset" title={`Zum Original zurückkehren: ${original} (mit Rückgängig)`} onClick={zuruecksetzen}>
                 <RotateCcw />
                 Zurücksetzen
               </button>

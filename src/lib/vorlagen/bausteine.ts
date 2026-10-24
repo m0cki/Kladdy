@@ -6,8 +6,12 @@
  * LaTeX (lib/latex/vorlage.ts). Tests: vorlagen.test.ts */
 import { HINWEIS_19, type Belegart } from './dokument';
 
+/** Standard-Zeilen des Firmenkopfs: Anschrift und Steuernummer (§ 33 UStDV), dazu Telefon und E-Mail. */
+export const FIRMENBLOCK_ZEILEN = '{strasse} · {plz} {ort}\nSteuernr. {steuernummer}\n{telefon}\n{email}';
+
 export const BAUSTEIN_TYPEN = [
   'kopf',
+  'firmenblock',
   'absenderzeile',
   'anschrift_meta',
   'titel',
@@ -26,6 +30,7 @@ export const BAUSTEIN_TYPEN = [
   'abstand',
   'fusszeile',
   'datenschutz',
+  'rahmen',
 ] as const;
 
 export type BausteinTyp = (typeof BAUSTEIN_TYPEN)[number];
@@ -58,10 +63,12 @@ export interface BausteinDef {
   felder: readonly BausteinFeld[];
   /** steht immer unten auf dem Blatt (Fußzeile) */
   unten?: boolean;
+  /** liegt um das ganze Blatt (Rahmen): nicht im Fluss, die Stelle in der Liste ist egal */
+  umrandet?: boolean;
 }
 
 const ALLE: readonly Belegart[] = ['quittung', 'rechnung', 'angebot', 'eigenbeleg'];
-const GROESSE = [['normal', 'Normal'], ['klein', 'Klein'], ['grau', 'Klein, grau']] as const;
+const GROESSE = [['normal', 'Normal'], ['klein', 'Klein'], ['grau', 'Klein, grau'], ['mini', 'Sehr klein, grau']] as const;
 
 /** Informationspflicht (Art. 13 DSGVO) in Kurzform – optionaler Baustein, nicht in den Standardvorlagen (§2.10). */
 export const DATENSCHUTZ_TEXT =
@@ -75,6 +82,20 @@ export const BAUSTEINE: Readonly<Record<BausteinTyp, BausteinDef>> = {
     felder: [
       { key: 'logo', label: 'Logo anzeigen', typ: 'toggle', default: true },
       { key: 'claim', label: 'Untertitel', typ: 'text', default: '{inhaber}' },
+    ],
+  },
+  firmenblock: {
+    name: 'Firmenkopf (Text)',
+    beschreibung: 'Firmenname groß, darunter Untertitel und Kontaktzeilen, Linie',
+    arten: ALLE,
+    felder: [
+      { key: 'name', label: 'Name', typ: 'text', default: '{firma}' },
+      { key: 'versal', label: 'Name in Großbuchstaben', typ: 'toggle', default: true },
+      { key: 'untertitel', label: 'Untertitel', typ: 'text', default: 'Inh. {inhaber}' },
+      // Zeilen, deren Platzhalter alle leer sind, fallen weg (firmenblock.ts): ohne Telefon keine leere Zeile
+      { key: 'zeilen', label: 'Zeilen', typ: 'textarea', default: FIRMENBLOCK_ZEILEN },
+      { key: 'linie', label: 'Linie darunter', typ: 'toggle', default: true },
+      { key: 'logo', label: 'Logo rechts', typ: 'toggle', default: false },
     ],
   },
   absenderzeile: {
@@ -107,6 +128,7 @@ export const BAUSTEINE: Readonly<Record<BausteinTyp, BausteinDef>> = {
       { key: 'rechts', label: 'Text rechts (optional)', typ: 'text', default: '' },
       { key: 'stil', label: 'Farbe', typ: 'select', default: 'schwarz', optionen: [['schwarz', 'Schwarz'], ['akzent', 'Akzentfarbe']] },
       { key: 'linie', label: 'Linie in Akzentfarbe darunter', typ: 'toggle', default: false },
+      { key: 'versal', label: 'Großbuchstaben', typ: 'toggle', default: false },
     ],
   },
   betreff: {
@@ -172,6 +194,8 @@ export const BAUSTEINE: Readonly<Record<BausteinTyp, BausteinDef>> = {
     beschreibung: 'Betrag, Datum, Zahlungsart, erhalten von, für',
     arten: ['quittung'],
     felder: [
+      // Formular: „Datum: … Nr.: …“, „Erhalten von: …“, Zahlungsart zum Ankreuzen (die gewählte mit Kreuz)
+      { key: 'stil', label: 'Darstellung', typ: 'select', default: 'kacheln', optionen: [['kacheln', 'Kacheln'], ['formular', 'Formular (Bezeichnung: Wert)']] },
       { key: 'worte', label: 'Betrag in Worten', typ: 'toggle', default: true },
       { key: 'zahlungsart', label: 'Zahlungsart anzeigen', typ: 'toggle', default: true },
       { key: 'von', label: 'Bezeichnung „erhalten von“', typ: 'text', default: 'Erhalten von' },
@@ -198,8 +222,10 @@ export const BAUSTEINE: Readonly<Record<BausteinTyp, BausteinDef>> = {
     beschreibung: 'Linien für Ort/Datum und Unterschrift',
     arten: ALLE,
     felder: [
+      // eine: Beschriftung („Unterschrift:“ aus „rechts“) über einer Linie über die ganze Breite
+      { key: 'stil', label: 'Linien', typ: 'select', default: 'zwei', optionen: [['zwei', 'Zwei: Ort, Datum und Unterschrift'], ['eine', 'Eine über die ganze Breite']] },
       { key: 'links', label: 'Beschriftung links', typ: 'text', default: 'Ort, Datum' },
-      { key: 'rechts', label: 'Beschriftung rechts', typ: 'text', default: 'Unterschrift' },
+      { key: 'rechts', label: 'Beschriftung rechts (bei einer Linie: darüber)', typ: 'text', default: 'Unterschrift' },
       { key: 'vorbelegen', label: 'Ort und Datum vorausfüllen', typ: 'toggle', default: true },
       { key: 'unten', label: 'Am Seitenende', typ: 'toggle', default: true },
     ],
@@ -237,6 +263,13 @@ export const BAUSTEINE: Readonly<Record<BausteinTyp, BausteinDef>> = {
     arten: ['rechnung', 'quittung', 'angebot'],
     felder: [{ key: 'text', label: 'Text', typ: 'textarea', default: DATENSCHUTZ_TEXT }],
   },
+  rahmen: {
+    name: 'Rahmen',
+    beschreibung: 'Linie um den Inhalt, z. B. gestrichelt wie zum Ausschneiden',
+    arten: ALLE,
+    umrandet: true,
+    felder: [{ key: 'linie', label: 'Linie', typ: 'select', default: 'gestrichelt', optionen: [['gestrichelt', 'Gestrichelt'], ['durchgezogen', 'Durchgezogen']] }],
+  },
 };
 
 /** Standardwerte eines Bausteins. */
@@ -271,6 +304,9 @@ export function aufloesen(b: Baustein): Aufgeloest {
 
 /** Steht der Baustein immer unten (Fußzeile) oder per Einstellung „Am Seitenende“? */
 export const istUnten = (b: Aufgeloest): boolean => !!BAUSTEINE[b.typ].unten || (b.typ === 'unterschrift' && b.an('unten'));
+
+/** Liegt der Baustein um das Blatt (Rahmen) statt im Fluss? */
+export const istUmrandet = (b: Pick<Aufgeloest, 'typ'>): boolean => !!BAUSTEINE[b.typ].umrandet;
 
 /** Sichtbare Bausteine (ohne ausgeblendete), aufgelöst, mit ihrem Index in der Vorlage. */
 export function sichtbare(bausteine: readonly Baustein[]): { index: number; b: Aufgeloest }[] {

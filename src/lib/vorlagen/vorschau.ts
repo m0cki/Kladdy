@@ -8,6 +8,7 @@
  *   fällt die Nummer weg: Blatt und PDF tragen das Wasserzeichen ENTWURF, {nr} druckt „Entwurf“ (wie der Testbeleg).
  *   Logo und Akzentfarbe sind die aktuellen – gezeigt wird, wie die Vorlage heute aussieht.
  * - Auswahl „Beispiel · Letzter Beleg“ je Art im localStorage (wie Darstellung und Updates), Standard: Beispiel.
+ *   Im selben Eintrag: das zuletzt gezeigte Design je Art (Vorlagen-Galerie), Standard: das aktive.
  * Tests: vorschau.test.ts */
 import { ausgestellterBeleg } from '../belegpdf';
 import type { Firma } from '../firma';
@@ -16,6 +17,7 @@ import { ladeBeleg, ladeKundenAnschrift, type BelegVoll } from '../queries/rechn
 import { formularAusEntwurf, formularZuDokument, type BelegZeile, type KundeAnschrift, type PositionZeile } from '../rechnungen';
 import type { KeyValueStore } from '../settings';
 import { BELEGARTEN, type BelegDokument, type Belegart } from './dokument';
+import { istDesign } from './standard';
 
 export type Vorschauquelle = 'beispiel' | 'beleg';
 export type Quellen = Record<Belegart, Vorschauquelle>;
@@ -67,30 +69,54 @@ export async function ladeVorschauBeleg(id: number, ctx: Omit<VorschauKontext, '
 }
 
 /* ---------- Auswahl je Art merken ---------- */
+/* Ein Eintrag im localStorage: { quelle: { art: 'beispiel'|'beleg' }, design: { art: schluessel } }. Jede Funktion
+ * schreibt nur ihren Teil und lässt den anderen stehen. */
 
 const standardQuellen = (): Quellen => ({ rechnung: 'beispiel', quittung: 'beispiel', angebot: 'beispiel', eigenbeleg: 'beispiel' });
 
-export function ladeQuellen(store: KeyValueStore | undefined): Quellen {
-  const q = standardQuellen();
+const istObjekt = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+
+function gemerkt(store: KeyValueStore | undefined): Record<string, unknown> {
   try {
     const raw = store?.getItem(VORSCHAU_KEY);
     const r: unknown = raw ? JSON.parse(raw) : null;
-    const quelle = r && typeof r === 'object' && !Array.isArray(r) ? (r as { quelle?: unknown }).quelle : null;
-    if (quelle && typeof quelle === 'object') {
-      for (const a of BELEGARTEN) if ((quelle as Record<string, unknown>)[a] === 'beleg') q[a] = 'beleg';
-    }
+    return istObjekt(r) ? r : {};
   } catch {
-    /* kaputt ⇒ Beispiel */
+    return {}; // kaputt ⇒ Standard
   }
+}
+
+function merken(store: KeyValueStore | undefined, teil: 'quelle' | 'design', wert: Record<string, string>): void {
+  try {
+    store?.setItem(VORSCHAU_KEY, JSON.stringify({ ...gemerkt(store), [teil]: wert }));
+  } catch {
+    /* Speicher gesperrt – dann gilt die Auswahl nur bis zum Neustart */
+  }
+}
+
+export function ladeQuellen(store: KeyValueStore | undefined): Quellen {
+  const q = standardQuellen();
+  const quelle = gemerkt(store).quelle;
+  if (istObjekt(quelle)) for (const a of BELEGARTEN) if (quelle[a] === 'beleg') q[a] = 'beleg';
   return q;
 }
 
 export function speichereQuelle(store: KeyValueStore | undefined, art: Belegart, quelle: Vorschauquelle): Quellen {
   const q = { ...ladeQuellen(store), [art]: quelle };
-  try {
-    store?.setItem(VORSCHAU_KEY, JSON.stringify({ quelle: q }));
-  } catch {
-    /* Speicher gesperrt – dann gilt die Auswahl nur bis zum Neustart */
-  }
+  merken(store, 'quelle', q);
   return q;
+}
+
+/** Zuletzt gezeigtes Design je Art (nur gültige; fehlt ⇒ nicht gemerkt, dann zeigt die Seite das aktive). */
+export function ladeGezeigteDesigns(store: KeyValueStore | undefined): Partial<Record<Belegart, string>> {
+  const d = gemerkt(store).design;
+  const o: Partial<Record<Belegart, string>> = {};
+  if (istObjekt(d)) for (const a of BELEGARTEN) if (istDesign(a, d[a])) o[a] = d[a];
+  return o;
+}
+
+export function speichereGezeigtesDesign(store: KeyValueStore | undefined, art: Belegart, design: string): Partial<Record<Belegart, string>> {
+  const d = { ...ladeGezeigteDesigns(store), ...(istDesign(art, design) ? { [art]: design } : {}) };
+  merken(store, 'design', d);
+  return d;
 }

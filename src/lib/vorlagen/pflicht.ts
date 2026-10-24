@@ -67,12 +67,14 @@ export function pflichtCheck(doc: BelegDokument, bausteine: readonly Baustein[],
 
   const quittung = doc.art === 'quittung';
   const qf = quittung && hat('quittung_felder');
+  // Quittung „Formular“ druckt auch die Nummer („Nr.: …“); Firmenkopf (Text) zählt über seine Platzhalter (druckt)
+  const qfFormular = quittung && hat('quittung_felder', (b) => b.text('stil') === 'formular');
   const fussAdresse = hat('fusszeile', (b) => b.an('adresse'));
 
-  add('Name und Anschrift (Aussteller)', fussAdresse || (druckt('strasse') && druckt('ort')), 'Absenderzeile oder Fußzeile mit Adresse fehlt',
+  add('Name und Anschrift (Aussteller)', fussAdresse || (druckt('strasse') && druckt('ort')), 'Firmenkopf, Absenderzeile oder Fußzeile mit Adresse fehlt',
     !!(F.name.trim() && F.strasse.trim() && F.plz.trim() && F.ort.trim()), 'in den Firmendaten ergänzen', `${F.name}, ${F.plz} ${F.ort}`);
   // vollständiger Name des Unternehmers = Inhaber (der Firmenname allein reicht nicht); die Fußzeile „Adresse“ druckt ihn mit
-  add('Vollständiger Name (Inhaber)', fussAdresse || druckt('inhaber'), '{inhaber} wird nirgends gedruckt – z. B. in der Absenderzeile ergänzen',
+  add('Vollständiger Name (Inhaber)', fussAdresse || druckt('inhaber'), '{inhaber} wird nirgends gedruckt – z. B. im Firmenkopf oder in der Absenderzeile ergänzen',
     !!F.inhaber.trim(), 'in den Firmendaten ergänzen', F.inhaber);
 
   if (quittung && gesamt <= kleinbetrag) {
@@ -84,7 +86,7 @@ export function pflichtCheck(doc: BelegDokument, bausteine: readonly Baustein[],
       [e.name, e.zeilen[e.zeilen.length - 1]].filter(Boolean).join(', '));
   }
 
-  add('Steuernummer', hat('fusszeile', (b) => b.an('kontakt')) || druckt('steuernummer'), 'Fußzeile oder {steuernummer} fehlt',
+  add('Steuernummer', hat('fusszeile', (b) => b.an('kontakt')) || druckt('steuernummer'), 'Fußzeile, Firmenkopf oder {steuernummer} fehlt',
     !!F.steuernummer.trim(), 'in den Firmendaten ergänzen', F.steuernummer);
   add('Ausstellungsdatum', hat('anschrift_meta', (b) => b.an('datum')) || qf || druckt('datum'), 'Datum wird nirgends gedruckt',
     !!doc.datum, 'Datum fehlt', datumText(doc.datum));
@@ -104,7 +106,7 @@ export function pflichtCheck(doc: BelegDokument, bausteine: readonly Baustein[],
     out.push({ label: 'Steuersatz und Steuerbetrag', ok: false, hint: 'Regelbesteuerung: Belege mit Umsatzsteuer kann Kladdy noch nicht ausstellen' });
   }
 
-  const nrGedruckt = hat('anschrift_meta', (b) => b.an('nr')) || druckt('nr');
+  const nrGedruckt = hat('anschrift_meta', (b) => b.an('nr')) || qfFormular || druckt('nr');
   if (!nrGedruckt) out.push({ label: 'Fortlaufende Nummer', ok: false, hint: 'Nummer wird nirgends gedruckt' });
   else if (doc.nummer) out.push({ label: 'Fortlaufende Nummer', ok: true, hint: doc.nummer });
   else {

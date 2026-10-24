@@ -306,5 +306,42 @@ describe('Formular', () => {
     expect(anzeige.kunde).toBe('Anna Schmidt · K-0001');
     expect(anzeige.adresse).toBe('Gartenweg 3\n12390 Seehausen');
     expect(anzeige.zielTage).toBe('14');
+    expect(anzeige.vorlageDesign).toBe('klassisch');
+  });
+
+  it('Design der Vorlage im Entwurf: nur ≠ klassisch in entwurf_json, alte Entwürfe ⇒ klassisch, Artwechsel ⇒ klassisch', () => {
+    const zeile = (art: string, vorlage_id: number | null, entwurf_json: string | null) => ({
+      id: 6,
+      art,
+      kunde_id: null,
+      kunde_name: 'Anna',
+      kunde_adresse: null,
+      kunde_nummer_live: null,
+      kunde_name_live: null,
+      datum: '2026-10-20',
+      leistung_von: null,
+      leistung_bis: null,
+      faellig_am: null,
+      betreff: 'Rasen',
+      einleitung: null,
+      schlusstext: null,
+      zahlungsart: 'bar',
+      bezahlt_am: null,
+      vorlage_id,
+      termin_id: null,
+      entwurf_json,
+    });
+    expect(formularAusEntwurf(zeile('quittung', null, '{"vorlage_design":"formular"}'), [], HEUTE).vorlageDesign).toBe('formular');
+    // alt: mit eigener Kopie (vor 0010 immer klassisch) oder ohne
+    expect(formularAusEntwurf(zeile('quittung', 3, null), [], HEUTE)).toMatchObject({ vorlageId: 3, vorlageDesign: 'klassisch' });
+    expect(formularAusEntwurf(zeile('quittung', null, '{"vorlage_design":"gibtsnicht"}'), [], HEUTE).vorlageDesign).toBe('klassisch');
+    expect(formularAusEntwurf(zeile('rechnung', null, '{"vorlage_design":"formular"}'), [], HEUTE).vorlageDesign).toBe('klassisch');
+
+    const q = { ...neuesFormular({ art: 'quittung', betrag: 6_500, text: 'Rasen', name: 'Anna' }, { heute: HEUTE, zielTage: {} }), vorlageDesign: 'formular' };
+    const d = formularZuDaten(q, KUNDEN);
+    expect(d.ok && d.daten.zusatz).toEqual({ vorlage_design: 'formular' });
+    const k = formularZuDaten({ ...q, vorlageDesign: 'klassisch' }, KUNDEN);
+    expect(k.ok && k.daten.zusatz).toEqual({});
+    expect(artWechseln(q, 'rechnung')).toMatchObject({ vorlageId: null, vorlageDesign: 'klassisch' });
   });
 });

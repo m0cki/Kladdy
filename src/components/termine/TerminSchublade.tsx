@@ -252,7 +252,8 @@ function TerminFormularAnsicht({
         vorhanden: entwurf,
         altLeistung: t?.leistung ?? '',
         zielTage: stamm.zielTage,
-        vorlageId: stamm.vorlagen[d.beleg],
+        vorlageId: stamm.vorlagen[d.beleg].id,
+        vorlageDesign: stamm.vorlagen[d.beleg].design,
         heute: h,
       });
       if (!vorbereitet) {

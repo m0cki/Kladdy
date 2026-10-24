@@ -5,7 +5,7 @@ import { BELEGARTEN, type BelegDokument } from '../vorlagen/dokument';
 import { standardVorlage } from '../vorlagen/standard';
 import { MAKRO_NAMEN, datenTex, makroWerte, positionenTex } from './daten';
 import { KompilierFehler, belegAssets, belegTex, fehlerZeilen } from './kompilieren';
-import { abstandMm, bereichZuZeile, mainTex, textTex } from './vorlage';
+import { RAHMEN_MM, abstandMm, bereichZuZeile, mainTex, rahmenTex, striche, textTex } from './vorlage';
 
 const rechnung = (): BelegDokument => testbeleg('rechnung', BEISPIEL_FIRMA, 'klein', '2026-10-18');
 const quittung = (): BelegDokument => testbeleg('quittung', BEISPIEL_FIRMA, 'klein', '2026-10-18');
@@ -248,6 +248,93 @@ describe('main.tex', () => {
     expect(abstandMm('text', 'unterschrift')).toBe(10);
     expect(abstandMm(null, 'unterschrift', true)).toBe(0);
     expect(abstandMm('text', 'positionen')).toBe(3.5);
+  });
+});
+
+describe('Design „Formular“ und neue Bausteine', () => {
+  const formular = () => mainTex('quittung', standardVorlage('quittung', 'formular'), '#6366f1').tex;
+
+  it('Aufbau wie jede Vorlage: Klammern ausgeglichen, keine Leerzeilen, keine Daten, nur Standardpakete', () => {
+    const tex = formular();
+    expect(klammernOk(tex)).toBe(true);
+    expect(tex.slice(tex.indexOf('\\begin{document}'))).not.toMatch(/\n\s*\n/);
+    for (const x of ['Mustermann', 'Müller', 'Rasenmähen']) expect(tex).not.toContain(x);
+    expect(tex).not.toMatch(/\\write18|\\directlua|\\immediate|\\openout|\\ShellEscape/);
+  });
+
+  it('Rahmen gestrichelt hinter dem Blatt, vor dem ersten Baustein; durchgezogen als vier Linien', () => {
+    const tex = formular();
+    expect(tex).toContain(String.raw`\AddToShipoutPictureBG{\AtPageLowerLeft{\color{marke}\multiput(`);
+    expect(tex.indexOf('AddToShipoutPictureBG{\\AtPageLowerLeft{\\color{marke}')).toBeLessThan(tex.indexOf('\\begin{document}') + 400);
+    expect(rahmenTex('a5q', 'gestrichelt').match(/\\multiput/g)).toHaveLength(4);
+    const voll = rahmenTex('a4', 'durchgezogen');
+    expect(voll.match(/\\put\(/g)).toHaveLength(4);
+    expect(voll).not.toContain('multiput');
+    // der Rahmen ist kein Baustein im Fluss: kein Abstand, kein Bereich mit Inhalt
+    const m = mainTex('quittung', [{ typ: 'rahmen' }], '#6366f1');
+    expect(m.tex).toContain('AddToShipoutPictureBG{\\AtPageLowerLeft');
+  });
+
+  it('Striche enden an beiden Ecken', () => {
+    for (const l of [100, 180, 134.5, 3]) {
+      const { n, schritt } = striche(l);
+      expect(n).toBeGreaterThanOrEqual(2);
+      expect((n - 1) * schritt + 2).toBeCloseTo(l, 6);
+    }
+    const r = RAHMEN_MM.a5q;
+    expect(r.breite - r.links - r.rechts).toBe(190);
+  });
+
+  it('Firmenkopf: Name fett in Versalien, Zeilen nur mit Wert (\\ifdefempty), Trennlinie', () => {
+    const tex = formular();
+    expect(tex).toContain(String.raw`\bfseries \MakeUppercase{\Firma{}}\par}`);
+    expect(tex).toContain(String.raw`\ifboolexpr{test {\ifdefempty{\FirmaInhaber}}}{}{%`);
+    expect(tex).toContain(String.raw`\ifboolexpr{test {\ifdefempty{\Steuernummer}}}{}{%`);
+    expect(tex).toContain(String.raw`\ifboolexpr{test {\ifdefempty{\FirmaStrasse}} and test {\ifdefempty{\FirmaPLZ}} and test {\ifdefempty{\FirmaStadt}}}{}{%`);
+    expect(tex).toContain(String.raw`{\color{haar}\hrule height .25mm}`);
+    // feste Texte im Firmenkopf escaped
+    const eigen = mainTex('quittung', [{ typ: 'firmenblock', name: 'A & B 100%', untertitel: 'Fahrzeugpflege_{inhaber}', versal: false }], '#6366f1').tex;
+    expect(eigen).toContain(String.raw`\bfseries A \& B 100\%\par}`);
+    expect(eigen).toContain(String.raw`Fahrzeugpflege\_\FirmaInhaber{}\par`);
+  });
+
+  it('Titel in Versalien, Felder als „Label: Wert“, Zahlungsart zum Ankreuzen, eine Unterschriftslinie', () => {
+    const tex = formular();
+    expect(tex).toContain(String.raw`\MakeUppercase{\Belegart{}}`);
+    expect(tex).toContain(String.raw`\KForm{Datum}{\Datum}`);
+    expect(tex).toContain(String.raw`\KForm{Nr.}{\KNr}`);
+    expect(tex).toContain(String.raw`\KForm{Erhalten von}{`);
+    expect(tex).toContain(String.raw`\KForm{Für}{`);
+    expect(tex).toContain(String.raw`\KAnkreuz{bar}{Bar}\hspace{5mm}\KAnkreuz{bank}{Überweisung}\hspace{5mm}\KAnkreuz{paypal}{PayPal}`);
+    expect(tex).toContain('Gesamtbetrag:');
+    expect(tex).not.toContain('Betrag in Worten');
+    expect(tex).toContain(String.raw`\bfseries Unterschrift:\strut\par}`);
+    expect(tex).not.toContain('Ort, Datum');
+    // § 19-Hinweis sehr klein und grau
+    expect(tex).toContain(String.raw`\fontsize{6.5}`);
+    // Klassisch bleibt bei Kacheln und zwei Linien
+    const klassisch = mainTex('quittung', standardVorlage('quittung'), '#6366f1').tex;
+    expect(klassisch).not.toContain('\\KForm{');
+    expect(klassisch).not.toContain('AddToShipoutPictureBG{\\AtPageLowerLeft{\\color{marke}\\multiput');
+    expect(klassisch).toContain('Ort, Datum');
+  });
+
+  it('daten.tex: Firma „Müller & Söhne 100%“ escaped, Zahlungsweg als Schlüssel (quittiert vor gewählt)', () => {
+    const firma = { ...BEISPIEL_FIRMA, name: 'Müller & Söhne 100%', inhaber: 'Max_Mustermann' };
+    const q = { ...testbeleg('quittung', firma, 'klein', '2026-10-18'), zahlungsweg: 'bar' as const };
+    const d = datenTex(q);
+    expect(makro(d, 'Firma')).toBe(String.raw`Müller \& Söhne 100\%`);
+    expect(makro(d, 'FirmaInhaber')).toBe(String.raw`Max\_Mustermann`);
+    expect(makro(d, 'ZahlungswegKurz')).toBe('bar');
+    expect(makro(datenTex({ ...q, zahlungsweg: 'bar', quittiert: { am: '2026-10-18', zahlungsweg: 'paypal' } }), 'ZahlungswegKurz')).toBe('paypal');
+    expect(makro(datenTex({ ...q, zahlungsweg: null }), 'ZahlungswegKurz')).toBe('');
+    // main.tex bleibt ohne Daten
+    expect(mainTex('quittung', standardVorlage('quittung', 'formular'), '#6366f1').tex).not.toContain('Söhne');
+  });
+
+  it('Abstände: eine Unterschriftslinie 6 mm, zwei 10 mm', () => {
+    expect(abstandMm('text', 'unterschrift', false, 'eine')).toBe(6);
+    expect(abstandMm('text', 'unterschrift', false, 'zwei')).toBe(10);
   });
 });
 

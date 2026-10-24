@@ -21,7 +21,8 @@ import {
   type TerminZeile,
 } from '../termine';
 import { ladeBelegEinstellungen } from './einstellungen';
-import { ladeVorlagenFuerArt } from './vorlagen';
+import { STANDARD_DESIGN } from '../vorlagen/standard';
+import { ladeVorlagenFuerArt, type VorlagenWahl } from './vorlagen';
 
 const TERMIN_SQL = `
   SELECT t.id, t.kunde_id, k.name AS kunde_name, k.nummer AS kunde_nummer, k.notiz AS kunde_notiz,
@@ -93,7 +94,8 @@ export interface TerminStamm {
   /** Zahlungsziel neuer Rechnungen in Tagen */
   zielTage: number;
   /** aktive Vorlage je Art (null = Standard) */
-  vorlagen: Record<ErtragsArt, number | null>;
+  /** aktive Vorlage je Art: eigene Kopie (null = Design aus dem Code) und Design */
+  vorlagen: Record<ErtragsArt, { id: number | null; design: string }>;
   leistungen: LeistungsVorschlag[];
 }
 
@@ -114,13 +116,18 @@ const LEISTUNG_SQL = `
   UNION ALL
   SELECT t.leistung, NULL FROM termine t`;
 
+const aktiveWahl = (liste: readonly VorlagenWahl[]): { id: number | null; design: string } => {
+  const v = liste.find((x) => x.aktiv);
+  return { id: v?.id ?? null, design: v?.design ?? STANDARD_DESIGN };
+};
+
 /** Einstellungen › Belege und die aktiven Vorlagen (Seite Termine: „Quittung vorbereiten“ und „ausstellen“). */
 export async function ladeTerminEinstellungen(): Promise<Pick<TerminStamm, 'belegArt' | 'zielTage' | 'vorlagen'>> {
   const [einstellungen, quittung, rechnung] = await Promise.all([ladeBelegEinstellungen(), ladeVorlagenFuerArt('quittung'), ladeVorlagenFuerArt('rechnung')]);
   return {
     belegArt: einstellungen.beleg_art,
     zielTage: einstellungen.zahlungsziel_tage,
-    vorlagen: { quittung: quittung.find((v) => v.aktiv)?.id ?? null, rechnung: rechnung.find((v) => v.aktiv)?.id ?? null },
+    vorlagen: { quittung: aktiveWahl(quittung), rechnung: aktiveWahl(rechnung) },
   };
 }
 

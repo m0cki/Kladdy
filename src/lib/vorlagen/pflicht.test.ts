@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BEISPIEL_FIRMA, testbeleg } from './beispiel';
+import { BEISPIEL_FIRMA, beispielbeleg, testbeleg } from './beispiel';
 import type { BelegDokument } from './dokument';
 import { pflichtCheck, pflichtOk, pflichtTitel } from './pflicht';
 import { standardVorlage } from './standard';
@@ -133,5 +133,36 @@ describe('weitere Arten und Modi', () => {
     const eb: BelegDokument = { ...quittung(), art: 'eigenbeleg', eigenbeleg: { grund: 'verloren', grund_text: '', gebucht: null } };
     const l = pflichtCheck(eb, [{ typ: 'titel' }, { typ: 'unterschrift' }]);
     expect(l.filter((p) => !p.ok).map((p) => p.hint)).toContain('Baustein „Eigenbeleg-Angaben“ fehlt');
+  });
+});
+
+describe('Design „Formular“ der Quittung', () => {
+  const formular = () => standardVorlage('quittung', 'formular');
+  const beispiel = () => beispielbeleg('quittung', BEISPIEL_FIRMA, 'klein', '2026-10-18');
+
+  it('mit Beispieldaten vollständig: Firmenkopf zählt als Anschrift, Inhaber und Steuernummer, Felder als Nummer', () => {
+    for (const d of [beispiel(), quittung(), { ...beispiel(), nummer: 'QU-2026-0001' }]) {
+      const l = pflichtCheck(d, formular(), { naechste_nummer: 'QU-2026-0001' });
+      expect(l.filter((p) => !p.ok).map((p) => p.label)).toEqual([]);
+      expect(pflichtOk(l)).toBe(true);
+    }
+  });
+
+  it('ohne § 19-Baustein nicht ok', () => {
+    const l = pflichtCheck(beispiel(), formular().filter((b) => b.typ !== 'steuerhinweis'));
+    expect(punkt(l, 'Entgelt und § 19-Hinweis').ok).toBe(false);
+    expect(pflichtOk(l)).toBe(false);
+  });
+
+  it('ohne Firmenkopf fehlen Anschrift, Inhaber und Steuernummer', () => {
+    const l = pflichtCheck(beispiel(), formular().filter((b) => b.typ !== 'firmenblock'));
+    expect(pflichtOk(l)).toBe(false);
+    const hints = l.filter((p) => !p.ok).map((p) => p.hint ?? '');
+    expect(hints.some((h) => h.includes('Firmenkopf'))).toBe(true);
+  });
+
+  it('Felder im Kachel-Stil statt Formular zählen weiter als Nummer (Titel ohne Nr.)', () => {
+    const v = formular().map((b) => (b.typ === 'quittung_felder' ? { ...b, stil: 'kacheln' } : b));
+    expect(punkt(pflichtCheck({ ...beispiel(), nummer: 'QU-1' }, v), 'Fortlaufende Nummer').ok).toBe(false);
   });
 });

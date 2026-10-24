@@ -154,7 +154,8 @@ export async function vorbereiten(t: Termin, stamm: Pick<TerminStamm, 'belegArt'
     vorhanden: null,
     altLeistung: t.leistung,
     zielTage: stamm.zielTage,
-    vorlageId: stamm.vorlagen[art],
+    vorlageId: stamm.vorlagen[art].id,
+    vorlageDesign: stamm.vorlagen[art].design,
     heute: h,
   });
   if (!entwurf) return;

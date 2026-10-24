@@ -5,7 +5,7 @@ import type { KeyValueStore } from '../settings';
 import { BEISPIEL_FIRMA, testbeleg } from './beispiel';
 import { ersetzen, istEntwurf, platzhalterWerte } from './dokument';
 import { standardVorlage } from './standard';
-import { VORSCHAU_KEY, ladeQuellen, letzterBeleg, speichereQuelle, vorschauDokument } from './vorschau';
+import { VORSCHAU_KEY, ladeGezeigteDesigns, ladeQuellen, letzterBeleg, speichereGezeigtesDesign, speichereQuelle, vorschauDokument } from './vorschau';
 
 const zeile = (id: number, art: ListenArt, nummer: string | null, datum: string | null) => ({ id, art, nummer, datum });
 
@@ -138,5 +138,31 @@ describe('Auswahl Beispiel · Letzter Beleg je Art', () => {
     expect(ladeQuellen(speicher({ [VORSCHAU_KEY]: JSON.stringify({ quelle: { rechnung: 'irgendwas' } }) })).rechnung).toBe('beispiel');
     expect(ladeQuellen(undefined).angebot).toBe('beispiel');
     expect(speichereQuelle(undefined, 'angebot', 'beleg').angebot).toBe('beleg');
+  });
+});
+
+describe('zuletzt gezeigtes Design je Art', () => {
+  it('nichts gemerkt ⇒ leer; gemerkt je Art, ohne die Quelle zu verlieren (und umgekehrt)', () => {
+    const s = speicher();
+    expect(ladeGezeigteDesigns(s)).toEqual({});
+    speichereQuelle(s, 'quittung', 'beleg');
+    speichereGezeigtesDesign(s, 'quittung', 'formular');
+    expect(ladeGezeigteDesigns(s)).toEqual({ quittung: 'formular' });
+    expect(ladeQuellen(s).quittung).toBe('beleg');
+    speichereQuelle(s, 'rechnung', 'beleg');
+    expect(ladeGezeigteDesigns(s)).toEqual({ quittung: 'formular' });
+    speichereGezeigtesDesign(s, 'rechnung', 'klassisch');
+    expect(JSON.parse(s.data[VORSCHAU_KEY])).toEqual({
+      quelle: { rechnung: 'beleg', quittung: 'beleg', angebot: 'beispiel', eigenbeleg: 'beispiel' },
+      design: { quittung: 'formular', rechnung: 'klassisch' },
+    });
+  });
+
+  it('unbekannte Designs werden weder gelesen noch gemerkt', () => {
+    const s = speicher({ [VORSCHAU_KEY]: JSON.stringify({ design: { quittung: 'gibtsnicht', rechnung: 'formular', angebot: 3 } }) });
+    expect(ladeGezeigteDesigns(s)).toEqual({});
+    expect(speichereGezeigtesDesign(s, 'eigenbeleg', 'formular')).toEqual({});
+    expect(ladeGezeigteDesigns(speicher({ [VORSCHAU_KEY]: '{kaputt' }))).toEqual({});
+    expect(speichereGezeigtesDesign(undefined, 'quittung', 'formular')).toEqual({ quittung: 'formular' });
   });
 });

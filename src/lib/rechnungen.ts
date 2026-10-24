@@ -21,6 +21,7 @@ import {
   type EigenbelegGrund,
   type KundeSchnappschuss,
 } from './vorlagen/dokument';
+import { STANDARD_DESIGN, designSchluessel } from './vorlagen/standard';
 import { plusTage, zeitraum, type Zeitraum } from './zeitraum';
 
 /* ================= Zeilen der Liste ================= */
@@ -380,8 +381,10 @@ export interface BelegFormular {
   bezahltAm: string | null;
   grund: EigenbelegGrund;
   grundText: string;
-  /** null = Standardvorlage, sonst vorlagen.id */
+  /** null = Standardvorlage, sonst vorlagen.id (eigene Kopie des Designs) */
   vorlageId: number | null;
+  /** Design der Vorlage (lib/vorlagen/standard.ts), im Entwurf als entwurf_json.vorlage_design (nur ≠ 'klassisch') */
+  vorlageDesign: string;
   terminId: number | null;
   /** schon erfasste Zahlung, die beim Ausstellen verknüpft wird */
   buchungId: number | null;
@@ -583,6 +586,8 @@ export function formularZuDaten(f: BelegFormular, kunden: readonly KundeAnschrif
   }
   if (f.buchungId != null) zusatz.buchung_id = f.buchungId;
   if (f.art === 'quittung' && f.mehrere) zusatz.mehrere = true;
+  // Design der Vorlage merken; 'klassisch' ist der Standard und bleibt weg (alte Entwürfe haben keinen Schlüssel)
+  if (f.vorlageDesign !== STANDARD_DESIGN) zusatz.vorlage_design = f.vorlageDesign;
   // Kategorie nur beim Eigenbeleg (Ausgabe); die Einnahme-Kategorie setzt Rust beim Ausstellen
   const katEigen = f.art === 'eigenbeleg' ? (f.positionen[0]?.kategorieId ?? null) : null;
   const positionen = positionenAus(f).map((p) => ({
@@ -667,6 +672,7 @@ export function neuesFormular(v: NeuVorgabe, o: { heute: string; zielTage: Parti
     grund: 'verloren',
     grundText: '',
     vorlageId: null,
+    vorlageDesign: STANDARD_DESIGN,
     terminId: v.terminId ?? null,
     buchungId: v.buchungId ?? null,
   };
@@ -745,6 +751,8 @@ export function formularAusEntwurf(z: EntwurfZeile, positionen: readonly Positio
     grund: istGrund(zusatz.grund) ? zusatz.grund : 'verloren',
     grundText: typeof zusatz.grund_text === 'string' ? zusatz.grund_text : '',
     vorlageId: z.vorlage_id,
+    // ohne Schlüssel (alte Entwürfe, auch mit vorlage_id: alle Kopien waren 'klassisch') ⇒ 'klassisch'
+    vorlageDesign: designSchluessel(art, zusatz.vorlage_design),
     terminId: z.termin_id,
     buchungId: typeof zusatz.buchung_id === 'number' ? zusatz.buchung_id : null,
   };
@@ -778,6 +786,7 @@ export function artWechseln(f: BelegFormular, art: Belegart, zielTage: Partial<R
     bezahltAm: art === 'rechnung' ? f.bezahltAm : null,
     buchungId: art === 'angebot' ? null : f.buchungId,
     vorlageId: null,
+    vorlageDesign: STANDARD_DESIGN,
   };
 }
 
@@ -802,7 +811,10 @@ export function betragSetzen(f: BelegFormular, eingabe: string): BelegFormular {
 export const formularSumme = (f: BelegFormular): number => belegSumme({ positionen: positionenAus(f) });
 
 /** Ausgestellter Beleg ⇒ Formular, nur zum Anzeigen in der gesperrten Maske (so steht es auf dem Beleg). */
-export function formularAusDokument(d: BelegDokument, extra: { vorlageId: number | null; terminId: number | null }): BelegFormular {
+export function formularAusDokument(
+  d: BelegDokument,
+  extra: { vorlageId: number | null; terminId: number | null; vorlageDesign?: string },
+): BelegFormular {
   const k = d.kunde;
   return {
     art: d.art,
@@ -829,6 +841,7 @@ export function formularAusDokument(d: BelegDokument, extra: { vorlageId: number
     grund: d.eigenbeleg?.grund ?? 'verloren',
     grundText: d.eigenbeleg?.grund_text ?? '',
     vorlageId: extra.vorlageId,
+    vorlageDesign: designSchluessel(d.art, extra.vorlageDesign),
     terminId: extra.terminId,
     buchungId: null,
   };

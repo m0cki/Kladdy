@@ -42,11 +42,11 @@ const ctx: ErtragKontext = {
   kreise: KREISE,
   kennwerte: new Map([[2026, { kleinbetragsrechnung_cent: 25_000 }]]),
   vorlagen: {
-    quittung: [{ id: null, name: 'Standard-Quittung', bausteine: standardVorlage('quittung'), aktiv: true }],
-    rechnung: [
-      { id: null, name: 'Standard-Rechnung', bausteine: standardVorlage('rechnung'), aktiv: false },
-      { id: 7, name: 'Meine Rechnung', bausteine: standardVorlage('rechnung'), aktiv: true },
+    quittung: [
+      { id: null, design: 'klassisch', name: 'Klassisch', bausteine: standardVorlage('quittung'), aktiv: true },
+      { id: null, design: 'formular', name: 'Formular', bausteine: standardVorlage('quittung', 'formular'), aktiv: false },
     ],
+    rechnung: [{ id: 7, design: 'klassisch', name: 'Meine Rechnung', bausteine: standardVorlage('rechnung'), aktiv: true }],
   },
   zahlungszielTage: 14,
   heute: HEUTE,
@@ -156,7 +156,7 @@ describe('Nummer, offene Rechnungen, Prüfung', () => {
 describe('Beleg aus der Schublade', () => {
   it('Quittung für einen bekannten Kunden: ein Posten, Leistung statt Beschreibung, aktive Vorlage', () => {
     const f = belegFormular(formular(), ertrag({ leistung: 'Rasen mähen, 120 m²' }), 6_000, ctx);
-    expect(f).toMatchObject({ art: 'quittung', kunde: 'Anna Schmidt · K-0001', datum: HEUTE, betreff: 'Rasen mähen', zahlungsart: 'bar', bezahltAm: null, vorlageId: null });
+    expect(f).toMatchObject({ art: 'quittung', kunde: 'Anna Schmidt · K-0001', datum: HEUTE, betreff: 'Rasen mähen', zahlungsart: 'bar', bezahltAm: null, vorlageId: null, vorlageDesign: 'klassisch' });
     expect(f.positionen).toEqual([{ beschreibung: 'Rasen mähen, 120 m²', menge: '1', einheit: 'Stk.', preis: '60,00', kategorieId: 9 }]);
     expect(karteiAnschrift(formular(), KUNDEN)?.id).toBe(1);
     expect(karteiAnschrift(formular({ wer: 'Bob Bauer · K-0002' }), KUNDEN)).toBeNull();
@@ -168,10 +168,22 @@ describe('Beleg aus der Schublade', () => {
     const offen = belegFormular(formular({ wer: 'Clara Neu' }), ertrag({ art: 'rechnung', bezahlt: false }), 6_000, ctx);
     expect(offen.bezahltAm).toBeNull();
     expect(vorlageFuer({ art: 'rechnung', vorlage: null }, ctx.vorlagen).id).toBe(7);
-    expect(vorlageFuer({ art: 'rechnung', vorlage: { id: null } }, ctx.vorlagen).name).toBe('Standard-Rechnung');
     expect(vorlageFuer({ art: 'rechnung', vorlage: { id: 99 } }, ctx.vorlagen).id).toBe(7);
     expect(vorlageFuer({ art: 'quittung', vorlage: null }, { ...ctx.vorlagen, quittung: [] }).name).toBe('Standard-Quittung');
-    expect(belegFormular(formular({ wer: 'Clara Neu' }), ertrag({ art: 'rechnung', vorlage: { id: null } }), 6_000, ctx).vorlageId).toBeNull();
+  });
+
+  it('Vorlage nach Design: gewähltes Design, ohne Design die id (null ⇒ klassisch), Unbekanntes ⇒ aktive', () => {
+    expect(vorlageFuer({ art: 'quittung', vorlage: { id: null, design: 'formular' } }, ctx.vorlagen).name).toBe('Formular');
+    expect(vorlageFuer({ art: 'quittung', vorlage: { id: null } }, ctx.vorlagen).design).toBe('klassisch');
+    expect(vorlageFuer({ art: 'quittung', vorlage: { id: null, design: 'gibtsnicht' } }, ctx.vorlagen).design).toBe('klassisch');
+    expect(vorlageFuer({ art: 'rechnung', vorlage: { id: null } }, ctx.vorlagen).id).toBe(7);
+    const f = belegFormular(formular(), ertrag({ vorlage: { id: null, design: 'formular' } }), 6_000, ctx);
+    expect(f).toMatchObject({ vorlageId: null, vorlageDesign: 'formular' });
+    const v = belegVorbereiten(formular(), ertrag({ vorlage: { id: null, design: 'formular' } }), 6_000, ctx);
+    // gedruckt wird das Formular; die Pflichtangaben sind auch dort vollständig
+    expect(v.gedruckt.some((b) => b.typ === 'firmenblock')).toBe(true);
+    expect(v.fehlt).toEqual([]);
+    expect(v.daten?.zusatz).toMatchObject({ vorlage_design: 'formular' });
   });
 
   it('vorbereitet für beleg_ausstellen: Daten, Nummer, Pflichtangaben', () => {

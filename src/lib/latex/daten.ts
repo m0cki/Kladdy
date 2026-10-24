@@ -5,6 +5,7 @@
  * Zusätzlich zu §7.4 (für die Bausteine): \KundeAnzeige (Name, Quittung ohne Namen „Barverkauf“),
  * \KundeAdresseEinzeilig, \FirmaPLZ, \FirmaStadt, \LeistungsdatumLabel, \Zahlungsziel, \AnzahlPositionen,
  * \QuittungFuer, \Quittiert, \EigenbelegGrund, \GebuchtAls, \UnterschriftDatum, \Storniert (1 oder leer),
+ * \ZahlungswegKurz (bar, bank, paypal oder leer – für die Ankreuzfelder der Quittung „Formular“),
  * \GiroCode (`girocode.png` bei offener Rechnung mit gültigen EPC-Daten, sonst leer; die Datei liefert belegAssets).
  * \LogoDatei ist `logo.png`, wenn der Beleg ein Firmenlogo hat (`doc.logo`), sonst leer (§7.4).
  * Tests: latex.test.ts */
@@ -22,6 +23,7 @@ import {
   empfaenger,
   ersetzen,
   gebuchtText,
+  gedruckterZahlungsweg,
   leistungLabel,
   leistungText,
   mengeText,
@@ -50,6 +52,7 @@ export const MAKRO_NAMEN = [
   'Schlusstext', 'Gruss',
   'KundeAnzeige', 'KundeAdresseEinzeilig', 'FirmaPLZ', 'FirmaStadt', 'LeistungsdatumLabel', 'Zahlungsziel', 'AnzahlPositionen',
   'QuittungFuer', 'Quittiert', 'EigenbelegGrund', 'GebuchtAls', 'UnterschriftDatum', 'Storniert', 'GiroCode',
+  'ZahlungswegKurz',
 ] as const;
 
 export type MakroName = (typeof MAKRO_NAMEN)[number];
@@ -124,6 +127,8 @@ export function makroWerte(doc: BelegDokument): Record<MakroName, string> {
     Storniert: doc.storniert ? '1' : '',
     // fester Dateiname (kein Nutzerwert); belegAssets liefert die Datei, sobald main.tex sie einbindet
     GiroCode: girocodeDatei(doc),
+    // fester Schlüssel (kein Nutzerwert): welches Kästchen angekreuzt wird
+    ZahlungswegKurz: gedruckterZahlungsweg(doc) ?? '',
   };
 }
 

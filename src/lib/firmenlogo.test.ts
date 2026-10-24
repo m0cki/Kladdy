@@ -67,6 +67,9 @@ describe('Firmenlogo', () => {
     expect(vorlageZeigtLogo([{ typ: 'kopf' }])).toBe(true);
     expect(vorlageZeigtLogo([{ typ: 'kopf', logo: false }])).toBe(false);
     expect(vorlageZeigtLogo([{ typ: 'kopf', aus: true }])).toBe(false);
+    // Firmenkopf (Text): Logo nur, wenn eingeschaltet (Standard aus, auch im Design „Formular“)
+    expect(vorlageZeigtLogo(standardVorlage('quittung', 'formular'))).toBe(false);
+    expect(vorlageZeigtLogo([{ typ: 'firmenblock', logo: true }])).toBe(true);
   });
 
   it('von mehreren gezogenen Dateien das erste Bild', () => {

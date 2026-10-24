@@ -417,6 +417,14 @@ describe('Vorbereiteter Beleg (Entwurf ohne Nummer)', () => {
     expect(vorbereitungFormular({ ...basis, art: 'quittung', termin: { ...basis.termin, betrag: null } }).positionen[0].preis).toBe('');
   });
 
+  it('aktives Design der Art landet im Entwurf (entwurf_json.vorlage_design), unbekannt ⇒ klassisch', () => {
+    const q = vorbereitungFormular({ ...basis, art: 'quittung', vorlageId: null, vorlageDesign: 'formular' });
+    expect(q).toMatchObject({ vorlageId: null, vorlageDesign: 'formular' });
+    expect(vorbereitungDaten({ ...basis, art: 'quittung', vorlageId: null, vorlageDesign: 'formular' })?.zusatz).toEqual({ vorlage_design: 'formular' });
+    expect(vorbereitungFormular({ ...basis, art: 'rechnung', vorlageDesign: 'formular' }).vorlageDesign).toBe('klassisch');
+    expect(vorbereitungDaten({ ...basis, art: 'rechnung' })?.zusatz).toEqual({});
+  });
+
   it('vorhanden: folgt dem Termin, behält eigene Positionen und Betreff; Artwechsel mit Standardtexten', () => {
     const q = vorbereitungFormular({ ...basis, art: 'quittung' });
     const vorhanden: BelegFormular = {
@@ -476,7 +484,7 @@ describe('Erfassen-Schublade zum Termin', () => {
     expect(vorbelegungMitBezug({ typ: 'ausgabe' }, null)).toEqual({ typ: 'ausgabe' });
     expect(vorbelegungMitBezug({}, { termin: termin({ id: 7, kunde_id: 3 }), entwurf: null })).toEqual({ typ: 'einnahme', kunde: 3, betrag: 6_500, text: 'Rasen mähen', termin: 7 });
 
-    expect(ertragAusEntwurf(bezug.entwurf)).toEqual({ leistung: '', adresse: '', vorlage: { id: 4 } });
+    expect(ertragAusEntwurf(bezug.entwurf)).toEqual({ leistung: '', adresse: '', vorlage: { id: 4, design: 'klassisch' } });
     expect(ertragAusEntwurf({ ...bezug.entwurf!, formular: { ...formular, betreff: 'Eigener' } }).leistung).toBe('Hecke');
     expect(ertragAusEntwurf(null)).toEqual({ leistung: '', adresse: '', vorlage: null });
     expect(ertragBezug(bezug)).toEqual({ termin: { id: 7, datum: H }, entwurf: formular });

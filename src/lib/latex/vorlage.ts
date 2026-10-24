@@ -9,10 +9,13 @@
  * - Was in der Vorschau leer bleibt (z. B. Betreff ohne Text), lässt auch das PDF weg: Bausteine, deren Text nur aus
  *   Platzhaltern besteht, stehen in \ifboolexpr{test {\ifdefempty{…}} and …}{}{…}.
  * - Abstände zwischen Bausteinen bilden die CSS-Regeln aus blatt.css nach (`abstandMm`).
+ * - Der Rahmen (Baustein „rahmen“) liegt wie das Wasserzeichen hinter der Seite (eso-pic, Bildumgebung des Kernels),
+ *   4 mm außerhalb des Satzspiegels (`RAHMEN_MM`, gleiche Werte wie .sh-rahmen in blatt.css).
  * - `bereiche` ordnet jede Zeile von main.tex ihrem Baustein zu, damit ein Kompilierfehler den Baustein nennen kann (§7.3).
  * Tests: latex.test.ts */
-import { BAUSTEINE, istUnten, sichtbare, type Aufgeloest, type Baustein, type BausteinTyp } from '../vorlagen/bausteine';
-import { ARTEN, formatVon, zerlegen, type Belegart, type PlatzhalterName } from '../vorlagen/dokument';
+import { BAUSTEINE, istUmrandet, istUnten, sichtbare, type Aufgeloest, type Baustein, type BausteinTyp } from '../vorlagen/bausteine';
+import { ARTEN, formatVon, zerlegen, type Belegart, type Blattformat, type PlatzhalterName } from '../vorlagen/dokument';
+import { firmenZeilen } from '../vorlagen/firmenblock';
 import { belegAkzent } from '../vorlagen/farbe';
 import { qrGroesseMm } from '../girocode/girocode';
 import { escapeStueck } from './escape';
@@ -102,8 +105,8 @@ const zeilen = (...z: (string | false | null | undefined)[]): string => z.filter
  * Abstand vor einem Baustein in mm (Nachbau der CSS-Regeln `.blk + .blk` usw., spätere Regeln gewinnen).
  * `vorher` = vorheriger gedruckter Baustein (null = erster), `unten` = im unteren Bereich (Fußzeile).
  */
-export function abstandMm(vorher: BausteinTyp | null, typ: BausteinTyp, unten = false): number {
-  if (!unten && typ === 'unterschrift') return 10;
+export function abstandMm(vorher: BausteinTyp | null, typ: BausteinTyp, unten = false, stil = ''): number {
+  if (!unten && typ === 'unterschrift') return stil === 'eine' ? 6 : 10;
   if (!vorher) return typ === 'positionen' && !unten ? 6 : 0;
   if (vorher === 'quittung_felder' || vorher === 'eigenbeleg_felder') return 0;
   if (vorher === 'titel' && (typ === 'quittung_felder' || typ === 'eigenbeleg_felder')) return 3.5;
@@ -127,11 +130,24 @@ interface Ctx {
 type Schnipsel = TexText;
 const fest = (tex: string): Schnipsel => ({ tex, leer: null });
 
-const GROESSE_PT: Readonly<Record<string, number>> = { normal: 10, klein: 8.5, grau: 8 };
+const GROESSE_PT: Readonly<Record<string, number>> = { normal: 10, klein: 8.5, grau: 8, mini: 6.5 };
 function textBlock(text: string, groesse: string): Schnipsel {
   const t = textTex(text);
-  const grau = groesse === 'grau' ? L`\color{grau}` : '';
+  const grau = groesse === 'grau' || groesse === 'mini' ? L`\color{grau}` : '';
   return { tex: `{${fs(GROESSE_PT[groesse] ?? 10)}${grau}${t.tex}\\par}`, leer: t.leer };
+}
+
+/** Großbuchstaben wie `text-transform: uppercase` in der Vorschau (Makros werden dabei aufgelöst). */
+const versal = (tex: string, an: boolean): string => (an ? L`\MakeUppercase{${tex}}` : tex);
+
+/** Firmenkopf: eine Zeile pro Textzeile; eine Zeile, deren Platzhalter alle leer sind, fällt weg (firmenblock.ts). */
+function firmenZeilenTex(text: string): string {
+  return firmenZeilen(text)
+    .map((z) => {
+      const tex = textTex(z.text, true).tex + L`\par`;
+      return z.platzhalter.length ? wennNichtLeer(z.platzhalter.map((p) => MAKRO[p]), tex) : tex;
+    })
+    .join('\n');
 }
 
 /** Feld-Raster der Quittung/des Eigenbelegs: drei Spalten 1,35 : 1 : 1 bzw. zwei gleiche, 8 mm Abstand. */
@@ -161,6 +177,33 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => Schnipsel>>
         L`\begin{minipage}[t]{60mm}\vspace{0pt}\raggedleft`,
         b.an('logo') && L`\ifdefempty{\LogoDatei}{}{\includegraphics[height=${h}mm,width=60mm,keepaspectratio]{\LogoDatei}}`,
         L`\end{minipage}\par`,
+      ),
+    );
+  },
+  firmenblock(b, x) {
+    const name = textTex(b.text('name'), true);
+    const untertitel = firmenZeilenTex(b.text('untertitel'));
+    const kontakt = firmenZeilenTex(b.text('zeilen'));
+    const logo = b.an('logo');
+    const h = x.a4 ? 16 : 12;
+    const inhalt = zeilen(
+      wennNichtLeer(name.leer, L`{${fs(17, 1.15)}\bfseries ${versal(name.tex, b.an('versal'))}\par}`),
+      untertitel && L`\vspace{1mm}{${fs(9, 1.4)}` + untertitel + '}',
+      kontakt && L`\vspace{.6mm}{${fs(8.5, 1.4)}` + kontakt + '}',
+    );
+    return fest(
+      zeilen(
+        logo
+          ? zeilen(
+              L`\noindent\begin{minipage}[t]{\dimexpr\linewidth-68mm\relax}\vspace{0pt}\raggedright`,
+              inhalt,
+              L`\end{minipage}\hfill`,
+              L`\begin{minipage}[t]{60mm}\vspace{0pt}\raggedleft`,
+              L`\ifdefempty{\LogoDatei}{}{\includegraphics[height=${String(h)}mm,width=60mm,keepaspectratio]{\LogoDatei}}`,
+              L`\end{minipage}\par`,
+            )
+          : L`{\raggedright ` + inhalt + '\n}',
+        b.an('linie') && L`\vspace{2.5mm}{\color{haar}\hrule height .25mm}`,
       ),
     );
   },
@@ -206,7 +249,7 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => Schnipsel>>
     const rechts = r.leer && !r.leer.length ? '' : wennNichtLeer(r.leer, L`\hfill{${fs(10.5)}\bfseries ${r.tex}}`);
     return fest(
       zeilen(
-        L`\noindent{${fs(x.a4 ? 17 : 18, 1.2)}\bfseries${farbe} ${t.tex}}${rechts}\par`,
+        L`\noindent{${fs(x.a4 ? 17 : 18, 1.2)}\bfseries${farbe} ${versal(t.tex, b.an('versal'))}}${rechts}\par`,
         b.an('linie') && L`\vspace{1.8mm}{\color{akzent}\hrule height .45mm}`,
       ),
     );
@@ -306,6 +349,23 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => Schnipsel>>
   quittung_felder(b) {
     const von = textTex(b.text('von'), true).tex;
     const fuer = textTex(b.text('fuer'), true).tex;
+    const fuerWert = L`\ifnum\AnzahlPositionen>1\relax\ifdefempty{\Betreff}{}{\Betreff\par}{${fs(9)}\let\Position\KPositionMini\vspace{1mm}\Positionen}\else\QuittungFuer\fi`;
+    if (b.text('stil') === 'formular') {
+      // „Bezeichnung: Wert“ wie ein Quittungsblock; Zahlungsart als Ankreuzfelder, die gedruckte mit Kreuz
+      const halb = L`\dimexpr(\linewidth-8mm)/2\relax`;
+      const kreuze = L`\KAnkreuz{bar}{Bar}\hspace{5mm}\KAnkreuz{bank}{Überweisung}\hspace{5mm}\KAnkreuz{paypal}{PayPal}`;
+      return fest(
+        zeilen(
+          L`\noindent\begin{minipage}[t]{${halb}}\KForm{Datum}{\Datum}\end{minipage}\hfill\begin{minipage}[t]{${halb}}\KForm{Nr.}{\KNr}\end{minipage}\par`,
+          L`{\color{haar}\hrule height .25mm}\vspace{3mm}`,
+          L`\KForm{${von}}{\KundeAnzeige\ifdefempty{\KundeAdresseEinzeilig}{}{, \KundeAdresseEinzeilig}}`,
+          L`\KForm{${fuer}}{${fuerWert}}`,
+          b.an('zahlungsart') && L`\KForm{Zahlungsart}{${kreuze}}`,
+          L`\vspace{1mm}{${fs(13, 1.3)}\noindent\textbf{Gesamtbetrag:}\ \textbf{\Gesamt}\par}\vspace{1mm}`,
+          b.an('worte') && L`{${fs(9)}\noindent\textcolor{grau}{in Worten:} \BetragInWorten\par}\vspace{1mm}`,
+        ),
+      );
+    }
     const felder = [L`\KFeld{Betrag}{{${fs(15, 1.3)}\bfseries\Gesamt}}`, L`\KFeld{Datum}{\Datum}`];
     if (b.an('zahlungsart')) felder.push(L`\KFeld{Zahlungsart}{\Zahlungsart}`);
     return fest(
@@ -313,7 +373,7 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => Schnipsel>>
         raster(felder),
         b.an('worte') && L`\KFeld{Betrag in Worten}{\BetragInWorten}`,
         L`\KFeld{${von}}{\KundeAnzeige\ifdefempty{\KundeAdresseEinzeilig}{}{, \KundeAdresseEinzeilig}}`,
-        L`\KFeld{${fuer}}{\ifnum\AnzahlPositionen>1\relax\ifdefempty{\Betreff}{}{\Betreff\par}{${fs(9)}\let\Position\KPositionMini\vspace{1mm}\Positionen}\else\QuittungFuer\fi}`,
+        L`\KFeld{${fuer}}{${fuerWert}}`,
       ),
     );
   },
@@ -336,11 +396,14 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => Schnipsel>>
   unterschrift(b) {
     const links = textTex(b.text('links'), true).tex;
     const rechts = textTex(b.text('rechts'), true).tex;
+    // eine Linie über die ganze Breite, die Beschriftung darüber (Quittungsblock)
+    if (b.text('stil') === 'eine') return fest(L`{${fs(9)}\bfseries ${rechts}\strut\par}\vspace{11mm}{\color{ink}\hrule height .25mm}`);
     const vor = b.an('vorbelegen') ? L`\ifdefempty{\FirmaStadt}{}{\FirmaStadt, }\UnterschriftDatum` : '';
     const spalte = (oben: string, unten: string) =>
       L`\begin{minipage}[b]{\dimexpr(\linewidth-14mm)/2\relax}{${fs(9.5)}\hspace*{1mm}${oben}\strut\par}` +
       L`\vspace{1mm}{\color{ink}\hrule height .25mm}\vspace{1mm}{${fs(7.5)}\color{grau}${unten}\strut\par}\end{minipage}`;
-    return fest(L`\vspace{2mm}\noindent` + spalte(vor, links) + L`\hspace{14mm}%` + '\n' + spalte('', rechts) + L`\par`);
+    // \hfill statt \hspace{14mm}: zwei gerundete Halbe sind sonst 1sp zu breit, und TeX bricht die zweite Spalte um
+    return fest(L`\vspace{2mm}\noindent` + spalte(vor, links) + L`\hfill%` + '\n' + spalte('', rechts) + L`\par`);
   },
   trennlinie(b) {
     const art = b.text('farbe');
@@ -351,6 +414,8 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => Schnipsel>>
     const mm = { klein: 4, mittel: 8, gross: 14 }[b.text('groesse')] ?? 8;
     return fest(L`\vspace{${String(mm)}mm}`);
   },
+  // der Rahmen wird nicht im Fluss gesetzt, sondern in mainTex hinter die Seite gelegt (rahmenTex)
+  rahmen: () => ({ tex: '', leer: [] }),
   fusszeile(b) {
     const spalten = [
       b.an('adresse') && L`\textcolor{ink}{\bfseries\Firma}\par\KZeile{\FirmaInhaber}\KZeile{\FirmaStrasse}\KZeile{\FirmaOrt}`,
@@ -369,6 +434,49 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => Schnipsel>>
     );
   },
 };
+
+/* ---------- Rahmen ---------- */
+
+/** Abstand des Rahmens vom Papierrand in mm: 4 mm außerhalb des Satzspiegels (Ränder aus der Präambel bzw. .sheet). */
+export const RAHMEN_MM: Readonly<Record<Blattformat, { oben: number; rechts: number; unten: number; links: number; breite: number; hoehe: number }>> = {
+  a4: { oben: 14, rechts: 16, unten: 8, links: 18, breite: 210, hoehe: 297 },
+  a5q: { oben: 7, rechts: 10, unten: 6, links: 10, breite: 210, hoehe: 148 },
+};
+const STRICH_MM = 2;
+const LUECKE_MM = 1.5;
+const RAHMEN_DICKE = 0.25;
+
+/** Gestrichelte Strecke: Anzahl Striche und Schritt so, dass sie genau an beiden Enden mit einem Strich aufhört. */
+export function striche(laengeMm: number): { n: number; schritt: number } {
+  const n = Math.max(2, Math.round((laengeMm + LUECKE_MM) / (STRICH_MM + LUECKE_MM)));
+  return { n, schritt: (laengeMm - STRICH_MM) / (n - 1) };
+}
+
+/** Rahmen hinter jeder Seite (eso-pic): vier Linien, gestrichelt aus kurzen Regeln oder durchgezogen. */
+export function rahmenTex(format: Blattformat, linie: string): string {
+  const r = RAHMEN_MM[format];
+  const x0 = r.links;
+  const y0 = r.unten;
+  const w = r.breite - r.links - r.rechts;
+  const h = r.hoehe - r.oben - r.unten;
+  const d = zahl(RAHMEN_DICKE);
+  const u = (mm: number) => L`\LenToUnit{${zahl(mm)}mm}`;
+  let tex: string;
+  if (linie === 'durchgezogen') {
+    tex =
+      L`\put(${u(x0)},${u(y0)}){\rule{${zahl(w)}mm}{${d}mm}}` +
+      L`\put(${u(x0)},${u(y0 + h - RAHMEN_DICKE)}){\rule{${zahl(w)}mm}{${d}mm}}` +
+      L`\put(${u(x0)},${u(y0)}){\rule{${d}mm}{${zahl(h)}mm}}` +
+      L`\put(${u(x0 + w - RAHMEN_DICKE)},${u(y0)}){\rule{${d}mm}{${zahl(h)}mm}}`;
+  } else {
+    const wa = striche(w);
+    const ha = striche(h);
+    const waag = (y: number) => L`\multiput(${u(x0)},${u(y)})(${u(wa.schritt)},0){${String(wa.n)}}{\rule{${zahl(STRICH_MM)}mm}{${d}mm}}`;
+    const senk = (x: number) => L`\multiput(${u(x)},${u(y0)})(0,${u(ha.schritt)}){${String(ha.n)}}{\rule{${d}mm}{${zahl(STRICH_MM)}mm}}`;
+    tex = waag(y0) + waag(y0 + h - RAHMEN_DICKE) + senk(x0) + senk(x0 + w - RAHMEN_DICKE);
+  }
+  return L`\AddToShipoutPictureBG{\AtPageLowerLeft{\color{marke}` + tex + '}}';
+}
 
 /* ---------- Präambel ---------- */
 
@@ -396,7 +504,8 @@ function praeambel(art: Belegart, akzentHex: string): string {
       ? L`\usepackage[a4paper, top=18mm, bottom=12mm, left=22mm, right=20mm]{geometry}`
       : L`\usepackage[a5paper, landscape, top=11mm, bottom=10mm, left=14mm, right=14mm]{geometry}`,
     L`\usepackage{fontspec}`,
-    L`\IfFontExistsTF{Helvetica Neue}{\setmainfont{Helvetica Neue}}{\setmainfont{texgyreheros}[Extension=.otf, UprightFont=*-regular, BoldFont=*-bold, ItalicFont=*-italic, BoldItalicFont=*-bolditalic]}`,
+    // Schnitte ausdrücklich: ohne Angabe nimmt fontspec aus HelveticaNeue.ttc für Fett den fett-kursiven Schnitt
+    L`\IfFontExistsTF{Helvetica Neue}{\setmainfont{Helvetica Neue}[UprightFont=*, BoldFont=* Bold, ItalicFont=* Italic, BoldItalicFont=* Bold Italic]}{\setmainfont{texgyreheros}[Extension=.otf, UprightFont=*-regular, BoldFont=*-bold, ItalicFont=*-italic, BoldItalicFont=*-bolditalic]}`,
     L`\usepackage[ngerman]{babel}`,
     L`\usepackage{xcolor, graphicx, etoolbox, eso-pic}`,
     L`\definecolor{akzent}{HTML}{${belegAkzent(akzentHex)}}`,
@@ -418,6 +527,10 @@ function praeambel(art: Belegart, akzentHex: string): string {
     L`\newcommand{\KZeileVor}[2]{\ifdefempty{#2}{}{#1#2\par}}`,
     L`\newcommand{\KMeta}[2]{\noindent\strut\textcolor{grau}{#1}\hfill #2\par\vspace{1.1mm}}`,
     L`\newcommand{\KFeld}[2]{{${fs(7.5)}\color{grau}#1\par}\vspace{.6mm}{${fs(11, 1.3)}#2\par}\vspace{3mm}}`,
+    L`\newcommand{\KForm}[2]{{${fs(10.5, 1.35)}\noindent\textbf{#1:}\ #2\par}\vspace{2mm}}`,
+    // Ankreuzfeld 3 mm, angekreuzt mit einem Kreuz (nicht nur Farbe); gezeichnet, keine Sonderzeichen aus der Schrift
+    L`\newcommand{\KKaestchen}[1]{\raisebox{-.35mm}{\setlength{\unitlength}{1mm}\begin{picture}(3,3)\put(0,0){\rule{3mm}{.25mm}}\put(0,2.75){\rule{3mm}{.25mm}}\put(0,0){\rule{.25mm}{3mm}}\put(2.75,0){\rule{.25mm}{3mm}}\ifnum#1=1 \put(1.5,1.5){\makebox(0,0){\rotatebox{45}{\rule[-.15mm]{2.7mm}{.3mm}}}}\put(1.5,1.5){\makebox(0,0){\rotatebox{-45}{\rule[-.15mm]{2.7mm}{.3mm}}}}\fi\end{picture}}}`,
+    L`\newcommand{\KAnkreuz}[2]{\mbox{\ifdefstring{\ZahlungswegKurz}{#1}{\KKaestchen{1}}{\KKaestchen{0}}\hspace{1.5mm}#2}}`,
     L`\newcommand{\KPositionMini}[6]{\noindent\makebox[20mm][l]{\textcolor{grau}{#3\ifblank{#4}{}{~#4}~×}}\hspace{2.5mm}\parbox[t]{\dimexpr\linewidth-47.5mm\relax}{\raggedright #2}\hfill\makebox[22mm][r]{#6}\par}`,
     L`\newcommand{\KWasserzeichen}[3]{\AddToShipoutPictureBG{\AtPageCenter{\makebox(0,0){\rotatebox{33}{\setlength{\fboxrule}{${String(wm.rand)}mm}\setlength{\fboxsep}{2mm}\textcolor{#3}{\fbox{\hspace{7mm}\textcolor{#2}{\fontsize{${String(wm.pt)}}{${String(wm.pt)}}\selectfont\bfseries\addfontfeature{LetterSpace=10}#1}\hspace{7mm}}}}}}}}`,
   );
@@ -457,11 +570,14 @@ export function mainTex(art: Belegart, bausteine: readonly Baustein[], akzent: s
     add(L`\AddToShipoutPictureBG*{\AtPageUpperLeft{` + marke('105', 5) + marke('210', 5) + marke('148.5', 8) + '}}');
   }
 
-  const liste = sichtbare(bausteine);
+  const alle = sichtbare(bausteine);
+  // Rahmen: hinter jede Seite, unabhängig von der Stelle in der Liste
+  for (const x of alle.filter((y) => istUmrandet(y.b))) add(`% Baustein ${x.index + 1}: ${BAUSTEINE[x.b.typ].name}\n` + rahmenTex(formatVon(art), x.b.text('linie')), x.index, x.b.typ);
+  const liste = alle.filter((y) => !istUmrandet(y.b));
   const block = (x: (typeof liste)[number], vorher: BausteinTyp | null, unten: boolean): boolean => {
     const s = BLOCK[x.b.typ](x.b, { art, a4, vorher });
     if (!s.tex || (s.leer && !s.leer.length)) return false;
-    const mm = abstandMm(vorher, x.b.typ, unten) + (unten && vorher ? 4 : 0);
+    const mm = abstandMm(vorher, x.b.typ, unten, x.b.text('stil')) + (unten && vorher ? 4 : 0);
     const abstand = mm ? L`\vspace{${zahl(mm)}mm}` + '\n' : '';
     add(`% Baustein ${x.index + 1}: ${BAUSTEINE[x.b.typ].name}\n` + wennNichtLeer(s.leer, abstand + s.tex), x.index, x.b.typ);
     return true;

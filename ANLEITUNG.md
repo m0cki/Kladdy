@@ -606,6 +606,7 @@ CREATE TABLE vorlagen (                       -- Block-Baukasten (§7)
   id INTEGER PRIMARY KEY, name TEXT NOT NULL, art TEXT NOT NULL,  -- wie rechnungen.art
   bloecke_json TEXT NOT NULL,                  -- [{ "typ": "kopf", "logo": true }, { "typ": "positionen", … }, …]
   ist_standard INTEGER NOT NULL DEFAULT 0, geaendert_am TEXT NOT NULL
+  -- seit 0010: basis TEXT NOT NULL DEFAULT 'klassisch'  = Design, von dem die eigene Kopie stammt (§7.0)
 );
 CREATE TABLE planposten (                      -- geplante Zahlungen für die Vorschau (Auswertung → Liquidität)
   id INTEGER PRIMARY KEY, datum TEXT NOT NULL, text TEXT NOT NULL, betrag_cent INTEGER NOT NULL  -- negativ = Ausgabe
@@ -958,8 +959,39 @@ Eine Vorlage ist eine geordnete Liste von Bausteinen mit Einstellungen, gespeich
 **Bausteine** (Katalog im Prototyp: `prototyp/js/pages/belege.js → App.sheet.BLOCKS`): Kopf mit Logo · Absenderzeile ·
 Anschrift & Belegdaten · Titel · Betreff · Freitext · Positionen · Gesamtbetrag · Betrag in Worten · Steuerhinweis (§ 19) ·
 Zahlung & GiroCode · Quittungsangaben · Eigenbeleg-Angaben · Grußformel · Unterschrift · Trennlinie · Abstand · Fußzeile (unten verankert) ·
-Datenschutzhinweis (optional, nicht in den Standardvorlagen; Text mit `{email}`, klein und grau, §2.10).
+Datenschutzhinweis (optional, nicht in den Standardvorlagen; Text mit `{email}`, klein und grau, §2.10) ·
+Firmenkopf (Text) · Rahmen.
 Jeder Baustein hat einfache Einstellungen (Schalter, Text mit Platzhaltern wie `{kunde}`, `{nr}`, `{summe}`, `{faellig}`, Auswahl).
+
+**Designs (Vorlagen-Galerie):** Je Art liefert die App ein oder mehrere fertige Designs mit (im Code,
+`src/lib/vorlagen/standard.ts`: Schlüssel, Name, Beschreibung, Bausteine). Jede Art hat „Klassisch“ (`klassisch`, die
+bisherige Standardvorlage); die Quittung zusätzlich „Formular“ (`formular`, wie ein Quittungsblock: gestrichelter Rahmen,
+Firmenkopf mit großem fettem Namen in Versalien, „QUITTUNG“ in Versalien, „Datum: … | Nr.: …“, Trennlinie, „Erhalten von:“,
+„Für:“, „Zahlungsart:“ mit Kästchen – der gedruckte Zahlungsweg angekreuzt –, „Gesamtbetrag: …“, darunter sehr klein der
+§ 19-Hinweis, „Unterschrift:“ mit einer Linie über die ganze Breite). Ein weiteres Design ist eine reine Code-Änderung.
+- **Aktives Design** je Art (Einstellung `vorlagen_design` = `{ "quittung": "formular", … }`, fehlt ⇒ `klassisch`): das nehmen
+  neue Belege. Wirksam ist dessen eigene Kopie (wenn es eine gibt), sonst das Design selbst.
+- **Eigene Kopien je (Art, Design):** Tabelle `vorlagen`, Spalte `basis` (Migration 0010; alte Kopien = `klassisch`), Namen
+  „Meine Quittung“ (klassisch) bzw. „Meine Quittung (Formular)“. `ist_standard` gilt je Zeile.
+- **Seite „Vorlagen“:** Hat die Art mehrere Designs, wählt eine Leiste über dem Baukasten, welches gezeigt und bearbeitet
+  wird (markiert: aktiv, „angepasst“ = eigene Kopie); dazu „Neue Quittungen verwenden „Klassisch“ · Diese verwenden“.
+  Zeigen und Bearbeiten ändern nie das aktive Design, „Zurücksetzen“ betrifft nur das gezeigte. Zuletzt gezeigtes Design je
+  Art in localStorage (`kladdy.vorlagen.v1`), Adresse `?art=quittung&design=formular`.
+- **Beleg-Maske und Erfassen-Schublade:** Auswahl „Vorlage“ = alle Designs der Art (mit ihren wirksamen Bausteinen),
+  vorbelegt das aktive. Ein Entwurf merkt sich das Design (`entwurf_json.vorlage_design`, nur wenn ≠ `klassisch`;
+  `vorlage_id` = eigene Kopie oder NULL). Alte Entwürfe ohne Schlüssel ⇒ `klassisch`. Ausgestellte Belege bleiben, wie sie sind.
+
+**Neue Bausteine und Einstellungen** (Vorschau und PDF gleich, Standardwerte ändern bestehende Vorlagen nicht):
+- **Firmenkopf (Text)** (alle Arten): Name (Standard `{firma}`, Großbuchstaben an/aus), Untertitel (`Inh. {inhaber}`),
+  Zeilen (Standard Anschrift, Steuernummer, Telefon, E-Mail), Trennlinie, optional Logo rechts. Eine Zeile, deren
+  Platzhalter alle leer sind, fällt ganz weg (`src/lib/vorlagen/firmenblock.ts`; im PDF per `\ifdefempty`).
+- **Rahmen** (alle Arten): gestrichelt oder durchgezogen, 4 mm außerhalb des Satzspiegels um das ganze Blatt (PDF:
+  `eso-pic`, gestrichelt aus kurzen Linien; Vorschau: SVG). Liegt hinter dem Blatt, kein Abstand im Fluss.
+- **Titel:** „Großbuchstaben“. **Quittungsangaben:** Stil „Kacheln“ (bisher) oder „Formular“ (Label: Wert, Ankreuzfelder).
+  **Unterschrift:** Stil „Zwei Linien“ (bisher) oder „Eine Linie“ (Beschriftung darüber, Linie über die ganze Breite).
+  **Freitext/Steuerhinweis:** Größe „Sehr klein, grau“ (6,5 pt).
+- Pflichtangaben-Check: Der Firmenkopf zählt für Anschrift, Inhaber und Steuernummer, Quittungsangaben im Stil „Formular“
+  für die Nummer.
 
 **Seite „Vorlagen“** (siehe Prototyp `#/vorlagen`):
 - Art-Umschalter Rechnung · Quittung · Angebot · Eigenbeleg.
@@ -968,7 +1000,7 @@ Jeder Baustein hat einfache Einstellungen (Schalter, Text mit Platzhaltern wie `
   Darunter der **Pflichtangaben-Check** (§ 34a UStDV): Entfernt man z. B. den § 19-Hinweis, wird das sofort rot markiert.
 - **Rechts:** Live-Vorschau auf Papier. Klick auf einen Bereich im Blatt wählt den Baustein aus. Vorschau mit Beispieldaten
   oder einem echten Beleg. Knopf „PDF“.
-- Die erste Änderung an einer Standardvorlage legt automatisch eine **eigene Kopie** an. „Zurücksetzen“ stellt den Standard
+- Die erste Änderung an einem Design legt automatisch eine **eigene Kopie** an. „Zurücksetzen“ stellt das Design
   wieder her (mit Rückgängig). Gespeichert wird automatisch.
 - **Experten-Ansicht „LaTeX“** (nur lesen): zeigt den automatisch erzeugten LaTeX-Code.
 
@@ -1012,7 +1044,8 @@ den Baustein und die Meldung anzeigen und protokollieren.
 `\Firma` `\FirmaInhaber` `\FirmaStrasse` `\FirmaOrt` `\FirmaEmail` `\FirmaTelefon` `\FirmaWeb` `\Steuernummer` `\Bank` `\IBAN` `\BIC` `\LogoDatei` ·
 `\KundeName` `\KundeZusatz` `\KundeStrasse` `\KundeOrt` `\Kundennummer` ·
 `\Betreff` `\Einleitung` `\Positionen` `\Gesamt` `\BetragInWorten` `\Zahlungsart` `\Steuerhinweis` `\Zahlungshinweis`
-`\Schlusstext` `\Gruss`
+`\Schlusstext` `\Gruss` · `\ZahlungswegKurz` (gedruckter Zahlungsweg als Schlüssel `bar`/`bank`/`paypal` für die
+Ankreuzfelder der Quittungsangaben im Stil „Formular“, quittiert vor gewählt)
 
 `\Positionen` enthält eine Folge von `\Position{Nr}{Beschreibung}{Menge}{Einheit}{Einzelpreis}{Gesamt}`.
 **Wie** eine Position aussieht, legt die Vorlage selbst fest.
@@ -1678,7 +1711,7 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
      (ohne Protokoll je Zeile, nichts festgeschrieben). Tectonic: `src-tauri/src/tectonic.rs` (`tectonic_finden` in der
      Reihenfolge aus §3.1, für `compile_latex` wiederverwendbar; `tectonic_suchen`, `tectonic_pfad_pruefen`,
      `tectonic_pruefen` mit `--version` und Zeitlimit), eigener Pfad in `einstellungen['tectonic_pfad']`
-- **Nächste Migration:** `0010` (`0009` schützt Protokoll und Festschreibungen per Trigger; ausgelieferte Migrationen nie ändern).
+- **Nächste Migration:** `0011` (`0010` ergänzt `vorlagen.basis` für die Vorlagen-Galerie; ausgelieferte Migrationen nie ändern).
 - **Phase 1 abgeschlossen.** Weiter mit **Phase 2** in Teilen (je ein PR): 1. Diagramm-Komponenten (§9.6, §9.5) ·
   2. Auswertung mit großem Umschalter + Überblick (§6.9.1) · 3. Liquidität (§6.9.2) · 4. Suche/Befehlspalette ⌘K (§6.2)
 - **Phase 2 in Teilen:**
@@ -1939,6 +1972,26 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
   (scharf, wie in der Vorschau); Rechnung ausstellen, danach Logo wechseln bzw. zurücksetzen ⇒ die ausgestellte Rechnung
   zeigt in der Maske weiter das alte Logo, neue Belege das neue; „Zurücksetzen“ ⇒ App-Symbol, „Rückgängig“ holt das Logo
   zurück; Einträge `firmenlogo` im Protokoll; im Demo-Modus eigenes Logo, „Demo-Daten entfernen“ räumt es weg.
+- **Vorlagen-Galerie** (§7.0) – **erledigt (Branch `vorlagen-galerie`)**: mehrere mitgelieferte Designs je Art
+  (`STANDARD_VORLAGEN[art]` = Liste aus Schlüssel, Name, Beschreibung, Bausteinen; `standardVorlage(art, design)`,
+  Unbekanntes ⇒ „Klassisch“), neues Quittungs-Design „Formular“. Migration `0010_vorlagen_basis` (`vorlagen.basis`, alte
+  Kopien ⇒ `klassisch`; Sicherung davor wie immer automatisch). Aktives Design je Art in der Einstellung `vorlagen_design`
+  (protokolliert, `einstellungAendern` liest und schreibt im selben Auftrag). `src/lib/queries/vorlagen.ts`:
+  `ladeEigeneVorlage(art, basis)`, `ladeEigeneVorlagen`, `ladeAktivesDesign`/`speichereAktivesDesign`,
+  `ladeAktiveBausteine`, `ladeVorlagenFuerArt` (je Design eine Wahl mit `design`), `speichereVorlage(art, bausteine,
+  basis)`, `vorlageZuruecksetzen(art, basis)`. Neue Bausteine „Firmenkopf (Text)“ und „Rahmen“, neue Einstellungen
+  (Titel in Versalien, Quittungsangaben „Formular“, Unterschrift „Eine Linie“, Größe „Sehr klein“), Makro
+  `\ZahlungswegKurz` in daten.tex. Nebenbei behoben: Fett wurde im PDF als Fett-Kursiv gesetzt (Schriftschnitte jetzt
+  ausdrücklich in der Präambel), zwei Unterschriftsspalten rutschten im PDF untereinander (jetzt `\hfill`), ein Logo im
+  Firmenkopf geht als Asset mit. Duplizieren nimmt das aktive Design der Art.
+  **Auf dem Mac prüfen:** Vorlagen › Quittung: Leiste „Klassisch · Formular“, „Formular“ zeigt den Quittungsblock;
+  „Diese verwenden“ ⇒ Toast, Haken wandert, neue Quittung (Erfassen-Schublade und Maske) ist vorbelegt mit „Formular“;
+  Formular ändern ⇒ „Meine Quittung (Formular)“, „angepasst“, aktives Design bleibt; „Zurücksetzen“ nur beim gezeigten
+  Design, mit Rückgängig; nach Neustart ist das zuletzt gezeigte Design wieder da; Bleistift in der Beleg-Maske öffnet
+  das Design des Belegs; „PDF“ auf der Vorlagen-Seite und eine ausgestellte Formular-Quittung sehen aus wie die Vorschau
+  (gestrichelter Rahmen, gewählter Zahlungsweg angekreuzt), ohne Telefon fällt die Zeile weg; Pflichtangaben-Check grün,
+  ohne § 19-Baustein rot; alte Entwürfe und ausgestellte Belege unverändert; die Migration legt vorher eine Sicherung an
+  (`sicherungen/vor-migration`); Einträge `vorlagen_design` und `vorlagen` im Protokoll.
 - **Offen aus Phase 1 (Teil 1+2):** Regelbesteuerung wirkt noch nicht auf Buchungen/Belege.
 - **Aus Phase 1 nachgeholt:** Kategorien bearbeiten, optionale Kategorien und EÜR-Zuordnung pro Jahr – **erledigt (Branch
   `kategorien-euer`, auf dem Ende der Phase-3-Kette)**: Migration `0008_kategorien` (Katalog Abschreibungen (AfA), Bewirtung 70 %, Geschenke, Homeoffice,

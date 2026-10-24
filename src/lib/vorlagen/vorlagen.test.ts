@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BAUSTEINE, BAUSTEIN_TYPEN, aufloesen, bausteineAusJson, istUnten, sichtbare } from './bausteine';
+import { BAUSTEINE, BAUSTEIN_TYPEN, aufloesen, bausteineAusJson, istUnten, sichtbare, type Baustein } from './bausteine';
 import { BEISPIEL_FIRMA, firmaOderBeispiel, testbeleg } from './beispiel';
 import {
   ARTEN,
@@ -18,7 +18,7 @@ import {
   zerlegen,
 } from './dokument';
 import { belegAkzent } from './farbe';
-import { STANDARD_VORLAGEN, standardVorlage } from './standard';
+import { STANDARD_VORLAGEN, designFuer, designSchluessel, designsFuer, istDesign, standardVorlage } from './standard';
 
 const rechnung = () => testbeleg('rechnung', BEISPIEL_FIRMA, 'klein', '2026-10-18');
 const quittung = () => testbeleg('quittung', BEISPIEL_FIRMA, 'klein', '2026-10-18');
@@ -125,6 +125,7 @@ describe('Bausteine', () => {
 });
 
 describe('Standardvorlagen (im Code)', () => {
+  const alle = () => BELEGARTEN.flatMap((art) => STANDARD_VORLAGEN[art].map((d) => ({ art, d })));
   it('für jede Belegart, Format passend', () => {
     for (const art of BELEGARTEN) expect(STANDARD_VORLAGEN[art].length).toBeGreaterThan(0);
     expect(formatVon('rechnung')).toBe('a4');
@@ -132,20 +133,48 @@ describe('Standardvorlagen (im Code)', () => {
     expect(formatVon('quittung')).toBe('a5q');
     expect(formatVon('eigenbeleg')).toBe('a5q');
   });
+  it('jede Art hat „Klassisch“ zuerst, die Quittung auch „Formular“; Schlüssel je Art eindeutig', () => {
+    for (const art of BELEGARTEN) {
+      expect(designsFuer(art)[0]).toMatchObject({ schluessel: 'klassisch', name: 'Klassisch' });
+      const keys = designsFuer(art).map((d) => d.schluessel);
+      expect(new Set(keys).size).toBe(keys.length);
+    }
+    expect(designsFuer('quittung').map((d) => [d.schluessel, d.name])).toEqual([
+      ['klassisch', 'Klassisch'],
+      ['formular', 'Formular'],
+    ]);
+    for (const { d } of alle()) expect(d.beschreibung.trim()).not.toBe('');
+  });
+  it('unbekannte Designs fallen auf „Klassisch“ zurück', () => {
+    expect(standardVorlage('quittung', 'gibtsnicht')).toEqual(standardVorlage('quittung'));
+    expect(standardVorlage('rechnung', 'formular')).toEqual(standardVorlage('rechnung', 'klassisch'));
+    expect(designFuer('quittung', 'formular').name).toBe('Formular');
+    expect(designFuer('angebot', 'formular').schluessel).toBe('klassisch');
+    expect(designSchluessel('quittung', 'formular')).toBe('formular');
+    expect(designSchluessel('rechnung', 'formular')).toBe('klassisch');
+    expect(designSchluessel('quittung', undefined)).toBe('klassisch');
+    expect(designSchluessel('quittung', 7)).toBe('klassisch');
+    expect(istDesign('quittung', 'formular')).toBe(true);
+    expect(istDesign('eigenbeleg', 'formular')).toBe(false);
+  });
   it('nur Bausteine, die zur Belegart passen', () => {
-    for (const art of BELEGARTEN) for (const b of STANDARD_VORLAGEN[art]) expect(BAUSTEINE[b.typ].arten, `${art}/${b.typ}`).toContain(art);
+    for (const { art, d } of alle()) for (const b of d.bausteine) expect(BAUSTEINE[b.typ].arten, `${art}/${d.schluessel}/${b.typ}`).toContain(art);
   });
   it('Rechnung und Quittung drucken den § 19-Hinweis, die Quittung den Inhaber', () => {
-    expect(STANDARD_VORLAGEN.rechnung.some((b) => b.typ === 'steuerhinweis')).toBe(true);
-    expect(STANDARD_VORLAGEN.quittung.some((b) => b.typ === 'steuerhinweis')).toBe(true);
-    expect(STANDARD_VORLAGEN.quittung.some((b) => String(b.text ?? '').includes('{inhaber}'))).toBe(true);
+    for (const d of [...STANDARD_VORLAGEN.rechnung, ...STANDARD_VORLAGEN.quittung]) expect(d.bausteine.some((b) => b.typ === 'steuerhinweis')).toBe(true);
+    // Absenderzeile (Klassisch) bzw. Untertitel des Firmenkopfs (Formular), mit Standardwerten des Bausteins
+    const druckt = (b: Baustein) => aufloesen(b).texte().some((t) => t.includes('{inhaber}'));
+    for (const d of STANDARD_VORLAGEN.quittung) expect(d.bausteine.some(druckt), d.schluessel).toBe(true);
   });
   it('standardVorlage liefert eine Kopie', () => {
     const v = standardVorlage('rechnung');
     v[0].claim = 'geändert';
     v.pop();
-    expect(STANDARD_VORLAGEN.rechnung[0].claim).toBe('{inhaber}');
-    expect(standardVorlage('rechnung')).toHaveLength(STANDARD_VORLAGEN.rechnung.length);
+    expect(STANDARD_VORLAGEN.rechnung[0].bausteine[0].claim).toBe('{inhaber}');
+    expect(standardVorlage('rechnung')).toHaveLength(STANDARD_VORLAGEN.rechnung[0].bausteine.length);
+    const f = standardVorlage('quittung', 'formular');
+    f[0].linie = 'durchgezogen';
+    expect(designFuer('quittung', 'formular').bausteine[0].linie).toBeUndefined();
   });
   it('Nummernkreise RE/QU/AN/EB', () => {
     expect([ARTEN.rechnung.prefix, ARTEN.quittung.prefix, ARTEN.angebot.prefix, ARTEN.eigenbeleg.prefix]).toEqual(['RE', 'QU', 'AN', 'EB']);
