@@ -2,10 +2,11 @@
  *
  * - Präambel nach Format: A4 hochkant (Rechnung, Angebot) bzw. A5 quer (Quittung, Eigenbeleg), Ränder wie das
  *   Papierblatt der Vorschau (blatt.css). Nur Pakete aus TeX Live, die Tectonic selbst lädt: geometry, fontspec, babel,
- *   xcolor, graphicx, etoolbox, eso-pic. Schrift: Helvetica Neue (macOS), sonst TeX Gyre Heros aus TeX Live.
+ *   xcolor, graphicx, etoolbox, eso-pic, ulem (Unterstreichen). Schrift: Helvetica Neue (macOS), sonst TeX Gyre Heros aus TeX Live.
  * - main.tex enthält keine Daten des Belegs, nur Makros aus daten.tex (daten.ts). Texte aus den Baustein-Einstellungen
  *   (später in der Vorlagen-Seite editierbar) werden escaped, Platzhalter werden zu Makros ({kunde} ⇒ \KundeAnzeige{}).
- *   Kein roher LaTeX-Code vom Nutzer, nirgends.
+ *   Kein roher LaTeX-Code vom Nutzer, nirgends. Formatierung (<b>, <i>, <u> im Vorlagentext, formatierung.ts) wird zu
+ *   \textbf, \textit und \uline (`formatTex`).
  * - Was in der Vorschau leer bleibt (z. B. Betreff ohne Text), lässt auch das PDF weg: Bausteine, deren Text nur aus
  *   Platzhaltern besteht, stehen in \ifboolexpr{test {\ifdefempty{…}} and …}{}{…}.
  * - Abstände zwischen Bausteinen bilden die CSS-Regeln aus blatt.css nach (`abstandMm`).
@@ -14,7 +15,8 @@
  * - `bereiche` ordnet jede Zeile von main.tex ihrem Baustein zu, damit ein Kompilierfehler den Baustein nennen kann (§7.3).
  * Tests: latex.test.ts */
 import { BAUSTEINE, istUmrandet, istUnten, sichtbare, type Aufgeloest, type Baustein, type BausteinTyp } from '../vorlagen/bausteine';
-import { ARTEN, formatVon, zerlegen, type Belegart, type Blattformat, type PlatzhalterName } from '../vorlagen/dokument';
+import { ARTEN, formatVon, type Belegart, type Blattformat, type PlatzhalterName } from '../vorlagen/dokument';
+import { parsen, type Stil } from '../vorlagen/formatierung';
 import { firmenZeilen } from '../vorlagen/firmenblock';
 import { belegAkzent } from '../vorlagen/farbe';
 import { qrGroesseMm } from '../girocode/girocode';
@@ -62,31 +64,44 @@ export interface TexText {
 }
 
 export function textTex(text: string, einzeilig = false): TexText {
-  const teile = zerlegen(text);
   let tex = '';
   let immer = false;
   const makros: string[] = [];
-  for (const t of teile) {
+  // Formatierung aus dem Vorlagentext (nie aus Werten): Markup VOR den Platzhaltern lesen (formatierung.ts)
+  for (const t of parsen(text)) {
     if (t.art === 'platzhalter') {
-      tex += `\\${MAKRO[t.name]}{}`;
+      tex += formatTex(`\\${MAKRO[t.name]}{}`, t);
       if (t.name === 'nr') immer = true;
       else if (!makros.includes(MAKRO[t.name])) makros.push(MAKRO[t.name]);
       continue;
     }
     if (t.text.trim()) immer = true;
     if (einzeilig) {
-      tex += escapeStueck(t.text);
+      tex += formatTex(escapeStueck(t.text), t);
       continue;
     }
     // Zeilenumbruch ⇒ neuer Absatz (parskip 0 = neue Zeile); eine Leerzeile ⇒ eine Zeile Abstand.
     // \par statt \\: ein leerer Platzhalter am Zeilenanfang oder -ende hinterlässt so keine leere Zeile.
+    // \par steht immer außerhalb von \textbf{…} usw. (ein Absatz in \uline geht nicht).
     tex += t.text
       .replace(/\r\n?/g, '\n')
       .split(/(\n+)/)
-      .map((s) => (s.startsWith('\n') ? L`\par ` + L`\vspace{\baselineskip}`.repeat(s.length - 1) : escapeStueck(s)))
+      .map((s) => (s.startsWith('\n') ? L`\par ` + L`\vspace{\baselineskip}`.repeat(s.length - 1) : formatTex(escapeStueck(s), t)))
       .join('');
   }
   return { tex, leer: immer ? null : makros };
+}
+
+/**
+ * Formatierung um ein fertiges (escaptes) Stück: \textbf, \textit und innen \uline (ulem, bricht am Leerzeichen um).
+ * \uline steht innen, weil ulem eine Gruppe in seinem Argument als unteilbaren Kasten setzt.
+ */
+export function formatTex(tex: string, s: Stil): string {
+  if (!tex) return '';
+  let out = s.unterstrichen ? L`\uline{${tex}}` : tex;
+  if (s.kursiv) out = L`\textit{${out}}`;
+  if (s.fett) out = L`\textbf{${out}}`;
+  return out;
 }
 
 /** Nur drucken, wenn nicht alle Makros leer sind. */
@@ -508,6 +523,8 @@ function praeambel(art: Belegart, akzentHex: string): string {
     L`\IfFontExistsTF{Helvetica Neue}{\setmainfont{Helvetica Neue}[UprightFont=*, BoldFont=* Bold, ItalicFont=* Italic, BoldItalicFont=* Bold Italic]}{\setmainfont{texgyreheros}[Extension=.otf, UprightFont=*-regular, BoldFont=*-bold, ItalicFont=*-italic, BoldItalicFont=*-bolditalic]}`,
     L`\usepackage[ngerman]{babel}`,
     L`\usepackage{xcolor, graphicx, etoolbox, eso-pic}`,
+    // Unterstreichen im Text (\uline, bricht um); normalem: \emph bleibt kursiv
+    L`\usepackage[normalem]{ulem}`,
     L`\definecolor{akzent}{HTML}{${belegAkzent(akzentHex)}}`,
     ...FARBEN.map(([n, h]) => L`\definecolor{${n}}{HTML}{${h}}`),
     L`\setlength{\parindent}{0pt}`,

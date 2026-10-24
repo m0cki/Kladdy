@@ -12,7 +12,9 @@
  * - Rechts: Live-Vorschau mit Beispieldaten (eigene Firmendaten, sobald eingetragen) oder – Umschalter „Beispiel ·
  *   Letzter Beleg“, nur wenn es einen gibt, je Art gemerkt – mit dem letzten Beleg der Art in den aktuellen Bausteinen
  *   (lib/vorlagen/vorschau.ts: nur gelesen, ohne Nummer ⇒ Wasserzeichen ENTWURF). Klick ins Blatt wählt den
- *   Baustein. „PDF“ setzt das Blatt mit Tectonic wie der Testbeleg (Entwurf, keine Nummer, nichts wird abgelegt) und
+ *   Baustein; Klick auf einen Text aus einer Einstellung bearbeitet ihn direkt im Blatt (FormatEditor: fett, kursiv,
+ *   unterstrichen, Platzhalter als Chips; Esc oder Klick daneben beendet). Die Einstellungskarte nutzt denselben Editor.
+ *   Jede Eingabe läuft über `einstellen` (Autosave, eigene Kopie, Protokoll wie bisher). „PDF“ setzt das Blatt mit Tectonic wie der Testbeleg (Entwurf, keine Nummer, nichts wird abgelegt) und
  *   öffnet es, Fehler mit Baustein und Zeile. „LaTeX“ zeigt die erzeugte main.tex (nur lesen).
  * - Speichern: Die erste Änderung an einem Design legt dessen eigene Kopie an, danach automatisch (entprellt, beim
  *   Verlassen sofort). „Zurücksetzen“ kehrt beim gezeigten Design zum Original zurück (mit Rückgängig), andere Designs
@@ -62,7 +64,8 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react';
-import { BlattVorschau } from '../components/belege/Blatt';
+import { BlattVorschau, type BlattBearbeitung } from '../components/belege/Blatt';
+import { FormatEditor, type FormatEditorHandle } from '../components/belege/FormatEditor';
 import { EmptyState } from '../components/ui/EmptyState';
 import { PageHead, reveal } from '../components/ui/PageHead';
 import { Seg, type SegOption } from '../components/ui/Seg';
@@ -94,7 +97,6 @@ import {
   einstellen,
   entfernen,
   erlaubteTypen,
-  platzhalterEinfuegen,
   stelleAusMitten,
   umschalten,
   verschieben,
@@ -104,7 +106,7 @@ import {
   zusammenfassung,
 } from '../lib/vorlagen/baukasten';
 import { BEISPIEL_FIRMA, beispielbeleg, firmaOderBeispiel } from '../lib/vorlagen/beispiel';
-import { ARTEN, BELEGARTEN, PLATZHALTER, istBelegart, type BelegDokument, type Belegart } from '../lib/vorlagen/dokument';
+import { ARTEN, BELEGARTEN, PLATZHALTER, istBelegart, type BelegDokument, type Belegart, type PlatzhalterName } from '../lib/vorlagen/dokument';
 import { pflichtCheck, type Pflichtangabe } from '../lib/vorlagen/pflicht';
 import { STANDARD_DESIGN, designFuer, designSchluessel, designsFuer, istDesign, standardVorlage } from '../lib/vorlagen/standard';
 import {
@@ -545,6 +547,8 @@ function Baukasten({ art, design, basis, start, letzter, angepasst }: BaukastenP
   const listeRef = useRef<HTMLUListElement>(null);
   const addRef = useRef<HTMLDivElement>(null);
   const lebt = useRef(false);
+  /** Text, der gerade im Blatt bearbeitet wird (Baustein-Index, Einstellung) und der Klickpunkt beim Öffnen */
+  const [imBlatt, setImBlatt] = useState<{ index: number; key: string; klick: { x: number; y: number } } | null>(null);
   /** neuester Stand für „Rückgängig“ aus dem Toast */
   const aktuell = useRef({ bausteine, eigenName });
   useEffect(() => {
@@ -625,6 +629,7 @@ function Baukasten({ art, design, basis, start, letzter, angepasst }: BaukastenP
 
   /** Jede Änderung: Liste setzen, beim ersten Mal als eigene Kopie zeigen, entprellt speichern. */
   const aendern = (liste: Baustein[], auswahl?: number) => {
+    aktuell.current = { ...aktuell.current, bausteine: liste };
     setBausteine(liste);
     if (auswahl !== undefined) setSel(auswahl);
     setEigenName((n) => n ?? eigenerName(art, design));
@@ -744,6 +749,22 @@ function Baukasten({ art, design, basis, start, letzter, angepasst }: BaukastenP
     if (!ziehenAendert(zug.von, zug.stelle)) return;
     const r = ziehen(bausteine, zug.von, zug.stelle);
     aendern(r.liste, r.index);
+  };
+
+  /** Eine Einstellung setzen – vom Blatt und von der Karte, immer auf den neuesten Stand (schnelles Tippen). */
+  const setzen = (index: number, key: string, wert: Einstellung) => aendern(einstellen(aktuell.current.bausteine, index, key, wert));
+
+  // Bearbeiten im Blatt endet mit der Vorschau (LaTeX-Ansicht, Beleg wird geladen)
+  useEffect(() => {
+    if (ansicht !== 'vorschau') setImBlatt(null);
+  }, [ansicht]);
+
+  const bearbeitung: BlattBearbeitung = {
+    aktiv: imBlatt,
+    klick: imBlatt?.klick ?? null,
+    starten: (index, key, klick) => setImBlatt({ index, key, klick }),
+    ende: () => setImBlatt(null),
+    setze: setzen,
   };
 
   const imBlattWaehlen = (i: number) => {
@@ -914,7 +935,7 @@ function Baukasten({ art, design, basis, start, letzter, angepasst }: BaukastenP
           b={gewaehlt}
           index={sel}
           anzahl={bausteine.length}
-          setze={(key, wert) => aendern(einstellen(bausteine, sel, key, wert))}
+          setze={(key, wert) => setzen(sel, key, wert)}
           schieben={(richtung) => schieben(sel, richtung, false)}
         />
         <PflichtKarte art={art} liste={pflicht} eigeneFirma={eigeneFirma} mitBeleg={mitBeleg} />
@@ -955,7 +976,16 @@ function Baukasten({ art, design, basis, start, letzter, angepasst }: BaukastenP
         {ansicht === 'vorschau' && laedt ? (
           <div className="sk vl-sk-blatt" aria-busy="true" aria-label="Beleg wird geladen" />
         ) : ansicht === 'vorschau' ? (
-          <BlattVorschau doc={doc} bausteine={bausteine} editable ausgewaehlt={sel} onWaehle={imBlattWaehlen} maxScale={1.2} className="vl-desk" />
+          <BlattVorschau
+            doc={doc}
+            bausteine={bausteine}
+            editable
+            ausgewaehlt={sel}
+            onWaehle={imBlattWaehlen}
+            bearbeitung={bearbeitung}
+            maxScale={1.2}
+            className="vl-desk"
+          />
         ) : (
           <LatexAnsicht art={art} bausteine={bausteine} accent={accent} />
         )}
@@ -975,7 +1005,7 @@ interface KarteProps {
 }
 
 function BausteinKarte({ b, index, anzahl, setze, schieben }: KarteProps) {
-  const felder = useRef<Record<string, HTMLInputElement | HTMLTextAreaElement | null>>({});
+  const felder = useRef<Record<string, FormatEditorHandle | null>>({});
   if (!b) {
     return (
       <section className="card reveal" style={reveal(2)}>
@@ -989,17 +1019,8 @@ function BausteinKarte({ b, index, anzahl, setze, schieben }: KarteProps) {
   const r = aufloesen(b);
   const Icon = ICON[b.typ];
 
-  /** Platzhalter an der Schreibmarke des Feldes einfügen, danach steht die Marke dahinter. */
-  const platzhalter = (key: string, name: string) => {
-    const el = felder.current[key];
-    const neu = platzhalterEinfuegen(r.text(key), el ? el.selectionStart : null, el ? el.selectionEnd : null, name);
-    setze(key, neu.text);
-    requestAnimationFrame(() => {
-      if (!el) return;
-      el.focus();
-      el.setSelectionRange(neu.cursor, neu.cursor);
-    });
-  };
+  /** Platzhalter an der Schreibmarke des Feldes einfügen (als Chip), danach steht die Marke dahinter. */
+  const platzhalter = (key: string, name: PlatzhalterName) => felder.current[key]?.platzhalter(name);
 
   return (
     <section className="card reveal" style={reveal(2)}>
@@ -1049,17 +1070,27 @@ function BausteinKarte({ b, index, anzahl, setze, schieben }: KarteProps) {
                 </div>
               );
             }
-            const merken = (el: HTMLInputElement | HTMLTextAreaElement | null) => {
-              felder.current[f.key] = el;
+            const merken = (h: FormatEditorHandle | null) => {
+              felder.current[f.key] = h;
             };
             return (
               <div key={f.key} className="field">
-                <label htmlFor={id}>{f.label}</label>
-                {f.typ === 'textarea' ? (
-                  <textarea id={id} ref={merken} className="textarea" rows={3} value={r.text(f.key)} onChange={(e) => setze(f.key, e.target.value)} />
-                ) : (
-                  <input id={id} ref={merken} className="input" value={r.text(f.key)} onChange={(e) => setze(f.key, e.target.value)} />
-                )}
+                <label id={`${id}-label`} onClick={() => felder.current[f.key]?.fokus()}>
+                  {f.label}
+                </label>
+                <FormatEditor
+                  ref={merken}
+                  id={id}
+                  wert={r.text(f.key)}
+                  onChange={(w) => setze(f.key, w)}
+                  mehrzeilig={f.typ === 'textarea'}
+                  leiste="fest"
+                  als="div"
+                  label={f.label}
+                  labelledBy={`${id}-label`}
+                  className={f.typ === 'textarea' ? 'textarea' : 'input'}
+                  leerText=""
+                />
                 <div className="vl-ph" role="group" aria-label={`Platzhalter in „${f.label}“ einfügen`}>
                   {PLATZHALTER.map(([name, titel]) => (
                     <button

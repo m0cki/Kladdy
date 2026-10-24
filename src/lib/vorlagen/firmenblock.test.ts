@@ -29,4 +29,13 @@ describe('Firmenkopf: Zeilen mit Platzhaltern', () => {
     const ohne = { ...BEISPIEL_FIRMA, telefon: '', steuernummer: '' };
     expect(sichtbareZeilen(FIRMENBLOCK_ZEILEN, werte(ohne)).map((z) => z.text)).toEqual(['{strasse} · {plz} {ort}', '{email}']);
   });
+
+  it('Formatierung: über Zeilen hinweg je Zeile geschlossen, Tags zählen beim Weglassen nicht', () => {
+    expect(firmenZeilen('<b> Tel. {telefon}\n{email} </b>\n<i> </i>')).toEqual([
+      { text: '<b>Tel. {telefon}</b>', platzhalter: ['telefon'] },
+      { text: '<b>{email}</b>', platzhalter: ['email'] },
+    ]);
+    const w = { ...werte(), telefon: '' };
+    expect(sichtbareZeilen('<u>Tel. <b>{telefon}</b></u>\n<i>{email}</i>', w).map((z) => z.text)).toEqual(['<i>{email}</i>']);
+  });
 });

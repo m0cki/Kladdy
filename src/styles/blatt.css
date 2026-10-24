@@ -189,3 +189,15 @@
 .tb-log summary { cursor: pointer; color: var(--muted); }
 .tb-log pre { max-height: 220px; margin: 6px 0 0; padding: 8px 10px; overflow: auto; border-radius: var(--radius-sm); background: var(--surface-2); font-size: .72rem; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
 .tb-vorschau { margin-top: 12px; }
+
+/* Texte aus Einstellungen: auf der Vorlagen-Seite anklickbar und an Ort und Stelle bearbeitbar (FormatEditor) */
+.sheet .blk-tx { cursor: text; border-radius: 1mm; transition: background .15s; }
+.sheet .blk-tx:hover { background: var(--accent-soft); box-shadow: 0 0 0 .6mm var(--accent-soft); }
+.sheet .fe-eingabe.blk-edit {
+  border-radius: 1mm; outline: .4mm solid var(--accent); outline-offset: .6mm; background: var(--accent-soft);
+  box-shadow: 0 0 0 .6mm var(--accent-soft); min-width: 8mm;
+}
+.sheet span.fe-eingabe.blk-edit { display: inline-block; max-width: 100%; vertical-align: top; }
+.sheet .fe-eingabe:empty::before { color: var(--leer); font-style: italic; }
+.sheet .fe-chip { color: var(--akz); }
+.sheet .fe-chip { text-transform: none; letter-spacing: 0; }

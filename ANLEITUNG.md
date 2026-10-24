@@ -993,12 +993,39 @@ Firmenkopf mit großem fettem Namen in Versalien, „QUITTUNG“ in Versalien, �
 - Pflichtangaben-Check: Der Firmenkopf zählt für Anschrift, Inhaber und Steuernummer, Quittungsangaben im Stil „Formular“
   für die Nummer.
 
+**Formatierung (fett, kursiv, unterstrichen):** Alle Text- und Textfeld-Einstellungen der Bausteine dürfen Teile fett,
+kursiv oder unterstrichen setzen (`src/lib/vorlagen/formatierung.ts`).
+- **Speicherung:** im Text selbst als Markup mit genau drei Tags `<b>`, `<i>`, `<u>` (klein, ohne Attribute), z. B.
+  `<b>Umsatzsteuerfrei</b> gemäß <u>§ 19 UStG</u>`. Alles andere (`<strong>`, `<b class=…>`, `<br>`, einzelnes `<`) und
+  Tags ohne Gegenstück bleiben gewöhnlicher Text; Lesen schlägt nie fehl. Keine Migration: alte Texte ohne Tags gelten
+  unverändert. Gespeichert wird immer die feste Form (`normalisieren`): leere Tags fallen weg, Nachbarn gleicher Art
+  verschmelzen, neue Tags öffnen in der Reihenfolge b › i › u, Zeilenumbrüche stehen außerhalb der Tags (jede Zeile ist
+  für sich vollständig). Ein wörtliches `<b>…</b>` als Text lässt sich nicht schreiben (kein Escape).
+- **Platzhalter:** Das Markup wird **vor** dem Einsetzen der Werte gelesen. Werte (Kundenname, Betreff …) sind immer
+  Text, ein Kunde „<b>Müller</b>“ erscheint wörtlich. Ein Platzhalter übernimmt die Formatierung um ihn herum.
+- **Vorschau:** React-Elemente `<strong>`, `<em>`, `<u>` (nie HTML aus Strings). **PDF:** `\textbf`, `\textit` und
+  `\uline` (Paket `ulem` mit `normalem`, damit `\emph` kursiv bleibt), Reihenfolge `\textbf{\textit{\uline{…}}}`, Text
+  wie immer über `escape.ts`, `\par` außerhalb der Befehle.
+- **Klartext:** Pflichtangaben-Check, Zusammenfassung in der Bausteinliste und Leer-Prüfungen sehen den Text ohne Tags
+  (`klartext`); der Firmenkopf zählt Zeilen ohne Tags.
+- **Bearbeiten im Blatt** (nur Seite „Vorlagen“, Ansicht Vorschau): Klick auf einen Text im Blatt macht ihn direkt
+  bearbeitbar (Akzent-Umriss, heller Akzent-Hintergrund), darüber schwebt eine kleine Leiste „F · K · U“ (Tooltips
+  „Fett · ⌘B“, „Kursiv · ⌘I“, „Unterstrichen · ⌘U“, aktiver Stil markiert). Platzhalter erscheinen als kleine, nicht
+  bearbeitbare Chips in Monospace und werden als Ganzes gelöscht; getipptes `{kunde}` wird zum Chip. Esc oder ein Klick
+  daneben beendet; Enter = neue Zeile (mehrzeilige Felder) bzw. fertig (einzeilige). Einfügen nur als reiner Text.
+  Eigener Rückgängig-Verlauf im Feld (⌘Z/⌘⇧Z); die Kurzbefehle des Editors greifen nur dort, ⌘K und ⌘N bleiben.
+  Gespeichert wird automatisch wie jede Einstellung (Protokoll).
+- **Einstellungen links:** dieselbe Eingabe mit fester Leiste über dem Feld; die Platzhalter-Chips darunter fügen an der
+  Schreibmarke ein.
+
 **Seite „Vorlagen“** (siehe Prototyp `#/vorlagen`):
 - Art-Umschalter Rechnung · Quittung · Angebot · Eigenbeleg.
 - **Links:** Bausteinliste mit Griff zum Ziehen, Augen-Symbol (ausblenden), × (entfernen) und „+ Baustein hinzufügen“
-  (Palette mit allen passenden Bausteinen). Darunter die Einstellungen des gewählten Bausteins mit Platzhalter-Chips zum Einfügen.
+  (Palette mit allen passenden Bausteinen). Darunter die Einstellungen des gewählten Bausteins mit Platzhalter-Chips zum
+  Einfügen und Formatierung (siehe oben).
   Darunter der **Pflichtangaben-Check** (§ 34a UStDV): Entfernt man z. B. den § 19-Hinweis, wird das sofort rot markiert.
-- **Rechts:** Live-Vorschau auf Papier. Klick auf einen Bereich im Blatt wählt den Baustein aus. Vorschau mit Beispieldaten
+- **Rechts:** Live-Vorschau auf Papier. Klick auf einen Bereich im Blatt wählt den Baustein aus, Klick auf einen Text
+  bearbeitet ihn direkt (siehe Formatierung). Vorschau mit Beispieldaten
   oder einem echten Beleg. Knopf „PDF“.
 - Die erste Änderung an einem Design legt automatisch eine **eigene Kopie** an. „Zurücksetzen“ stellt das Design
   wieder her (mit Rückgängig). Gespeichert wird automatisch.
@@ -1783,7 +1810,7 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
      getrennt), `daten.ts` (daten.tex: alle Makros aus §7.4, immer definiert, dazu Hilfsmakros wie `\KundeAnzeige`,
      `\AnzahlPositionen`, `\Quittiert`; `\Positionen` als `\Position{}{}{}{}{}{}`-Folge, Beträge `1.234,50\,€`),
      `vorlage.ts` (main.tex aus den Bausteinen: Präambel A4 bzw. `a5paper, landscape`, nur geometry/fontspec/babel/
-     xcolor/graphicx/etoolbox/eso-pic, Helvetica Neue oder TeX Gyre Heros, keine Belegdaten in main.tex, Platzhalter ⇒
+     xcolor/graphicx/etoolbox/eso-pic/ulem, Helvetica Neue oder TeX Gyre Heros, keine Belegdaten in main.tex, Platzhalter ⇒
      Makros, leere Bausteine per `\ifdefempty` weggelassen, Abstände wie blatt.css, Zeilenbereiche je Baustein für
      Fehlermeldungen). Rust `src-tauri/src/latex.rs`: `compile_latex` (frischer Temp-Ordner 0700, Bildnamen nur
      `[A-Za-z0-9_-]` + png/jpg/jpeg/pdf, `tectonic -X compile main.tex --untrusted --keep-logs` ohne Shell und mit
@@ -1992,6 +2019,20 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
   (gestrichelter Rahmen, gewählter Zahlungsweg angekreuzt), ohne Telefon fällt die Zeile weg; Pflichtangaben-Check grün,
   ohne § 19-Baustein rot; alte Entwürfe und ausgestellte Belege unverändert; die Migration legt vorher eine Sicherung an
   (`sicherungen/vor-migration`); Einträge `vorlagen_design` und `vorlagen` im Protokoll.
+- **Formatierung in Vorlagen** (§7.0) – **erledigt (Branch `vorlagen-formatierung`)**: fett, kursiv und unterstrichen in
+  allen Text- und Textfeld-Einstellungen, gespeichert als Markup `<b>`/`<i>`/`<u>` im Text (keine Migration). Neu:
+  `src/lib/vorlagen/formatierung.ts` (Lesen, feste Form, Klartext, Rechnen mit Stellen, Platzhalter ersetzen ohne HTML),
+  `editordom.ts` (DOM des Editors ⇄ Läufe), `src/components/belege/FormatEditor.tsx` (contenteditable mit eigener
+  Leiste, Chips und Rückgängig). `Blatt.tsx` macht Texte auf der Vorlagen-Seite klickbar, `vorlage.ts` setzt
+  `\textbf`/`\textit`/`\uline` (Paket `ulem`), Pflichtangaben-Check, `texte()` und Zusammenfassung arbeiten auf Klartext.
+  **Auf dem Mac prüfen:** Vorlagen › Rechnung, Vorschau: Klick auf den Freitext ⇒ Umriss, Leiste „F · K · U“ darüber,
+  Schreibmarke an der Klickstelle; tippen; Wort markieren ⇒ F/K/U und ⌘B/⌘I/⌘U schalten, Knopf zeigt den Zustand;
+  Chip `{einleitung}` mit Backspace als Ganzes weg, `{kunde}` tippen ⇒ Chip; Enter im Freitext = neue Zeile, im Titel =
+  fertig; Esc und Klick daneben beenden; „gespeichert“ erscheint, Rückgängig in der Leiste und ⌘Z im Feld; Eintrag
+  `vorlagen` im Protokoll; Einstellungen links: dieselbe Formatierung, Platzhalter-Chips fügen an der Schreibmarke ein;
+  Ziehen in der Bausteinliste geht weiter; „PDF“ zeigt fett/kursiv/unterstrichen wie die Vorschau (auch Quittung
+  „Formular“); ein Kunde „<b>Test</b>“ erscheint wörtlich; ⌘K und ⌘N funktionieren weiter, auch während ein Text bearbeitet
+  wird; Einfügen von formatiertem Text aus einer anderen App kommt als reiner Text an.
 - **Offen aus Phase 1 (Teil 1+2):** Regelbesteuerung wirkt noch nicht auf Buchungen/Belege.
 - **Aus Phase 1 nachgeholt:** Kategorien bearbeiten, optionale Kategorien und EÜR-Zuordnung pro Jahr – **erledigt (Branch
   `kategorien-euer`, auf dem Ende der Phase-3-Kette)**: Migration `0008_kategorien` (Katalog Abschreibungen (AfA), Bewirtung 70 %, Geschenke, Homeoffice,

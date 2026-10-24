@@ -120,3 +120,25 @@
   .vl-right { position: static; }
   .vl-right .vl-desk { max-height: none; overflow: hidden; }
 }
+
+/* ---------- Format-Editor (components/belege/FormatEditor.tsx): Feld, Chips, Leiste F/K/U ---------- */
+.fe-eingabe { white-space: pre-wrap; overflow-wrap: anywhere; cursor: text; outline: none; }
+.fe-eingabe.input, .fe-eingabe.textarea { height: auto; padding: 9px 12px; line-height: 1.45; }
+.fe-eingabe.input { min-height: 40px; }
+.fe-eingabe.textarea { min-height: 76px; resize: none; }
+.fe-eingabe:empty::before { content: attr(data-leer); color: var(--muted); pointer-events: none; }
+.fe-chip {
+  display: inline-block; padding: 0 .4em; margin: 0 .05em; border-radius: 5px; border: 1px solid var(--accent-line);
+  background: var(--accent-soft); color: var(--accent); font: 500 .82em/1.35 var(--mono); font-style: normal;
+  white-space: nowrap; vertical-align: baseline; user-select: all; -webkit-user-select: all; cursor: default;
+}
+.fe-feld { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.fe-leiste { display: inline-flex; align-items: center; gap: 2px; padding: 3px; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background: var(--surface); }
+.fe-leiste.fest { align-self: flex-start; }
+.fe-leiste.schwebend { position: fixed; z-index: 60; box-shadow: var(--shadow); animation: fade .15s var(--ease) both; }
+.fe-btn { min-width: 28px; height: 26px; padding: 0 6px; border-radius: 6px; font: inherit; font-size: .84rem; color: var(--text-2); transition: background .15s, color .15s; }
+.fe-btn:hover { background: var(--hover); color: var(--text); }
+.fe-btn.on { background: var(--accent-soft); color: var(--accent); }
+.fe-btn.fe-f { font-weight: 800; }
+.fe-btn.fe-k { font-style: italic; }
+.fe-btn.fe-u { text-decoration: underline; text-underline-offset: 2px; }

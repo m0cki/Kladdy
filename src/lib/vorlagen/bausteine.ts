@@ -5,6 +5,7 @@
  * Jeder Baustein hat zwei Darstellungen, die gleich aussehen müssen: HTML (components/beleg/Blatt.tsx) und
  * LaTeX (lib/latex/vorlage.ts). Tests: vorlagen.test.ts */
 import { HINWEIS_19, type Belegart } from './dokument';
+import { klartext } from './formatierung';
 
 /** Standard-Zeilen des Firmenkopfs: Anschrift und Steuernummer (§ 33 UStDV), dazu Telefon und E-Mail. */
 export const FIRMENBLOCK_ZEILEN = '{strasse} · {plz} {ort}\nSteuernr. {steuernummer}\n{telefon}\n{email}';
@@ -46,6 +47,7 @@ export interface Baustein {
   [einstellung: string]: Einstellung | undefined;
 }
 
+/** text/textarea: Text mit Platzhaltern und Formatierung (<b>, <i>, <u>; lib/vorlagen/formatierung.ts), textarea mehrzeilig */
 export type FeldTyp = 'toggle' | 'text' | 'textarea' | 'select';
 
 export interface BausteinFeld {
@@ -272,6 +274,10 @@ export const BAUSTEINE: Readonly<Record<BausteinTyp, BausteinDef>> = {
   },
 };
 
+/** Feld einer Einstellung mit Text (und Formatierung)? */
+export const istTextFeld = (typ: BausteinTyp, key: string): BausteinFeld | null =>
+  BAUSTEINE[typ].felder.find((f) => f.key === key && (f.typ === 'text' || f.typ === 'textarea')) ?? null;
+
 /** Standardwerte eines Bausteins. */
 export function standardWerte(typ: BausteinTyp): Record<string, Einstellung> {
   const o: Record<string, Einstellung> = {};
@@ -284,7 +290,7 @@ export interface Aufgeloest {
   typ: BausteinTyp;
   text(key: string): string;
   an(key: string): boolean;
-  /** alle Textwerte (für den Pflichtangaben-Check) */
+  /** alle Textwerte als Klartext ohne Formatierung, Platzhalter als {name} (für den Pflichtangaben-Check) */
   texte(): string[];
 }
 
@@ -298,7 +304,7 @@ export function aufloesen(b: Baustein): Aufgeloest {
     typ: b.typ,
     text: (key) => (typeof werte[key] === 'string' ? (werte[key] as string) : ''),
     an: (key) => werte[key] === true,
-    texte: () => Object.values(werte).filter((v): v is string => typeof v === 'string'),
+    texte: () => Object.values(werte).flatMap((v) => (typeof v === 'string' ? [klartext(v)] : [])),
   };
 }
 

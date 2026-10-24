@@ -126,6 +126,9 @@ describe('Platzhalter und Kurzinfo', () => {
   it('Kurzinfo: erster gefüllter Text, sonst die Beschreibung', () => {
     expect(zusammenfassung({ typ: 'gruss' })).toBe('Mit freundlichen Grüßen · {inhaber}');
     expect(zusammenfassung({ typ: 'text', text: '' })).toBe(BAUSTEINE.text.beschreibung);
+    // Formatierung erscheint nicht in der Liste; nur Tags zählen als leer
+    expect(zusammenfassung({ typ: 'gruss', text: '<b>Viele Grüße</b>\n<i>{inhaber}</i>' })).toBe('Viele Grüße · {inhaber}');
+    expect(zusammenfassung({ typ: 'text', text: '<b></b>' })).toBe(BAUSTEINE.text.beschreibung);
     expect(zusammenfassung({ typ: 'titel', text: '', rechts: 'Nr. {nr}' })).toBe('Nr. {nr}');
     expect(zusammenfassung({ typ: 'positionen' })).toBe(BAUSTEINE.positionen.beschreibung);
   });

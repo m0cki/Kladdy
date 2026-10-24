@@ -5,7 +5,8 @@ import { BELEGARTEN, type BelegDokument } from '../vorlagen/dokument';
 import { standardVorlage } from '../vorlagen/standard';
 import { MAKRO_NAMEN, datenTex, makroWerte, positionenTex } from './daten';
 import { KompilierFehler, belegAssets, belegTex, fehlerZeilen } from './kompilieren';
-import { RAHMEN_MM, abstandMm, bereichZuZeile, mainTex, rahmenTex, striche, textTex } from './vorlage';
+import { RAHMEN_MM, abstandMm, bereichZuZeile, formatTex, mainTex, rahmenTex, striche, textTex } from './vorlage';
+import { OHNE_STIL } from '../vorlagen/formatierung';
 
 const rechnung = (): BelegDokument => testbeleg('rechnung', BEISPIEL_FIRMA, 'klein', '2026-10-18');
 const quittung = (): BelegDokument => testbeleg('quittung', BEISPIEL_FIRMA, 'klein', '2026-10-18');
@@ -141,7 +142,9 @@ describe('main.tex', () => {
 
   it('nur Standardpakete, kein Shell-Escape', () => {
     const { tex } = mainTex('rechnung', standardVorlage('rechnung'), '#6366f1');
-    expect(pakete(tex).sort()).toEqual(['babel', 'eso-pic', 'etoolbox', 'fontspec', 'geometry', 'graphicx', 'xcolor']);
+    expect(pakete(tex).sort()).toEqual(['babel', 'eso-pic', 'etoolbox', 'fontspec', 'geometry', 'graphicx', 'ulem', 'xcolor']);
+    // ulem nur mit normalem: \emph bleibt kursiv
+    expect(tex).toContain(String.raw`\usepackage[normalem]{ulem}`);
     expect(tex).not.toMatch(/\\write18|\\directlua|\\immediate|\\openout|\\ShellEscape/);
   });
 
@@ -405,5 +408,60 @@ describe('Kompilierfehler lesbar', () => {
     ]);
     expect(f).toBeInstanceOf(Error);
     expect(f.message).toBe('Kompilieren fehlgeschlagen');
+  });
+});
+
+describe('Formatierung im PDF (<b>, <i>, <u>)', () => {
+  it('fett, kursiv, unterstrichen ⇒ \\textbf, \\textit, \\uline (innen)', () => {
+    expect(textTex('a <b>fett</b> <i>kursiv</i> <u>unter</u>', true).tex).toBe(String.raw`a \textbf{fett} \textit{kursiv} \uline{unter}`);
+    expect(textTex('<b><i><u>alles</u></i></b>', true).tex).toBe(String.raw`\textbf{\textit{\uline{alles}}}`);
+    expect(textTex('<u>x<b>y</b></u>', true).tex).toBe(String.raw`\uline{x}\textbf{\uline{y}}`);
+    expect(formatTex('', { ...OHNE_STIL, fett: true })).toBe('');
+  });
+
+  it('Sonderzeichen im formatierten Text werden escaped, Platzhalter bleiben Makros', () => {
+    expect(textTex('<b>50 % & {kunde}</b>', true).tex).toBe(String.raw`\textbf{50 \% \& }\textbf{\KundeAnzeige{}}`);
+    expect(textTex('<u>Dünger "Bio" #5 -- {x}</u>', true).tex).toBe(String.raw`\uline{Dünger \textquotedbl{}Bio\textquotedbl{} \#5 -{}- \{x\}}`);
+    // unausgeglichene Tags sind Text
+    expect(textTex('a <b> b', true).tex).toBe('a <b> b');
+  });
+
+  it('Werte mit <b> oder & sind nie Markup (stehen in daten.tex, escaped)', () => {
+    const doc = { ...rechnung(), kunde: { ...rechnung().kunde!, name: '<b>Müller</b> & Co' } };
+    const vorlage = standardVorlage('rechnung').map((b) => (b.typ === 'text' ? { ...b, text: 'Hallo <i>{kunde}</i>' } : b));
+    const { main, daten } = belegTex(doc, vorlage, '#6366f1');
+    expect(makro(daten, 'KundeName')).toBe(String.raw`<b>Müller</b> \& Co`);
+    expect(main.tex).toContain(String.raw`Hallo \textit{\KundeAnzeige{}}`);
+    expect(main.tex).not.toContain('Müller');
+    expect(klammernOk(main.tex)).toBe(true);
+  });
+
+  it('Umbrüche: \\par steht außerhalb der Formatierung', () => {
+    expect(textTex('<b>Zeile 1\nZeile 2</b>').tex).toBe(String.raw`\textbf{Zeile 1}\par \textbf{Zeile 2}`);
+    expect(textTex('<u>a\n\nb</u>').tex).toBe(String.raw`\uline{a}\par \vspace{\baselineskip}\uline{b}`);
+  });
+
+  it('leer-Prüfung zählt Tags nicht als Text', () => {
+    expect(textTex('<b>{schlusstext}</b>').leer).toEqual(['Schlusstext']);
+    expect(textTex('<b></b>').leer).toEqual([]);
+  });
+
+  it('Firmenkopf: Formatierung über mehrere Zeilen wird je Zeile geschlossen, leere Zeilen fallen weiter weg', () => {
+    const v = standardVorlage('quittung', 'formular').map((b) => (b.typ === 'firmenblock' ? { ...b, zeilen: '<b>{strasse}\nTel. {telefon}</b>' } : b));
+    const { tex } = mainTex('quittung', v, '#6366f1');
+    expect(tex).toContain(String.raw`\textbf{\FirmaStrasse{}}\par`);
+    expect(tex).toContain(String.raw`\ifboolexpr{test {\ifdefempty{\FirmaTelefon}}}{}{%` + '\n' + String.raw`\textbf{Tel. }\textbf{\FirmaTelefon{}}\par`);
+    expect(klammernOk(tex)).toBe(true);
+  });
+
+  it('alle Text-Einstellungen formatiert: main.tex bleibt ausgeglichen', () => {
+    for (const art of BELEGARTEN) {
+      const v = standardVorlage(art).map((b) => {
+        const neu: Baustein = { ...b };
+        for (const [k, w] of Object.entries(b)) if (typeof w === 'string' && k !== 'typ' && w.includes('{')) neu[k] = `<b><i><u>${w}</u></i></b>`;
+        return neu;
+      });
+      expect(klammernOk(mainTex(art, v, '#6366f1').tex), art).toBe(true);
+    }
   });
 });
