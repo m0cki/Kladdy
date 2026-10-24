@@ -4,10 +4,12 @@
  * - Links: Bausteinliste (Griff zum Ziehen per Zeiger, ↑/↓ auf dem Griff; Auge = ausblenden, × = entfernen mit
  *   Rückgängig), „+ Baustein hinzufügen“ (Palette mit allen Bausteinen der Art, eingefügt unter dem ausgewählten),
  *   darunter die Einstellungen des gewählten Bausteins mit Platzhalter-Chips (fügen {name} an der Schreibmarke ein) und
- *   der Pflichtangaben-Check (§2.3) mit den Beispieldaten – ohne „Steuerhinweis (§ 19)“ sofort rot.
- * - Rechts: Live-Vorschau mit Beispieldaten (eigene Firmendaten, sobald eingetragen); Klick ins Blatt wählt den
- *   Baustein. „PDF“ setzt das Blatt mit Tectonic wie der Testbeleg (Entwurf, keine Nummer) und öffnet es, Fehler mit
- *   Baustein und Zeile. „LaTeX“ zeigt die erzeugte main.tex (nur lesen).
+ *   der Pflichtangaben-Check (§2.3) mit den Daten der Vorschau – ohne „Steuerhinweis (§ 19)“ sofort rot.
+ * - Rechts: Live-Vorschau mit Beispieldaten (eigene Firmendaten, sobald eingetragen) oder – Umschalter „Beispiel ·
+ *   Letzter Beleg“, nur wenn es einen gibt, je Art gemerkt – mit dem letzten Beleg der Art in den aktuellen Bausteinen
+ *   (lib/vorlagen/vorschau.ts: nur gelesen, ohne Nummer ⇒ Wasserzeichen ENTWURF). Klick ins Blatt wählt den
+ *   Baustein. „PDF“ setzt das Blatt mit Tectonic wie der Testbeleg (Entwurf, keine Nummer, nichts wird abgelegt) und
+ *   öffnet es, Fehler mit Baustein und Zeile. „LaTeX“ zeigt die erzeugte main.tex (nur lesen).
  * - Speichern: Die erste Änderung an der Standardvorlage legt die eigene Kopie an, danach automatisch (entprellt, beim
  *   Verlassen sofort). „Zurücksetzen“ kehrt zum Standard zurück (mit Rückgängig). Bedeutung der Tabelle `vorlagen`:
  *   lib/queries/vorlagen.ts. Im Browser ohne Datenbank: Standardvorlagen, Änderungen nur auf dieser Seite.
@@ -67,7 +69,9 @@ import { mainTex } from '../lib/latex/vorlage';
 import { useFirmenlogo } from '../lib/logoablage';
 import { inTauri } from '../lib/menu';
 import { UST_MODUS_STANDARD, ladeFirma, ladeUstModus, type UstModus } from '../lib/queries/einstellungen';
+import { ladeBelege } from '../lib/queries/rechnungen';
 import { ladeEigeneVorlage, speichereVorlage, vorlageZuruecksetzen, type EigeneVorlage } from '../lib/queries/vorlagen';
+import type { BelegZeile } from '../lib/rechnungen';
 import { BAUSTEINE, aufloesen, type Baustein, type BausteinTyp, type Einstellung } from '../lib/vorlagen/bausteine';
 import {
   EIGENER_NAME,
@@ -85,9 +89,10 @@ import {
   zusammenfassung,
 } from '../lib/vorlagen/baukasten';
 import { BEISPIEL_FIRMA, beispielbeleg, firmaOderBeispiel } from '../lib/vorlagen/beispiel';
-import { ARTEN, BELEGARTEN, PLATZHALTER, istBelegart, type Belegart } from '../lib/vorlagen/dokument';
+import { ARTEN, BELEGARTEN, PLATZHALTER, istBelegart, type BelegDokument, type Belegart } from '../lib/vorlagen/dokument';
 import { pflichtCheck, type Pflichtangabe } from '../lib/vorlagen/pflicht';
 import { standardVorlage } from '../lib/vorlagen/standard';
+import { ladeQuellen, ladeVorschauBeleg, letzterBeleg, speichereQuelle, type Vorschauquelle } from '../lib/vorlagen/vorschau';
 import { heute } from '../lib/zeitraum';
 import { useUi } from '../store/ui';
 import { Ladeansicht } from './einstellungen/Laden';
@@ -147,6 +152,18 @@ const RUECKGAENGIG = 'vorlage-rueckgaengig';
 const GRUNDLAGE: Readonly<Record<Belegart, string>> = { rechnung: '§ 34a UStDV', quittung: '§ 33/§ 34a UStDV', angebot: '', eigenbeleg: '' };
 const KEINE_OPTIONEN: readonly (readonly [string, string])[] = [];
 const TX_KLASSE: Readonly<Record<TexTeilArt, string>> = { kommentar: 'tx-c', befehl: 'tx-k', klammer: 'tx-b', text: '' };
+const QUELLEN: readonly SegOption<Vorschauquelle>[] = [
+  { value: 'beispiel', label: 'Beispiel' },
+  { value: 'beleg', label: 'Letzter Beleg' },
+];
+
+const speicher = (): Storage | undefined => {
+  try {
+    return typeof localStorage === 'undefined' ? undefined : localStorage;
+  } catch {
+    return undefined;
+  }
+};
 
 // Zuletzt gewählte Art bleibt beim Seitenwechsel erhalten (wenn die Adresse keine nennt)
 let zuletzt: Belegart = 'rechnung';
@@ -160,6 +177,9 @@ function merkeSchreiben<T>(auftrag: Promise<T>): Promise<T> {
 }
 
 type Basis = { firma: Firma; ust: UstModus };
+/** Letzter Beleg je Art (null = keiner); ohne Datenbank oder bei Fehler: keiner, dann gibt es nur Beispieldaten */
+type Letzte = Record<Belegart, BelegZeile | null>;
+const KEINE: Letzte = { rechnung: null, quittung: null, angebot: null, eigenbeleg: null };
 type Stand = { art: Belegart; status: 'ok'; eigene: EigeneVorlage | null } | { art: Belegart; status: 'fehler'; fehler: string };
 
 export default function Vorlagen() {
@@ -169,10 +189,29 @@ export default function Vorlagen() {
   const [basis, setBasis] = useState<Basis | null>(null);
   const [stand, setStand] = useState<Stand | null>(null);
   const [versuch, setVersuch] = useState(0);
+  /** null = wird noch gelesen (ein gemerktes „Letzter Beleg“ soll nicht erst die Beispieldaten zeigen) */
+  const [letzte, setLetzte] = useState<Letzte | null>(() => (datenbankVerfuegbar() ? null : KEINE));
 
   useEffect(() => {
     zuletzt = art;
   }, [art]);
+
+  // Letzter Beleg je Art für „Beispiel · Letzter Beleg“ (nur lesen)
+  useEffect(() => {
+    if (!datenbankVerfuegbar()) return;
+    let weg = false;
+    ladeBelege().then(
+      (zeilen) => {
+        if (!weg) setLetzte(Object.fromEntries(BELEGARTEN.map((a) => [a, letzterBeleg(zeilen, a)])) as Letzte);
+      },
+      () => {
+        if (!weg) setLetzte(KEINE); // ohne Liste eben nur Beispieldaten
+      },
+    );
+    return () => {
+      weg = true;
+    };
+  }, []);
 
   // Firmendaten für die Beispieldaten (ohne Datenbank oder bei Fehler: Beispielfirma, wie beim Testbeleg)
   useEffect(() => {
@@ -228,7 +267,7 @@ export default function Vorlagen() {
         back={{ to: '/belege', label: 'Rechnungen & Quittungen' }}
         actions={<Seg options={ART_OPTIONEN} value={art} onChange={artWaehlen} ariaLabel="Belegart der Vorlage" />}
       />
-      {!basis || !bereit ? (
+      {!basis || !bereit || !letzte ? (
         <Skelett />
       ) : bereit.status === 'fehler' ? (
         <Ladeansicht
@@ -241,7 +280,7 @@ export default function Vorlagen() {
           }}
         />
       ) : (
-        <Baukasten key={art} art={art} basis={basis} start={bereit.eigene} />
+        <Baukasten key={art} art={art} basis={basis} start={bereit.eigene} letzter={letzte[art]} />
       )}
     </div>
   );
@@ -311,8 +350,17 @@ const rueckgaengigWeg = () => {
 /* ================= Baukasten einer Art ================= */
 
 type PdfLauf = { status: 'laeuft' } | { status: 'fehler'; meldung: string; zeilen: string[]; log: string } | null;
+/** Geladener echter Beleg (Dokument ohne Nummer) */
+type Echt = { id: number; doc: BelegDokument };
 
-function Baukasten({ art, basis, start }: { art: Belegart; basis: Basis; start: EigeneVorlage | null }) {
+interface BaukastenProps {
+  art: Belegart;
+  basis: Basis;
+  start: EigeneVorlage | null;
+  letzter: BelegZeile | null;
+}
+
+function Baukasten({ art, basis, start, letzter }: BaukastenProps) {
   const accent = useUi((s) => s.settings.accent);
   const motion = useUi((s) => s.settings.motion);
   const showToast = useUi((s) => s.showToast);
@@ -327,6 +375,9 @@ function Baukasten({ art, basis, start }: { art: Belegart; basis: Basis; start: 
   const [zug, setZug] = useState<{ von: number; stelle: number } | null>(null);
   const [gespeichert, setGespeichert] = useState(0);
   const [pdf, setPdf] = useState<PdfLauf>(null);
+  /** Vorschau mit Beispieldaten oder dem letzten Beleg der Art (je Art gemerkt) */
+  const [quelle, setQuelle] = useState<Vorschauquelle>(() => ladeQuellen(speicher())[art]);
+  const [echt, setEcht] = useState<Echt | null>(null);
   const listeRef = useRef<HTMLUListElement>(null);
   const addRef = useRef<HTMLDivElement>(null);
   const lebt = useRef(false);
@@ -368,9 +419,44 @@ function Baukasten({ art, basis, start }: { art: Belegart; basis: Basis; start: 
   }, [palette]);
 
   const logo = useFirmenlogo((s) => s.name);
-  const doc = useMemo(() => ({ ...beispielbeleg(art, basis.firma, basis.ust, heute()), logo: logo || null }), [art, basis, logo]);
+  const mitBeleg = quelle === 'beleg' && letzter != null;
+  const belegId = mitBeleg ? letzter.id : null;
+
+  // Letzten Beleg lesen wie die Beleg-Maske (nichts wird geschrieben); weg oder Fehler ⇒ zurück zu den Beispieldaten
+  useEffect(() => {
+    if (belegId == null) return;
+    let weg = false;
+    const zurueck = (text: string) => {
+      if (weg) return;
+      setEcht(null);
+      setQuelle('beispiel');
+      useUi.getState().showToast({ text, icon: 'warn' });
+    };
+    ladeVorschauBeleg(belegId, { firma: basis.firma, ustModus: basis.ust, logo: '', heute: heute() }).then(
+      (d) => {
+        if (weg) return;
+        if (d) setEcht({ id: belegId, doc: d });
+        else zurueck('Der letzte Beleg ist nicht mehr da – Vorschau mit Beispieldaten');
+      },
+      (e: unknown) => zurueck(`Beleg nicht geladen: ${fehlerText(e)} – Vorschau mit Beispieldaten`),
+    );
+    return () => {
+      weg = true;
+    };
+  }, [belegId, basis]);
+
+  // bis der gewählte Beleg da ist: Platzhalter statt Blatt, PDF gesperrt
+  const echtDoc = belegId != null && echt?.id === belegId ? echt.doc : null;
+  const laedt = belegId != null && !echtDoc;
+  // aktuelles Firmenlogo auch beim echten Beleg: gezeigt wird, wie die Vorlage heute aussieht
+  const doc = useMemo(() => ({ ...(echtDoc ?? beispielbeleg(art, basis.firma, basis.ust, heute())), logo: logo || null }), [echtDoc, art, basis, logo]);
   const pflicht = useMemo(() => pflichtCheck(doc, bausteine), [doc, bausteine]);
   const eigeneFirma = basis.firma !== BEISPIEL_FIRMA;
+
+  const quelleWaehlen = (q: Vorschauquelle) => {
+    setQuelle(q);
+    speichereQuelle(speicher(), art, q);
+  };
 
   /** Jede Änderung: Liste setzen, beim ersten Mal als eigene Kopie zeigen, entprellt speichern. */
   const aendern = (liste: Baustein[], auswahl?: number) => {
@@ -663,22 +749,34 @@ function Baukasten({ art, basis, start }: { art: Belegart; basis: Basis; start: 
           setze={(key, wert) => aendern(einstellen(bausteine, sel, key, wert))}
           schieben={(richtung) => schieben(sel, richtung, false)}
         />
-        <PflichtKarte art={art} liste={pflicht} eigeneFirma={eigeneFirma} />
+        <PflichtKarte art={art} liste={pflicht} eigeneFirma={eigeneFirma} mitBeleg={mitBeleg} />
       </div>
 
       <div className="vl-right reveal" style={reveal(2)}>
         <div className="vl-toolbar">
           <Seg options={ANSICHTEN} value={ansicht} onChange={setAnsicht} ariaLabel="Ansicht" />
           <span className="spacer" />
-          <span className="vl-doc">
-            <FileText />
-            Beispieldaten{eigeneFirma ? ' · deine Firmendaten' : ''}
-          </span>
+          {letzter && <Seg options={QUELLEN} value={mitBeleg ? 'beleg' : 'beispiel'} onChange={quelleWaehlen} ariaLabel="Daten der Vorschau" />}
+          {mitBeleg ? (
+            <span className="vl-doc" title="Gezeigt als Entwurf ohne Nummer in den aktuellen Bausteinen – der Beleg selbst bleibt unverändert">
+              {laedt ? <LoaderCircle className="ic spin" /> : <FileText />}
+              {[letzter.nummer ?? 'Entwurf', letzter.kunde_name, letzter.nummer && 'als Entwurf'].filter(Boolean).join(' · ')}
+            </span>
+          ) : (
+            <span className="vl-doc">
+              <FileText />
+              Beispieldaten{eigeneFirma ? ' · deine Firmendaten' : ''}
+            </span>
+          )}
           <button
             type="button"
             className="btn ghost"
-            disabled={laeuft || !nativ}
-            title={nativ ? 'Mit Tectonic als PDF setzen und öffnen (Entwurf mit Beispieldaten)' : 'Nur in der Mac-App'}
+            disabled={laeuft || laedt || !nativ}
+            title={
+              nativ
+                ? `Mit Tectonic als PDF setzen und öffnen (Entwurf ${mitBeleg ? 'ohne Nummer mit dem letzten Beleg' : 'mit Beispieldaten'}, wird nicht abgelegt)`
+                : 'Nur in der Mac-App'
+            }
             onClick={() => void pdfErzeugen()}
           >
             {laeuft ? <LoaderCircle className="ic spin" /> : <Printer />}
@@ -686,7 +784,9 @@ function Baukasten({ art, basis, start }: { art: Belegart; basis: Basis; start: 
           </button>
         </div>
         {pdf && <PdfHinweis pdf={pdf} schliessen={() => setPdf(null)} />}
-        {ansicht === 'vorschau' ? (
+        {ansicht === 'vorschau' && laedt ? (
+          <div className="sk vl-sk-blatt" aria-busy="true" aria-label="Beleg wird geladen" />
+        ) : ansicht === 'vorschau' ? (
           <BlattVorschau doc={doc} bausteine={bausteine} editable ausgewaehlt={sel} onWaehle={imBlattWaehlen} maxScale={1.2} className="vl-desk" />
         ) : (
           <LatexAnsicht art={art} bausteine={bausteine} accent={accent} />
@@ -819,7 +919,7 @@ function BausteinKarte({ b, index, anzahl, setze, schieben }: KarteProps) {
 
 /* ================= Pflichtangaben-Check (§2.3) ================= */
 
-function PflichtKarte({ art, liste, eigeneFirma }: { art: Belegart; liste: readonly Pflichtangabe[]; eigeneFirma: boolean }) {
+function PflichtKarte({ art, liste, eigeneFirma, mitBeleg }: { art: Belegart; liste: readonly Pflichtangabe[]; eigeneFirma: boolean; mitBeleg: boolean }) {
   const fehlt = liste.filter((p) => !p.ok).length;
   const stand = fehlt ? `${fehlt} ${fehlt === 1 ? 'Angabe fehlt' : 'Angaben fehlen'}` : 'alles drin';
   return (
@@ -849,7 +949,8 @@ function PflichtKarte({ art, liste, eigeneFirma }: { art: Belegart; liste: reado
         </ul>
       )}
       <p className="hint vl-check-fuss">
-        Geprüft mit Beispieldaten und {eigeneFirma ? 'deinen Firmendaten' : 'einer Beispielfirma'} – es zählt nur, was die Bausteine auch drucken.
+        {mitBeleg ? 'Geprüft mit dem letzten Beleg' : `Geprüft mit Beispieldaten und ${eigeneFirma ? 'deinen Firmendaten' : 'einer Beispielfirma'}`} – es zählt nur, was die
+        Bausteine auch drucken.
       </p>
     </section>
   );

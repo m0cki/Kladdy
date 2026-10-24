@@ -499,7 +499,7 @@ vor Migration). Offen:
 |---|---|---|---|
 | F-01 | **Regelbesteuerung** wirkt noch nicht auf Buchungen/Belege (USt-Ausweis, Vorsteuer, Pflichtangaben nach §2.3) | §10 „Offen aus Phase 1“ | L |
 | F-02 | **Echter Tectonic-Lauf** mit allen vier Standardvorlagen am Mac (war beim Bauen nicht möglich) – Abnahme aus Phase 3: `Müller & Söhne 100%` kompiliert, PDF = Vorschau, GiroCode scannbar | §10 Phase 3 Teil 1 | S (Test) |
-| F-03 | Vorlagen-Seite: **Vorschau mit echtem Beleg** statt Beispieldaten | §10 Phase 3 Teil 5 „Offen“ | S |
+| F-03 | Vorlagen-Seite: **Vorschau mit echtem Beleg** statt Beispieldaten – erledigt (#32, „Beispiel · Letzter Beleg“) | §10 Phase 3 Teil 5 | S |
 | F-04 | Suche ⌘K: `?k=` auf der Kennzahlen-Seite auswerten, Wert rechts zeigen | §10 Phase 2 Teil 4 | S (mit Phase 4) |
 | F-05 | **Sicherung vor dem Update** (Toast in diesem Branch entfernt) – kommt mit dem Backup aus Phase 5 | `updates.ts` TODO | – |
 | F-06 | Export-Menüpunkt zeigt „kommt in Phase 5“ | `commands.ts` | – |
