@@ -21,10 +21,10 @@ fragt macOS nicht nach einer Freigabe. Wer das Skript vorher lesen will:
 Derselbe Befehl installiert eine neuere Version über eine vorhandene. Deine Daten liegen nicht in der App und
 bleiben dabei erhalten.
 
-**Ohne Terminal:** Die `.dmg` aus den [Releases](https://github.com/m0cki/Kladdy/releases/latest) laden, Kladdy in
-den Programme-Ordner ziehen und einmal öffnen. macOS blockiert den ersten Start, weil die App nicht von Apple
-notarisiert ist. Dann **Systemeinstellungen → Datenschutz & Sicherheit → „Dennoch öffnen“** wählen und mit dem
-Passwort bestätigen.
+**Ohne Terminal:** [Kladdy.dmg](https://github.com/m0cki/Kladdy/releases/latest/download/Kladdy.dmg) laden (immer die
+neueste Version), Kladdy in den Programme-Ordner ziehen und einmal öffnen. macOS blockiert den ersten Start, weil die
+App nicht von Apple notarisiert ist. Dann **Systemeinstellungen → Datenschutz & Sicherheit → „Dennoch öffnen“** wählen
+und mit dem Passwort bestätigen.
 
 ## Updates
 
