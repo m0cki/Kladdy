@@ -7,7 +7,8 @@
  *   gelesen, nichts zurückgeschrieben, kein PDF abgelegt. Damit der Nachbau nicht mit dem echten Beleg verwechselt wird,
  *   fällt die Nummer weg: Blatt und PDF tragen das Wasserzeichen ENTWURF, {nr} druckt „Entwurf“ (wie der Testbeleg).
  *   Logo und Akzentfarbe sind die aktuellen – gezeigt wird, wie die Vorlage heute aussieht.
- * - Auswahl „Beispiel · Letzter Beleg“ je Art im localStorage (wie Darstellung und Updates), Standard: Beispiel.
+ * - Auswahl „Beispiel · Letzter Beleg · Blanko“ je Art im localStorage (wie Darstellung und Updates), Standard:
+ *   Beispiel. „Blanko“ (Formular zum Ausfüllen von Hand, beispiel.ts `blankobeleg`) nur für Quittung und Eigenbeleg.
  *   Im selben Eintrag: die zuletzt gezeigte Vorlage je Art (Design oder 'eigen:<id>'), Standard: die aktive.
  * Tests: vorschau.test.ts */
 import { ausgestellterBeleg } from '../belegpdf';
@@ -17,10 +18,11 @@ import { ladeBeleg, ladeKundenAnschrift, type BelegVoll } from '../queries/rechn
 import { formularAusEntwurf, formularZuDokument, type BelegZeile, type KundeAnschrift, type PositionZeile } from '../rechnungen';
 import type { KeyValueStore } from '../settings';
 import { BELEGARTEN, type BelegDokument, type Belegart } from './dokument';
+import { hatBlanko } from './beispiel';
 import { eigeneId } from './eigene';
 import { istDesign } from './standard';
 
-export type Vorschauquelle = 'beispiel' | 'beleg';
+export type Vorschauquelle = 'beispiel' | 'beleg' | 'blanko';
 export type Quellen = Record<Belegart, Vorschauquelle>;
 
 export const VORSCHAU_KEY = 'kladdy.vorlagen.v1';
@@ -70,7 +72,7 @@ export async function ladeVorschauBeleg(id: number, ctx: Omit<VorschauKontext, '
 }
 
 /* ---------- Auswahl je Art merken ---------- */
-/* Ein Eintrag im localStorage: { quelle: { art: 'beispiel'|'beleg' }, design: { art: schluessel } }. Jede Funktion
+/* Ein Eintrag im localStorage: { quelle: { art: 'beispiel'|'beleg'|'blanko' }, design: { art: schluessel } }. Jede Funktion
  * schreibt nur ihren Teil und lässt den anderen stehen. */
 
 const standardQuellen = (): Quellen => ({ rechnung: 'beispiel', quittung: 'beispiel', angebot: 'beispiel', eigenbeleg: 'beispiel' });
@@ -98,12 +100,16 @@ function merken(store: KeyValueStore | undefined, teil: 'quelle' | 'design', wer
 export function ladeQuellen(store: KeyValueStore | undefined): Quellen {
   const q = standardQuellen();
   const quelle = gemerkt(store).quelle;
-  if (istObjekt(quelle)) for (const a of BELEGARTEN) if (quelle[a] === 'beleg') q[a] = 'beleg';
+  if (istObjekt(quelle))
+    for (const a of BELEGARTEN) {
+      if (quelle[a] === 'beleg') q[a] = 'beleg';
+      else if (quelle[a] === 'blanko' && hatBlanko(a)) q[a] = 'blanko';
+    }
   return q;
 }
 
 export function speichereQuelle(store: KeyValueStore | undefined, art: Belegart, quelle: Vorschauquelle): Quellen {
-  const q = { ...ladeQuellen(store), [art]: quelle };
+  const q = { ...ladeQuellen(store), [art]: quelle === 'blanko' && !hatBlanko(art) ? 'beispiel' : quelle };
   merken(store, 'quelle', q);
   return q;
 }

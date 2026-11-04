@@ -155,6 +155,15 @@
 .sheet .blk-form-summe { margin: 1mm 0; font-size: 13pt; line-height: 1.3; }
 .sheet .blk-form-worte { margin-bottom: 1mm; font-size: 9pt; }
 .sheet .blk-form-worte span { color: var(--grau); }
+/* Blanko-Formular: Schreiblinien statt Werten (wie \KLuecke, \KSchreib im PDF), leere Ankreuzfelder */
+.sheet .blk-luecke { display: inline-block; width: 30mm; height: 1em; vertical-align: -1mm; border-bottom: .2mm solid currentColor; }
+.sheet .blk-schreib { display: flex; flex: 1 1 auto; align-items: flex-end; gap: 1.5mm; min-width: 0; }
+.sheet .blk-schreib > i { flex: 1 1 auto; height: 7mm; border-bottom: .2mm solid var(--ink); }
+.sheet .schreib { display: flex; align-items: flex-end; gap: 1.5mm; }
+.sheet .schreib > b, .sheet .schreib > span:not(.blk-schreib) { flex: none; }
+.sheet .blk-kreuze { display: flex; flex-wrap: wrap; gap: 1mm 4mm; padding-top: 2mm; font-size: 9pt; }
+.sheet .blk-kreuze .blk-kreuz { margin-right: 0; }
+.sheet .blk-pos tr.blanko td { height: 8.5mm; }
 /* Unterschrift, Linie, Fußzeile */
 .sheet .blk-sign { display: grid; grid-template-columns: 1fr 1fr; gap: 14mm; padding-top: 2mm; }
 .sheet .blk-sign > div { display: flex; flex-direction: column; justify-content: flex-end; }

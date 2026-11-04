@@ -12,10 +12,23 @@
  * - Abstände zwischen Bausteinen bilden die CSS-Regeln aus blatt.css nach (`abstandMm`).
  * - Der Rahmen (Baustein „rahmen“) liegt wie das Wasserzeichen hinter der Seite (eso-pic, Bildumgebung des Kernels),
  *   4 mm außerhalb des Satzspiegels (`RAHMEN_MM`, gleiche Werte wie .sh-rahmen in blatt.css).
+ * - Blanko-Formular (`mainTex(…, { blanko: true })`, Vorlagen-Seite): Werte des Belegs werden Schreiblinien
+ *   (\KLuecke kurz im Text, \KSchreib über die restliche Breite), Ankreuzfelder leer, „Ort, Datum“ leer, kein
+ *   Wasserzeichen. Firmendaten kommen wie immer aus daten.tex.
  * - `bereiche` ordnet jede Zeile von main.tex ihrem Baustein zu, damit ein Kompilierfehler den Baustein nennen kann (§7.3).
  * Tests: latex.test.ts */
-import { BAUSTEINE, istUmrandet, istUnten, quittungAngaben, sichtbare, type Aufgeloest, type Baustein, type BausteinTyp } from '../vorlagen/bausteine';
-import { ARTEN, formatVon, type Belegart, type Blattformat, type PlatzhalterName } from '../vorlagen/dokument';
+import {
+  BAUSTEINE,
+  istUmrandet,
+  istUnten,
+  quittungAngaben,
+  sichtbare,
+  type Aufgeloest,
+  type Baustein,
+  type BausteinTyp,
+  type QuittungAngaben,
+} from '../vorlagen/bausteine';
+import { ARTEN, BELEG_PLATZHALTER, formatVon, type Belegart, type Blattformat, type PlatzhalterName } from '../vorlagen/dokument';
 import { parsen, type Stil } from '../vorlagen/formatierung';
 import { firmenZeilen } from '../vorlagen/firmenblock';
 import { belegAkzent } from '../vorlagen/farbe';
@@ -57,18 +70,24 @@ const zahl = (n: number) => String(Math.round(n * 100) / 100);
 export const fs = (pt: number, zeile = 1.42): string => L`\fontsize{${zahl(pt)}}{${zahl(pt * zeile)}}\selectfont `;
 
 /** Text aus einer Baustein-Einstellung ⇒ LaTeX. `leer`: Makros, die alle leer sein müssen, damit nichts gedruckt wird
- * (null = es steht immer etwas da, [] = der Text ist fest leer). */
+ * (null = es steht immer etwas da, [] = der Text ist fest leer). `blanko`: Platzhalter mit Werten des Belegs ⇒ \KLuecke. */
 export interface TexText {
   tex: string;
   leer: string[] | null;
 }
 
-export function textTex(text: string, einzeilig = false): TexText {
+export function textTex(text: string, einzeilig = false, blanko = false): TexText {
   let tex = '';
   let immer = false;
   const makros: string[] = [];
   // Formatierung aus dem Vorlagentext (nie aus Werten): Markup VOR den Platzhaltern lesen (formatierung.ts)
   for (const t of parsen(text)) {
+    // Blanko-Formular: Werte des Belegs als kurze Schreiblinie (steht immer da)
+    if (t.art === 'platzhalter' && blanko && BELEG_PLATZHALTER.has(t.name)) {
+      tex += formatTex(L`\KLuecke{}`, t);
+      immer = true;
+      continue;
+    }
     if (t.art === 'platzhalter') {
       tex += formatTex(`\\${MAKRO[t.name]}{}`, t);
       if (t.name === 'nr') immer = true;
@@ -140,14 +159,16 @@ interface Ctx {
   art: Belegart;
   a4: boolean;
   vorher: BausteinTyp | null;
+  /** Blanko-Formular zum Ausfüllen von Hand */
+  blanko: boolean;
 }
 
 type Schnipsel = TexText;
 const fest = (tex: string): Schnipsel => ({ tex, leer: null });
 
 const GROESSE_PT: Readonly<Record<string, number>> = { normal: 10, klein: 8.5, grau: 8, mini: 6.5 };
-function textBlock(text: string, groesse: string): Schnipsel {
-  const t = textTex(text);
+function textBlock(text: string, groesse: string, blanko: boolean): Schnipsel {
+  const t = textTex(text, false, blanko);
   const grau = groesse === 'grau' || groesse === 'mini' ? L`\color{grau}` : '';
   return { tex: `{${fs(GROESSE_PT[groesse] ?? 10)}${grau}${t.tex}\\par}`, leer: t.leer };
 }
@@ -156,10 +177,12 @@ function textBlock(text: string, groesse: string): Schnipsel {
 const versal = (tex: string, an: boolean): string => (an ? L`\MakeUppercase{${tex}}` : tex);
 
 /** Firmenkopf: eine Zeile pro Textzeile; eine Zeile, deren Platzhalter alle leer sind, fällt weg (firmenblock.ts). */
-function firmenZeilenTex(text: string): string {
+function firmenZeilenTex(text: string, blanko: boolean): string {
   return firmenZeilen(text)
     .map((z) => {
-      const tex = textTex(z.text, true).tex + L`\par`;
+      const tex = textTex(z.text, true, blanko).tex + L`\par`;
+      // Blanko: eine Zeile mit Schreiblinie steht immer da (wie sichtbareZeilen mit `luecken`)
+      if (blanko && z.platzhalter.some((p) => BELEG_PLATZHALTER.has(p))) return tex;
       return z.platzhalter.length ? wennNichtLeer(z.platzhalter.map((p) => MAKRO[p]), tex) : tex;
     })
     .join('\n');
@@ -185,10 +208,49 @@ function raster(felder: string[]): string {
   );
 }
 
+/** Leere Zeilen der Positionstabelle im Blanko-Formular (wie BLANKO_POSITIONEN in Blatt.tsx) */
+const BLANKO_POSITIONEN = 4;
+
+/** Zahlungswege zum Ankreuzen, alle leer (Blanko-Formular); bricht in schmalen Spalten zwischen den Feldern um */
+const KREUZE_LEER =
+  L`{${fs(9)}\raggedright\rule{0pt}{5mm}` +
+  ['Bar', 'Überweisung', 'PayPal'].map((t) => L`\mbox{\KKaestchen{0}\hspace{1.5mm}${t}}`).join(L`\hspace{4mm} `) +
+  // \par in der Gruppe: \raggedright muss beim Absatzende noch gelten
+  L`\par}`;
+
+/** Quittungsangaben im Blanko-Formular: dieselben Angaben und Stile wie mit Werten, statt Werten Schreiblinien. */
+function quittungBlanko(a: QuittungAngaben, von: string, fuer: string): string {
+  if (a.formular) {
+    const halb = L`\dimexpr(\linewidth-8mm)/2\relax`;
+    const nr = L`\begin{minipage}[t]{${halb}}\KForm{Nr.}{\KSchreib}\end{minipage}`;
+    const kopf = a.datum ? L`\noindent\begin{minipage}[t]{${halb}}\KForm{Datum}{\KSchreib}\end{minipage}\hfill` + nr + L`\par` : L`\noindent` + nr + L`\par`;
+    return zeilen(
+      kopf,
+      L`{\color{haar}\hrule height .25mm}\vspace{3mm}`,
+      a.kunde && L`\KForm{${von}}{\KSchreib}`,
+      a.zweck && L`\KForm{${fuer}}{\KSchreib}`,
+      a.zahlungsart && L`\KForm{Zahlungsart}{\KKaestchen{0}\hspace{1.5mm}Bar\hspace{5mm}\KKaestchen{0}\hspace{1.5mm}Überweisung\hspace{5mm}\KKaestchen{0}\hspace{1.5mm}PayPal}`,
+      a.betrag && L`\vspace{1mm}{${fs(13, 1.3)}\noindent\textbf{Gesamtbetrag:}\ \KSchreib[€]\par}\vspace{1mm}`,
+      a.worte && L`{${fs(9)}\noindent\textcolor{grau}{in Worten:} \KSchreib\par}\vspace{1mm}`,
+    );
+  }
+  const felder = [
+    a.betrag && L`\KFeld{Betrag}{\KSchreib[€]}`,
+    a.datum && L`\KFeld{Datum}{\KSchreib}`,
+    a.zahlungsart && L`\KFeld{Zahlungsart}{${KREUZE_LEER}}`,
+  ].filter((f): f is string => !!f);
+  return zeilen(
+    felder.length > 0 && raster(felder),
+    a.worte && L`\KFeld{Betrag in Worten}{\KSchreib}`,
+    a.kunde && L`\KFeld{${von}}{\KSchreib}`,
+    a.zweck && L`\KFeld{${fuer}}{\KSchreib}`,
+  );
+}
+
 const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => Schnipsel>> = {
   kopf(b, x) {
     const h = x.a4 ? 16 : 10;
-    const claim = textTex(b.text('claim'), true);
+    const claim = textTex(b.text('claim'), true, x.blanko);
     return fest(
       zeilen(
         L`\noindent\rule[-${h}mm]{0pt}{${h}mm}%`,
@@ -203,9 +265,9 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => Schnipsel>>
     );
   },
   firmenblock(b, x) {
-    const name = textTex(b.text('name'), true);
-    const untertitel = firmenZeilenTex(b.text('untertitel'));
-    const kontakt = firmenZeilenTex(b.text('zeilen'));
+    const name = textTex(b.text('name'), true, x.blanko);
+    const untertitel = firmenZeilenTex(b.text('untertitel'), x.blanko);
+    const kontakt = firmenZeilenTex(b.text('zeilen'), x.blanko);
     const logo = b.an('logo');
     const h = x.a4 ? 16 : 12;
     const inhalt = zeilen(
@@ -229,8 +291,8 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => Schnipsel>>
       ),
     );
   },
-  absenderzeile(b) {
-    const t = textTex(b.text('text'), true);
+  absenderzeile(b, x) {
+    const t = textTex(b.text('text'), true, x.blanko);
     if (!b.an('linie')) return { tex: L`{${fs(7.5)}\color{grau}${t.tex}\par}`, leer: t.leer };
     // Unterstrichen wie im Fensterumschlag; zu lang ⇒ auf 85 mm verkleinert (Vorschau: abgeschnitten mit …)
     return {
@@ -244,6 +306,27 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => Schnipsel>>
   },
   anschrift_meta(b, x) {
     const A = ARTEN[x.art];
+    if (x.blanko) {
+      // drei Zeilen für den Empfänger, rechts kurze Linien (wie die Vorschau)
+      const meta = [
+        b.an('nr') && L`\KMeta{${A.nrLabel}}{\KLuecke}`,
+        b.an('datum') && L`\KMeta{Datum}{\KLuecke}`,
+        b.an('leistung') && x.art !== 'angebot' && L`\KMeta{Leistungsdatum}{\KLuecke}`,
+        b.an('kundennr') && L`\KMeta{Kunden-Nr.}{\KLuecke}`,
+        b.an('faellig') && L`\KMeta{${x.art === 'angebot' ? 'Gültig bis' : 'Fällig am'}}{\KLuecke}`,
+      ];
+      return fest(
+        zeilen(
+          x.a4 ? L`\noindent\rule[-34mm]{0pt}{34mm}%` : L`\noindent`,
+          L`\begin{minipage}[t]{85mm}\vspace{0pt}\raggedright`,
+          L`\noindent\KSchreib\par`.repeat(3),
+          L`\end{minipage}\hfill`,
+          L`\begin{minipage}[t]{64mm}\vspace{0pt}${fs(9)}`,
+          ...meta,
+          L`\end{minipage}\par`,
+        ),
+      );
+    }
     const leerTest = ['KundeAnzeige', 'KundeZusatz', 'KundeStrasse', 'KundeOrt'].map((m) => 'test {\\ifdefempty{\\' + m + '}}').join(' and ');
     const meta = [
       b.an('nr') && L`\KMeta{${A.nrLabel}}{\ifdefempty{\Nummer}{\textcolor{leer}{\itshape Entwurf}}{\textbf{\Nummer}}}`,
@@ -265,8 +348,8 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => Schnipsel>>
     );
   },
   titel(b, x) {
-    const t = textTex(b.text('text'), true);
-    const r = textTex(b.text('rechts'), true);
+    const t = textTex(b.text('text'), true, x.blanko);
+    const r = textTex(b.text('rechts'), true, x.blanko);
     const farbe = b.text('stil') === 'akzent' ? L`\color{akzent}` : '';
     const rechts = r.leer && !r.leer.length ? '' : wennNichtLeer(r.leer, L`\hfill{${fs(10.5)}\bfseries ${r.tex}}`);
     return fest(
@@ -276,15 +359,15 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => Schnipsel>>
       ),
     );
   },
-  betreff(b) {
-    const t = textTex(b.text('text'));
+  betreff(b, x) {
+    const t = textTex(b.text('text'), false, x.blanko);
     return { tex: L`{\bfseries ${t.tex}\par}`, leer: t.leer };
   },
-  text: (b) => textBlock(b.text('text'), b.text('groesse')),
-  datenschutz: (b) => textBlock(b.text('text'), 'grau'),
-  steuerhinweis: (b) => textBlock(b.text('text'), b.text('groesse')),
-  gruss: (b) => textBlock(b.text('text'), 'normal'),
-  positionen(b) {
+  text: (b, x) => textBlock(b.text('text'), b.text('groesse'), x.blanko),
+  datenschutz: (b, x) => textBlock(b.text('text'), 'grau', x.blanko),
+  steuerhinweis: (b, x) => textBlock(b.text('text'), b.text('groesse'), x.blanko),
+  gruss: (b, x) => textBlock(b.text('text'), 'normal', x.blanko),
+  positionen(b, x) {
     const pos = b.an('pos');
     const einheit = b.an('einheit');
     const ep = b.an('einzelpreis');
@@ -307,28 +390,32 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => Schnipsel>>
         L`{${fs(8)}\color{grau}\noindent\strut ` + zelle(['Pos.', L`\makebox[\KPosB][l]{Beschreibung}`, 'Menge', 'Einzelpreis', 'Gesamt']) + L`\par}%`,
         L`\vspace{1.6mm}{\color{ink}\hrule height .25mm}%`,
         L`\setcounter{KPos}{0}%`,
-        L`\ifnum\AnzahlPositionen=0\relax\vspace{1.9mm}\noindent\textcolor{leer}{\itshape Noch keine Positionen}\par\vspace{1.9mm}\else\Positionen\fi`,
+        // Blanko: leere Zeilen zum Ausfüllen (wie die Vorschau)
+        x.blanko
+          ? L`\Position{}{}{}{}{}{}`.repeat(BLANKO_POSITIONEN)
+          : L`\ifnum\AnzahlPositionen=0\relax\vspace{1.9mm}\noindent\textcolor{leer}{\itshape Noch keine Positionen}\par\vspace{1.9mm}\else\Positionen\fi`,
         L`{\color{ink}\hrule height .25mm}\par}`,
       ),
     );
   },
   summe(b, x) {
-    const t = textTex(b.text('label'), true);
+    const t = textTex(b.text('label'), true, x.blanko);
+    const betrag = x.blanko ? L`\KLuecke\ €` : L`\Gesamt`;
     return fest(
       zeilen(
         x.vorher !== 'positionen' && L`{\color{ink}\hrule height .25mm}`,
-        L`\vspace{2.2mm}\noindent\strut{\bfseries ${t.tex}}\hfill{${fs(11)}\bfseries\color{akzent}\Gesamt}\par`,
+        L`\vspace{2.2mm}\noindent\strut{\bfseries ${t.tex}}\hfill{${fs(11)}\bfseries\color{akzent}${betrag}}\par`,
         L`\vspace{2.2mm}{\color{ink}\hrule height .5mm}`,
       ),
     );
   },
-  betrag_worte(b) {
-    const t = textTex(b.text('label'), true);
+  betrag_worte(b, x) {
+    const t = textTex(b.text('label'), true, x.blanko);
     const label = t.leer && !t.leer.length ? '' : wennNichtLeer(t.leer, L`\textcolor{grau}{${t.tex}:} `);
-    return fest(L`{${fs(9.5)}\itshape ${label}\BetragInWorten\par}`);
+    return fest(L`{${fs(9.5)}\itshape ${label}${x.blanko ? L`\KSchreib` : L`\BetragInWorten`}\par}`);
   },
   zahlung(b, x) {
-    const t = textTex(b.text('text'));
+    const t = textTex(b.text('text'), false, x.blanko);
     const hinweis = wennNichtLeer(t.leer, L`{${t.tex}\par}`);
     // Grauer Kasten wie .blk-pay.box: links die Bankverbindung, rechts (falls da) der GiroCode, senkrecht mittig
     const kasten = (inhalt: string) =>
@@ -368,12 +455,13 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => Schnipsel>>
     // Schon bei Ausstellung bezahlt: kein Zahlungsaufruf, keine Bankverbindung, kein GiroCode (Prototyp `quittiert`)
     return fest(L`\ifdefempty{\Quittiert}{%` + '\n' + zeilen(hinweis, zahlung) + L`%` + '\n' + L`}{{\Quittiert\par}}`);
   },
-  quittung_felder(b) {
+  quittung_felder(b, x) {
     // jede Angabe einzeln abschaltbar (wie die Vorschau); alle aus ⇒ nichts, auch kein Abstand
     const a = quittungAngaben(b);
     if (a.leer) return { tex: '', leer: [] };
-    const von = textTex(b.text('von'), true).tex;
-    const fuer = textTex(b.text('fuer'), true).tex;
+    const von = textTex(b.text('von'), true, x.blanko).tex;
+    const fuer = textTex(b.text('fuer'), true, x.blanko).tex;
+    if (x.blanko) return fest(quittungBlanko(a, von, fuer));
     const fuerWert = L`\ifnum\AnzahlPositionen>1\relax\ifdefempty{\Betreff}{}{\Betreff\par}{${fs(9)}\let\Position\KPositionMini\vspace{1mm}\Positionen}\else\QuittungFuer\fi`;
     const kunde = L`\KundeAnzeige\ifdefempty{\KundeAdresseEinzeilig}{}{, \KundeAdresseEinzeilig}`;
     if (a.formular) {
@@ -408,8 +496,19 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => Schnipsel>>
       ),
     );
   },
-  eigenbeleg_felder(b) {
-    const u = textTex(b.text('untertitel'), true);
+  eigenbeleg_felder(b, x) {
+    const u = textTex(b.text('untertitel'), true, x.blanko);
+    if (x.blanko) {
+      return fest(
+        zeilen(
+          wennNichtLeer(u.leer, L`\vspace{-1mm}{${fs(8)}\color{grau}${u.tex}\par}\vspace{3mm}`),
+          raster([L`\KFeld{Betrag}{\KSchreib[€]}`, L`\KFeld{Datum der Zahlung}{\KSchreib}`, L`\KFeld{Zahlungsart}{${KREUZE_LEER}}`]),
+          b.an('worte') && L`\KFeld{Betrag in Worten}{\KSchreib}`,
+          raster([L`\KFeld{Zahlungsempfänger}{\KSchreib}`, L`\KFeld{Grund für den Eigenbeleg}{\KSchreib}`]),
+          L`\KFeld{Gegenstand / Zweck der Ausgabe}{\KSchreib}`,
+        ),
+      );
+    }
     return fest(
       zeilen(
         wennNichtLeer(u.leer, L`\vspace{-1mm}{${fs(8)}\color{grau}${u.tex}\par}\vspace{3mm}`),
@@ -424,12 +523,13 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => Schnipsel>>
       ),
     );
   },
-  unterschrift(b) {
-    const links = textTex(b.text('links'), true).tex;
-    const rechts = textTex(b.text('rechts'), true).tex;
+  unterschrift(b, x) {
+    const links = textTex(b.text('links'), true, x.blanko).tex;
+    const rechts = textTex(b.text('rechts'), true, x.blanko).tex;
     // eine Linie über die ganze Breite, die Beschriftung darüber (Quittungsblock)
     if (b.text('stil') === 'eine') return fest(L`{${fs(9)}\bfseries ${rechts}\strut\par}\vspace{11mm}{\color{ink}\hrule height .25mm}`);
-    const vor = b.an('vorbelegen') ? L`\ifdefempty{\FirmaStadt}{}{\FirmaStadt, }\UnterschriftDatum` : '';
+    // Blanko: „Ort, Datum“ schreibt man von Hand
+    const vor = b.an('vorbelegen') && !x.blanko ? L`\ifdefempty{\FirmaStadt}{}{\FirmaStadt, }\UnterschriftDatum` : '';
     const spalte = (oben: string, unten: string) =>
       L`\begin{minipage}[b]{\dimexpr(\linewidth-14mm)/2\relax}{${fs(9.5)}\hspace*{1mm}${oben}\strut\par}` +
       L`\vspace{1mm}{\color{ink}\hrule height .25mm}\vspace{1mm}{${fs(7.5)}\color{grau}${unten}\strut\par}\end{minipage}`;
@@ -563,6 +663,10 @@ function praeambel(art: Belegart, akzentHex: string): string {
     L`\newcommand{\KForm}[2]{{${fs(10.5, 1.35)}\noindent\textbf{#1:}\ #2\par}\vspace{2mm}}`,
     // Ankreuzfeld 3 mm, angekreuzt mit einem Kreuz (nicht nur Farbe); gezeichnet, keine Sonderzeichen aus der Schrift
     L`\newcommand{\KKaestchen}[1]{\raisebox{-.35mm}{\setlength{\unitlength}{1mm}\begin{picture}(3,3)\put(0,0){\rule{3mm}{.25mm}}\put(0,2.75){\rule{3mm}{.25mm}}\put(0,0){\rule{.25mm}{3mm}}\put(2.75,0){\rule{.25mm}{3mm}}\ifnum#1=1 \put(1.5,1.5){\makebox(0,0){\rotatebox{45}{\rule[-.15mm]{2.7mm}{.3mm}}}}\put(1.5,1.5){\makebox(0,0){\rotatebox{-45}{\rule[-.15mm]{2.7mm}{.3mm}}}}\fi\end{picture}}}`,
+    // Blanko-Formular: kurze Schreiblinie im Text; Schreiblinie bis zum Zeilenende (7 mm hoch, Linie 1 mm unter der
+    // Grundlinie, fill schlägt \parfillskip), optional mit Text dahinter (z. B. €)
+    L`\newcommand{\KLuecke}{\leavevmode\rule[-1mm]{30mm}{.2mm}}`,
+    L`\newcommand{\KSchreib}[1][]{\leavevmode\rule{0pt}{7mm}\leaders\hrule height -.8mm depth 1mm\hskip 0pt plus 1fill\kern0pt\ifblank{#1}{}{\hspace{1.5mm}#1}}`,
     L`\newcommand{\KAnkreuz}[2]{\mbox{\ifdefstring{\ZahlungswegKurz}{#1}{\KKaestchen{1}}{\KKaestchen{0}}\hspace{1.5mm}#2}}`,
     L`\newcommand{\KPositionMini}[6]{\noindent\makebox[20mm][l]{\textcolor{grau}{#3\ifblank{#4}{}{~#4}~×}}\hspace{2.5mm}\parbox[t]{\dimexpr\linewidth-47.5mm\relax}{\raggedright #2}\hfill\makebox[22mm][r]{#6}\par}`,
     L`\newcommand{\KWasserzeichen}[3]{\AddToShipoutPictureBG{\AtPageCenter{\makebox(0,0){\rotatebox{33}{\setlength{\fboxrule}{${String(wm.rand)}mm}\setlength{\fboxsep}{2mm}\textcolor{#3}{\fbox{\hspace{7mm}\textcolor{#2}{\fontsize{${String(wm.pt)}}{${String(wm.pt)}}\selectfont\bfseries\addfontfeature{LetterSpace=10}#1}\hspace{7mm}}}}}}}}`,
@@ -586,8 +690,14 @@ export interface MainTex {
   bereiche: TexBereich[];
 }
 
+export interface MainTexOptionen {
+  /** Blanko-Formular zum Ausfüllen von Hand: Schreiblinien statt Werten, kein Wasserzeichen */
+  blanko?: boolean;
+}
+
 /** main.tex für eine Belegart aus ihren Bausteinen. `akzent` = Akzentfarbe der App ('#rrggbb'). */
-export function mainTex(art: Belegart, bausteine: readonly Baustein[], akzent: string): MainTex {
+export function mainTex(art: Belegart, bausteine: readonly Baustein[], akzent: string, optionen: MainTexOptionen = {}): MainTex {
+  const blanko = !!optionen.blanko;
   const a4 = formatVon(art) === 'a4';
   const teile: { text: string; index?: number; typ?: BausteinTyp }[] = [];
   const add = (text: string, index?: number, typ?: BausteinTyp) => teile.push({ text, index, typ });
@@ -596,7 +706,8 @@ export function mainTex(art: Belegart, bausteine: readonly Baustein[], akzent: s
   add('');
   add(L`\begin{document}`);
   add(L`\raggedright\color{ink}` + fs(10));
-  add(L`\ifdefempty{\Storniert}{\ifdefempty{\Nummer}{\KWasserzeichen{ENTWURF}{wm}{wmrand}}{}}{\KWasserzeichen{STORNIERT}{wmstorno}{wmstornorand}}`);
+  // Blanko-Formular: kein Beleg, also weder ENTWURF noch STORNIERT
+  if (!blanko) add(L`\ifdefempty{\Storniert}{\ifdefempty{\Nummer}{\KWasserzeichen{ENTWURF}{wm}{wmrand}}{}}{\KWasserzeichen{STORNIERT}{wmstorno}{wmstornorand}}`);
   if (a4) {
     // Falz- und Lochmarken am linken Rand der ersten Seite (wie die Vorschau)
     const marke = (mm: string, breite: number) => L`\put(0,\LenToUnit{-${mm}mm}){\textcolor{marke}{\rule{${String(breite)}mm}{.2mm}}}`;
@@ -608,7 +719,7 @@ export function mainTex(art: Belegart, bausteine: readonly Baustein[], akzent: s
   for (const x of alle.filter((y) => istUmrandet(y.b))) add(`% Baustein ${x.index + 1}: ${BAUSTEINE[x.b.typ].name}\n` + rahmenTex(formatVon(art), x.b.text('linie')), x.index, x.b.typ);
   const liste = alle.filter((y) => !istUmrandet(y.b));
   const block = (x: (typeof liste)[number], vorher: BausteinTyp | null, unten: boolean): boolean => {
-    const s = BLOCK[x.b.typ](x.b, { art, a4, vorher });
+    const s = BLOCK[x.b.typ](x.b, { art, a4, vorher, blanko });
     if (!s.tex || (s.leer && !s.leer.length)) return false;
     const mm = abstandMm(vorher, x.b.typ, unten, x.b.text('stil')) + (unten && vorher ? 4 : 0);
     const abstand = mm ? L`\vspace{${zahl(mm)}mm}` + '\n' : '';
