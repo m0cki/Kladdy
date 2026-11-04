@@ -26,6 +26,7 @@ import { formatBetrag } from '../../lib/money';
 import type { ErtragStamm } from '../../lib/queries/ertrag';
 import { anschriftText, type BelegZeile } from '../../lib/rechnungen';
 import { heute } from '../../lib/zeitraum';
+import { waehlbar, wahlName } from '../../lib/vorlagen/eigene';
 import { Seg } from '../ui/Seg';
 import { BelegDropzone, VorgemerkteBelege } from '../belege/BelegDateien';
 
@@ -169,15 +170,15 @@ function BelegKasten({
           <select
             id="bf-vorlage"
             className="select"
-            value={vorlage.design}
+            value={vorlage.schluessel}
             onChange={(e) => {
-              const v = vorlagen.find((x) => x.design === e.target.value);
+              const v = vorlagen.find((x) => x.schluessel === e.target.value);
               if (v) setErtrag({ vorlage: { id: v.id, design: v.design } });
             }}
           >
-            {vorlagen.map((v) => (
-              <option key={v.design} value={v.design}>
-                {v.name}
+            {waehlbar(vorlagen, vorlage).map((v) => (
+              <option key={v.schluessel} value={v.schluessel}>
+                {wahlName(v)}
               </option>
             ))}
           </select>

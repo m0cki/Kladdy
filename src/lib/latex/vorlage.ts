@@ -14,7 +14,7 @@
  *   4 mm außerhalb des Satzspiegels (`RAHMEN_MM`, gleiche Werte wie .sh-rahmen in blatt.css).
  * - `bereiche` ordnet jede Zeile von main.tex ihrem Baustein zu, damit ein Kompilierfehler den Baustein nennen kann (§7.3).
  * Tests: latex.test.ts */
-import { BAUSTEINE, istUmrandet, istUnten, sichtbare, type Aufgeloest, type Baustein, type BausteinTyp } from '../vorlagen/bausteine';
+import { BAUSTEINE, istUmrandet, istUnten, quittungAngaben, sichtbare, type Aufgeloest, type Baustein, type BausteinTyp } from '../vorlagen/bausteine';
 import { ARTEN, formatVon, type Belegart, type Blattformat, type PlatzhalterName } from '../vorlagen/dokument';
 import { parsen, type Stil } from '../vorlagen/formatierung';
 import { firmenZeilen } from '../vorlagen/firmenblock';
@@ -165,12 +165,19 @@ function firmenZeilenTex(text: string): string {
     .join('\n');
 }
 
-/** Feld-Raster der Quittung/des Eigenbelegs: drei Spalten 1,35 : 1 : 1 bzw. zwei gleiche, 8 mm Abstand. */
+/** Feld-Raster der Quittung/des Eigenbelegs: drei Spalten 1,35 : 1 : 1 bzw. zwei gleiche, 8 mm Abstand.
+ *  Die letzte Spalte bekommt den Rest, damit die Summe nie durch Rundung über \linewidth kommt (sonst bricht TeX um). */
 function raster(felder: string[]): string {
   const breiten =
     felder.length === 3
-      ? [L`\dimexpr(\linewidth-16mm)*135/335\relax`, L`\dimexpr(\linewidth-16mm)*100/335\relax`, L`\dimexpr(\linewidth-16mm)*100/335\relax`]
-      : felder.map(() => L`\dimexpr(\linewidth-8mm)/2\relax`);
+      ? [
+          L`\dimexpr(\linewidth-16mm)*135/335\relax`,
+          L`\dimexpr(\linewidth-16mm)*100/335\relax`,
+          L`\dimexpr\linewidth-16mm-(\linewidth-16mm)*135/335-(\linewidth-16mm)*100/335\relax`,
+        ]
+      : felder.length === 2
+        ? [L`\dimexpr(\linewidth-8mm)/2\relax`, L`\dimexpr\linewidth-8mm-(\linewidth-8mm)/2\relax`]
+        : felder.map(() => L`\dimexpr(\linewidth-8mm)/2\relax`);
   return (
     L`\noindent` +
     felder.map((f, i) => L`\begin{minipage}[t]{${breiten[i]}}` + f + L`\end{minipage}`).join(L`\hspace{8mm}%` + '\n') +
@@ -362,33 +369,42 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => Schnipsel>>
     return fest(L`\ifdefempty{\Quittiert}{%` + '\n' + zeilen(hinweis, zahlung) + L`%` + '\n' + L`}{{\Quittiert\par}}`);
   },
   quittung_felder(b) {
+    // jede Angabe einzeln abschaltbar (wie die Vorschau); alle aus ⇒ nichts, auch kein Abstand
+    const a = quittungAngaben(b);
+    if (a.leer) return { tex: '', leer: [] };
     const von = textTex(b.text('von'), true).tex;
     const fuer = textTex(b.text('fuer'), true).tex;
     const fuerWert = L`\ifnum\AnzahlPositionen>1\relax\ifdefempty{\Betreff}{}{\Betreff\par}{${fs(9)}\let\Position\KPositionMini\vspace{1mm}\Positionen}\else\QuittungFuer\fi`;
-    if (b.text('stil') === 'formular') {
+    const kunde = L`\KundeAnzeige\ifdefempty{\KundeAdresseEinzeilig}{}{, \KundeAdresseEinzeilig}`;
+    if (a.formular) {
       // „Bezeichnung: Wert“ wie ein Quittungsblock; Zahlungsart als Ankreuzfelder, die gedruckte mit Kreuz
       const halb = L`\dimexpr(\linewidth-8mm)/2\relax`;
       const kreuze = L`\KAnkreuz{bar}{Bar}\hspace{5mm}\KAnkreuz{bank}{Überweisung}\hspace{5mm}\KAnkreuz{paypal}{PayPal}`;
+      const nr = L`\begin{minipage}[t]{${halb}}\KForm{Nr.}{\KNr}\end{minipage}`;
+      const kopf = a.datum ? L`\noindent\begin{minipage}[t]{${halb}}\KForm{Datum}{\Datum}\end{minipage}\hfill` + nr + L`\par` : L`\noindent` + nr + L`\par`;
       return fest(
         zeilen(
-          L`\noindent\begin{minipage}[t]{${halb}}\KForm{Datum}{\Datum}\end{minipage}\hfill\begin{minipage}[t]{${halb}}\KForm{Nr.}{\KNr}\end{minipage}\par`,
+          kopf,
           L`{\color{haar}\hrule height .25mm}\vspace{3mm}`,
-          L`\KForm{${von}}{\KundeAnzeige\ifdefempty{\KundeAdresseEinzeilig}{}{, \KundeAdresseEinzeilig}}`,
-          L`\KForm{${fuer}}{${fuerWert}}`,
-          b.an('zahlungsart') && L`\KForm{Zahlungsart}{${kreuze}}`,
-          L`\vspace{1mm}{${fs(13, 1.3)}\noindent\textbf{Gesamtbetrag:}\ \textbf{\Gesamt}\par}\vspace{1mm}`,
-          b.an('worte') && L`{${fs(9)}\noindent\textcolor{grau}{in Worten:} \BetragInWorten\par}\vspace{1mm}`,
+          a.kunde && L`\KForm{${von}}{${kunde}}`,
+          a.zweck && L`\KForm{${fuer}}{${fuerWert}}`,
+          a.zahlungsart && L`\KForm{Zahlungsart}{${kreuze}}`,
+          a.betrag && L`\vspace{1mm}{${fs(13, 1.3)}\noindent\textbf{Gesamtbetrag:}\ \textbf{\Gesamt}\par}\vspace{1mm}`,
+          a.worte && L`{${fs(9)}\noindent\textcolor{grau}{in Worten:} \BetragInWorten\par}\vspace{1mm}`,
         ),
       );
     }
-    const felder = [L`\KFeld{Betrag}{{${fs(15, 1.3)}\bfseries\Gesamt}}`, L`\KFeld{Datum}{\Datum}`];
-    if (b.an('zahlungsart')) felder.push(L`\KFeld{Zahlungsart}{\Zahlungsart}`);
+    const felder = [
+      a.betrag && L`\KFeld{Betrag}{{${fs(15, 1.3)}\bfseries\Gesamt}}`,
+      a.datum && L`\KFeld{Datum}{\Datum}`,
+      a.zahlungsart && L`\KFeld{Zahlungsart}{\Zahlungsart}`,
+    ].filter((f): f is string => !!f);
     return fest(
       zeilen(
-        raster(felder),
-        b.an('worte') && L`\KFeld{Betrag in Worten}{\BetragInWorten}`,
-        L`\KFeld{${von}}{\KundeAnzeige\ifdefempty{\KundeAdresseEinzeilig}{}{, \KundeAdresseEinzeilig}}`,
-        L`\KFeld{${fuer}}{${fuerWert}}`,
+        felder.length > 0 && raster(felder),
+        a.worte && L`\KFeld{Betrag in Worten}{\BetragInWorten}`,
+        a.kunde && L`\KFeld{${von}}{${kunde}}`,
+        a.zweck && L`\KFeld{${fuer}}{${fuerWert}}`,
       ),
     );
   },

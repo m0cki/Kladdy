@@ -182,3 +182,60 @@ describe('Design „Formular“ der Quittung', () => {
     expect(punkt(l, 'Steuernummer').ok).toBe(true);
   });
 });
+
+describe('Quittungsangaben: einzelne Angaben abgeschaltet', () => {
+  const mit = (design: string, werte: Record<string, boolean | string>) =>
+    standardVorlage('quittung', design).map((b) => (b.typ === 'quittung_felder' ? { ...b, ...werte } : b));
+  const grosseQuittung = (): BelegDokument => {
+    const q = quittung();
+    // über der Kleinbetragsgrenze: Kunde mit Anschrift ist Pflicht
+    return { ...q, positionen: [{ ...q.positionen[0], menge: 1, einzelpreis_cent: 30_000 }] };
+  };
+
+  it('alle an (fehlende Schalter = an): alles da, wie bisher', () => {
+    expect(pflichtOk(pflichtCheck(quittung(), standardVorlage('quittung')))).toBe(true);
+    expect(pflichtOk(pflichtCheck(quittung(), mit('klassisch', { betrag: true, datum: true, kunde: true, zweck: true })))).toBe(true);
+  });
+
+  it('Betrag aus ⇒ Entgelt fehlt; Datum aus ⇒ Ausstellungsdatum fehlt; Hinweis nennt den Schalter', () => {
+    const l = pflichtCheck(quittung(), mit('klassisch', { betrag: false, datum: false }));
+    expect(punkt(l, 'Entgelt und § 19-Hinweis')).toMatchObject({ ok: false, hint: 'Quittungsangaben: „Betrag“ ist abgeschaltet' });
+    expect(punkt(l, 'Ausstellungsdatum')).toMatchObject({ ok: false, hint: 'Quittungsangaben: „Datum“ ist abgeschaltet' });
+    expect(pflichtTitel(quittung(), l)).toBe('Quittung: 2 Pflichtangaben fehlen');
+  });
+
+  it('Betrag in Worten allein ersetzt den Betrag nicht; {summe} in einem Freitext schon', () => {
+    const ohne = mit('klassisch', { betrag: false, worte: true });
+    expect(punkt(pflichtCheck(quittung(), ohne), 'Entgelt und § 19-Hinweis').ok).toBe(false);
+    expect(punkt(pflichtCheck(quittung(), [...ohne, { typ: 'text', text: 'Betrag: {summe}' }]), 'Entgelt und § 19-Hinweis').ok).toBe(true);
+  });
+
+  it('„Für“ aus ⇒ Leistung fehlt; „Erhalten von“ aus zählt erst über der Kleinbetragsgrenze', () => {
+    const v = mit('klassisch', { zweck: false, kunde: false });
+    const klein = pflichtCheck(quittung(), v);
+    expect(punkt(klein, 'Menge und Art der Leistung')).toMatchObject({ ok: false, hint: 'Quittungsangaben: „Für“ ist abgeschaltet' });
+    expect(punkt(klein, 'Name und Anschrift (Kunde)').ok).toBe(true);
+    const gross = pflichtCheck(grosseQuittung(), v);
+    expect(punkt(gross, 'Name und Anschrift (Kunde)')).toMatchObject({ ok: false, hint: 'Quittungsangaben: „Erhalten von“ ist abgeschaltet' });
+  });
+
+  it('Zahlungsart und Betrag in Worten sind keine Pflichtangaben', () => {
+    expect(pflichtOk(pflichtCheck(quittung(), mit('klassisch', { zahlungsart: false, worte: false })))).toBe(true);
+  });
+
+  it('Formular: Nummer zählt, solange der Baustein etwas druckt; alle aus ⇒ keine Nummer, kein Betrag, kein Datum', () => {
+    const nurBetrag = mit('formular', { datum: false, zahlungsart: false, kunde: false, zweck: false });
+    expect(punkt(pflichtCheck(quittung(), nurBetrag), 'Fortlaufende Nummer').ok).toBe(true);
+    const leer = mit('formular', { betrag: false, datum: false, zahlungsart: false, worte: false, kunde: false, zweck: false });
+    const l = pflichtCheck(quittung(), leer);
+    expect(punkt(l, 'Fortlaufende Nummer').ok).toBe(false);
+    expect(punkt(l, 'Ausstellungsdatum').ok).toBe(false);
+    expect(punkt(l, 'Entgelt und § 19-Hinweis').ok).toBe(false);
+  });
+
+  it('ohne Baustein: Hinweis „Quittungsangaben fehlt“', () => {
+    const l = pflichtCheck(quittung(), standardVorlage('quittung').filter((b) => b.typ !== 'quittung_felder'));
+    expect(punkt(l, 'Ausstellungsdatum').hint).toBe('Baustein „Quittungsangaben“ fehlt');
+    expect(punkt(l, 'Entgelt und § 19-Hinweis').hint).toBe('Gesamtbetrag wird nicht gedruckt');
+  });
+});

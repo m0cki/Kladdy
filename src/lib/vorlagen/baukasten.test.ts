@@ -158,3 +158,18 @@ describe('Beispielbeleg der Vorlagen-Seite', () => {
     expect(beispielbeleg('angebot', BEISPIEL_FIRMA, 'klein', '2026-10-22').faellig_am).toBe('2026-11-21');
   });
 });
+
+describe('Kurzinfo der Quittungsangaben', () => {
+  it('nennt die gezeigten Angaben, Nr. nur im Formular-Stil', () => {
+    expect(zusammenfassung({ typ: 'quittung_felder' })).toBe('Betrag · Datum · Zahlungsart · in Worten · Erhalten von · Für');
+    expect(zusammenfassung({ typ: 'quittung_felder', stil: 'formular', worte: false })).toBe('Betrag · Datum · Nr. · Zahlungsart · Erhalten von · Für');
+    expect(zusammenfassung({ typ: 'quittung_felder', datum: false, zahlungsart: false, von: 'Kunde', fuer: '<b>Zweck</b>' })).toBe(
+      'Betrag · in Worten · Kunde · Zweck',
+    );
+  });
+
+  it('alle aus: Hinweis statt leerer Zeile', () => {
+    const aus = { betrag: false, datum: false, zahlungsart: false, worte: false, kunde: false, zweck: false };
+    expect(zusammenfassung({ typ: 'quittung_felder', stil: 'formular', ...aus })).toBe('Alle Angaben abgeschaltet – druckt nichts');
+  });
+});

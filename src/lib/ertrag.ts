@@ -25,6 +25,7 @@ import type { KennwerteJahr } from './steuer-kennwerte';
 import { istBausteinTyp, type Baustein } from './vorlagen/bausteine';
 import { bausteineFuer, type BelegDokument, type Belegart } from './vorlagen/dokument';
 import { KLEINBETRAG_STANDARD_CENT, pflichtCheck } from './vorlagen/pflicht';
+import { wahlFinden } from './vorlagen/eigene';
 import { STANDARD_DESIGN, standardVorlage } from './vorlagen/standard';
 import { istDatum } from './zeitraum';
 
@@ -38,8 +39,8 @@ export interface Ertrag {
   art: ErtragsArt;
   /** nur Rechnung: „bereits bezahlt“ (Einnahme gleich mit) oder „noch offen“ (Einnahme erst beim Zahlungseingang) */
   bezahlt: boolean;
-  /** selbst gewählte Vorlage: Design (lib/vorlagen/standard.ts) und eigene Kopie (id null = Design aus dem Code);
-   *  ohne `design` zählt die id (fehlt sie: 'klassisch'); null = die aktive der Art */
+  /** selbst gewählte Vorlage: eigene Vorlage (id) bzw. Design (id null, lib/vorlagen/standard.ts; ohne `design`:
+   *  'klassisch'), lib/vorlagen/eigene.ts → wahlFinden; null = die aktive der Art */
   vorlage: { id: number | null; design?: string } | null;
   /** Anschrift eines neuen Kunden bzw. eines Kunden ohne Anschrift in der Kartei, Zeilen mit \n */
   adresse: string;
@@ -148,21 +149,14 @@ export function karteiAnschrift(f: Pick<Formular, 'wer' | 'kundeBewusstNeu'>, ku
   return x && (x.strasse || x.ort) ? x : null;
 }
 
-/** Gewählte Vorlage der Art (nach Design, sonst nach eigener Kopie); sonst die aktive, sonst der Standard. */
+/** Gewählte Vorlage der Art (eigene über die ID, sonst das Design); sonst die aktive, sonst der Standard. */
 export function vorlageFuer(e: Pick<Ertrag, 'art' | 'vorlage'>, vorlagen: ErtragKontext['vorlagen']): VorlagenWahl {
   const liste = vorlagen[e.art];
-  const g = e.vorlage;
-  const gewaehlt = !g
-    ? undefined
-    : g.design !== undefined
-      ? liste.find((v) => v.design === g.design)
-      : g.id != null
-        ? liste.find((v) => v.id === g.id)
-        : liste.find((v) => v.design === STANDARD_DESIGN);
   return (
-    gewaehlt ??
+    wahlFinden(liste, e.vorlage) ??
     liste.find((v) => v.aktiv) ??
     liste[0] ?? {
+      schluessel: STANDARD_DESIGN,
       id: null,
       design: STANDARD_DESIGN,
       name: e.art === 'rechnung' ? 'Standard-Rechnung' : 'Standard-Quittung',

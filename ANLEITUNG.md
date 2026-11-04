@@ -57,7 +57,7 @@
    ```bash
    xcode-select --install                                   # Apple-Entwicklerwerkzeuge
    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-   brew install node tectonic                               # Node (LTS ≥ 22) + LaTeX-Engine
+   brew install node                                        # Node (LTS ≥ 22); Tectonic holt npm run tectonic (§3.2)
    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh   # Rust (für Tauri)
    curl -fsSL https://claude.ai/install.sh | bash           # Claude Code, falls noch nicht installiert
    ```
@@ -352,7 +352,9 @@ Die **Datenbank nicht in iCloud Drive** legen (Sync kann SQLite beschädigen). B
   Dateiauswahl, danach dieselbe Schublade wie beim Datei-Drop, Export …, Nach Updates suchen …), **Bearbeiten-Menü
   unbedingt behalten**, sonst funktionieren ⌘C/⌘V/⌘Z in Eingabefeldern nicht. Darstellung (Hell/Dunkel ⇧⌘L, Seitenleiste ⌘\).
 - **Tectonic finden:** Mac-Apps erben den `PATH` der Shell nicht. In dieser Reihenfolge suchen: mitgeliefertes Sidecar
-  (sobald gebündelt, §3.2), `/opt/homebrew/bin/tectonic`, `/usr/local/bin/tectonic`, sonst Pfad in den Einstellungen.
+  (§3.2, liegt als `tectonic` neben der App-Datei: `Kladdy.app/Contents/MacOS/tectonic`, in der Entwicklung
+  `src-tauri/target/debug/tectonic`), `/opt/homebrew/bin/tectonic`, `/usr/local/bin/tectonic`, sonst Pfad in den
+  Einstellungen.
 - **Browser-Features:** Mindestens macOS 14. `color-mix()` geht. `oklch(from …)` (relative Farben) erst ab Safari 18,
   daher den `color-mix`-Fallback für `--accent-2` behalten. `backdrop-filter` zusätzlich mit `-webkit-`-Präfix.
 - **Bauen:** `npm run tauri build` erzeugt `src-tauri/target/release/bundle/macos/Kladdy.app` und eine `.dmg`.
@@ -455,6 +457,14 @@ Tauri signiert sie mit. **Nicht** einfach die Homebrew-Datei kopieren: Sie lädt
 (harfbuzz, icu4c, freetype …), die es auf anderen Macs nicht gibt. Ein eigenständiges Binary nehmen (z. B. aus den
 GitHub-Releases von Tectonic) und mit `otool -L` prüfen, dass nur System-Bibliotheken verlinkt sind. Tectonic lädt beim
 ersten PDF einmalig seine TeX-Pakete aus dem Internet und cacht sie (Hinweis in der App: „Erstes PDF dauert etwas länger“).
+**Umgesetzt:** `scripts/tectonic-holen.sh` (`npm run tectonic`) lädt das offizielle Release **Tectonic 0.17.0**
+(`tectonic-0.17.0-aarch64-apple-darwin.tar.gz`, SHA-256 `a3f1cac7…d45667`, fest im Skript samt Prüfsumme des
+entpackten Programms; `otool -L`: nur System-Frameworks, `libc++`, `libiconv`, `libSystem`; `minos` 11.0) nach
+`src-tauri/binaries/tectonic-<target-triple>` (nicht im Repository). Es läuft automatisch über `beforeDevCommand` und
+`beforeBuildCommand` (Tauri setzt `TAURI_ENV_TARGET_TRIPLE`), in der CI vor `cargo clippy` und im Release vor dem Bauen;
+ohne die Datei bricht schon `tauri-build` ab („resource path … doesn't exist“), wer `cargo` direkt aufruft, vorher
+einmal `npm run tectonic`. Neue Version: `VERSION` und die vier Prüfsummen im Skript ändern, vorher selbst nachrechnen.
+Der Paket-Cache liegt im Standardort von Tectonic (`~/Library/Caches/TectonicProject.Tectonic`).
 
 ---
 
@@ -969,17 +979,31 @@ bisherige Standardvorlage); die Quittung zusätzlich „Formular“ (`formular`,
 Firmenkopf mit großem fettem Namen in Versalien, „QUITTUNG“ in Versalien, „Datum: … | Nr.: …“, Trennlinie, „Erhalten von:“,
 „Für:“, „Zahlungsart:“ mit Kästchen – der gedruckte Zahlungsweg angekreuzt –, „Gesamtbetrag: …“, darunter sehr klein der
 § 19-Hinweis, „Unterschrift:“ mit einer Linie über die ganze Breite). Ein weiteres Design ist eine reine Code-Änderung.
-- **Aktives Design** je Art (Einstellung `vorlagen_design` = `{ "quittung": "formular", … }`, fehlt ⇒ `klassisch`): das nehmen
-  neue Belege. Wirksam ist dessen eigene Kopie (wenn es eine gibt), sonst das Design selbst.
-- **Eigene Kopien je (Art, Design):** Tabelle `vorlagen`, Spalte `basis` (Migration 0010; alte Kopien = `klassisch`), Namen
-  „Meine Quittung“ (klassisch) bzw. „Meine Quittung (Formular)“. `ist_standard` gilt je Zeile.
-- **Seite „Vorlagen“:** Hat die Art mehrere Designs, wählt eine Leiste über dem Baukasten, welches gezeigt und bearbeitet
-  wird (markiert: aktiv, „angepasst“ = eigene Kopie); dazu „Neue Quittungen verwenden „Klassisch“ · Diese verwenden“.
-  Zeigen und Bearbeiten ändern nie das aktive Design, „Zurücksetzen“ betrifft nur das gezeigte. Zuletzt gezeigtes Design je
-  Art in localStorage (`kladdy.vorlagen.v1`), Adresse `?art=quittung&design=formular`.
-- **Beleg-Maske und Erfassen-Schublade:** Auswahl „Vorlage“ = alle Designs der Art (mit ihren wirksamen Bausteinen),
-  vorbelegt das aktive. Ein Entwurf merkt sich das Design (`entwurf_json.vorlage_design`, nur wenn ≠ `klassisch`;
-  `vorlage_id` = eigene Kopie oder NULL). Alte Entwürfe ohne Schlüssel ⇒ `klassisch`. Ausgestellte Belege bleiben, wie sie sind.
+- **Aktive Vorlage** je Art (Einstellung `vorlagen_design` = `{ "quittung": "formular", "rechnung": "eigen:12", … }`, fehlt
+  oder ungültig ⇒ `klassisch`): Schlüssel eines Designs oder `eigen:<id>` einer eigenen Vorlage; das nehmen neue Belege.
+- **Eigene Vorlagen** (mehrere je Art, mit Namen): Tabelle `vorlagen` (`name`, `art`, `basis` = Design, von dem sie
+  stammt, Migration 0010; `archiviert`, Migration 0011). Mitgelieferte Designs bleiben unveränderlich: Die erste Änderung
+  an einem Design legt sofort eine eigene Vorlage an („Meine Quittung“, „Meine Quittung 2“ …; war das Design aktiv, wird
+  die Kopie aktiv, damit sich für neue Belege nichts ändert). „Neue Vorlage“ legt eine mit selbst gewähltem Namen an,
+  ausgehend von den Bausteinen der gerade gezeigten. Umbenennen prüft leer, höchstens 60 Zeichen und doppelt (ohne
+  Groß-/Kleinschreibung, auch gegen Designnamen). „Entfernen“ archiviert (nie löschen; Entwürfe und Belege, die sie
+  nutzen, zeigen sie weiter als „… (entfernt)“), war sie aktiv, wird ihr Design aktiv; Toast mit „Rückgängig“.
+  Anlegen, Ändern, Umbenennen, Entfernen und Wiederherstellen stehen im Protokoll (`vorlagen`, `vorlagen_design`).
+  `ist_standard` hat keine Bedeutung mehr (neue Zeilen 0). Reine Logik: `src/lib/vorlagen/eigene.ts`.
+- **Seite „Vorlagen“:** Eine Leiste über dem Baukasten zeigt die Designs und die eigenen Vorlagen der Art (Haken = aktiv,
+  Zusatz „eigene“) mit „Neue Vorlage“, Umbenennen (Stift) und Entfernen (Papierkorb, nur eigene); darunter
+  „Neue Quittungen verwenden „…“ · Diese verwenden“. Zeigen und Bearbeiten ändern nie die aktive Vorlage (außer bei der
+  automatischen Kopie des aktiven Designs, s. o.). „Zurücksetzen“ gibt es nur bei eigenen Vorlagen (Bausteine ihres
+  Designs, mit Rückgängig). Zuletzt gezeigte Vorlage je Art in localStorage (`kladdy.vorlagen.v1`), Adresse
+  `?art=quittung&design=formular` bzw. `&design=eigen:12`. Unter den Bausteinen ein Hinweis, dass Firmendaten unter
+  Einstellungen › Firma stehen (Link).
+- **Beleg-Maske und Erfassen-Schublade:** Auswahl „Vorlage“ = Designs und eigene Vorlagen der Art, vorbelegt die aktive.
+  Ein Entwurf merkt sich `vorlage_id` (eigene Vorlage, sonst NULL) und das Design (`entwurf_json.vorlage_design`, nur
+  wenn ≠ `klassisch`); gesucht wird zuerst über die ID, sonst über das Design. Alte Entwürfe ohne Schlüssel ⇒ `klassisch`.
+  Ausgestellte Belege bleiben, wie sie sind.
+- **Alte Kopien (vor 0011):** „Kopie ersetzt das Design“ wird beim Update in die neue Form übersetzt: Kopien sind eigene
+  Vorlagen; war ein Design aktiv, für das es eine Kopie gab, wird die Kopie aktiv (`eigen:<id>`), und Entwürfe mit diesem
+  Design zeigen auf die Kopie. Die Belege sehen danach genauso aus wie vorher.
 
 **Neue Bausteine und Einstellungen** (Vorschau und PDF gleich, Standardwerte ändern bestehende Vorlagen nicht):
 - **Firmenkopf (Text)** (alle Arten): Name (Standard `{firma}`, Großbuchstaben an/aus), Untertitel (`Inh. {inhaber}`),
@@ -987,11 +1011,15 @@ Firmenkopf mit großem fettem Namen in Versalien, „QUITTUNG“ in Versalien, �
   Platzhalter alle leer sind, fällt ganz weg (`src/lib/vorlagen/firmenblock.ts`; im PDF per `\ifdefempty`).
 - **Rahmen** (alle Arten): gestrichelt oder durchgezogen, 4 mm außerhalb des Satzspiegels um das ganze Blatt (PDF:
   `eso-pic`, gestrichelt aus kurzen Linien; Vorschau: SVG). Liegt hinter dem Blatt, kein Abstand im Fluss.
-- **Titel:** „Großbuchstaben“. **Quittungsangaben:** Stil „Kacheln“ (bisher) oder „Formular“ (Label: Wert, Ankreuzfelder).
+- **Titel:** „Großbuchstaben“. **Quittungsangaben:** Stil „Kacheln“ (bisher) oder „Formular“ (Label: Wert, Ankreuzfelder);
+  jede Angabe einzeln abschaltbar (Betrag, Datum, Zahlungsart, Betrag in Worten, Erhalten von, Für; fehlt der Schlüssel ⇒
+  an). Kacheln: das Raster passt sich an (3 Kacheln 1,35 : 1 : 1, sonst gleich breit, keine ⇒ kein Raster); Formular: die
+  Nr. steht, solange eine Angabe an ist. Alle aus ⇒ der Baustein druckt nichts (auch keinen Abstand), die Kurzinfo sagt
+  „Alle Angaben abgeschaltet – druckt nichts“. Vorschau und PDF gleich.
   **Unterschrift:** Stil „Zwei Linien“ (bisher) oder „Eine Linie“ (Beschriftung darüber, Linie über die ganze Breite).
   **Freitext/Steuerhinweis:** Größe „Sehr klein, grau“ (6,5 pt).
 - Pflichtangaben-Check: Der Firmenkopf zählt für Anschrift, Inhaber und Steuernummer, Quittungsangaben im Stil „Formular“
-  für die Nummer.
+  für die Nummer. Abgeschaltete Quittungsangaben zählen nicht (Hinweis „Quittungsangaben: „Datum“ ist abgeschaltet“).
 
 **Formatierung (fett, kursiv, unterstrichen):** Alle Text- und Textfeld-Einstellungen der Bausteine dürfen Teile fett,
 kursiv oder unterstrichen setzen (`src/lib/vorlagen/formatierung.ts`).
@@ -1699,7 +1727,7 @@ Hat der Nutzer ein **Firmenlogo** hochgeladen (§6.10), steht dort stattdessen s
 
 Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nennt die Abnahme-Punkte → du startest die App (`npm run tauri dev`) und prüfst → Commit.
 
-### Stand (18.10.2026)
+### Stand (04.11.2026)
 - **Veröffentlicht:** v1.0.0 (13.10.2026) mit Phase 0, Einstellungs-Seite, Updater, CI und Release-Action
   (Ablauf: `RELEASE.md`; nur von Hand, Release-Commits liegen nur auf den Tags, `main` behält 0.1.0).
 - **Phase 1 in Teilen (je ein PR):**
@@ -1738,7 +1766,7 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
      (ohne Protokoll je Zeile, nichts festgeschrieben). Tectonic: `src-tauri/src/tectonic.rs` (`tectonic_finden` in der
      Reihenfolge aus §3.1, für `compile_latex` wiederverwendbar; `tectonic_suchen`, `tectonic_pfad_pruefen`,
      `tectonic_pruefen` mit `--version` und Zeitlimit), eigener Pfad in `einstellungen['tectonic_pfad']`
-- **Nächste Migration:** `0011` (`0010` ergänzt `vorlagen.basis` für die Vorlagen-Galerie; ausgelieferte Migrationen nie ändern).
+- **Nächste Migration:** `0012` (`0011` = `vorlagen_eigene`: `vorlagen.archiviert`, mehrere eigene Vorlagen je Art; ausgelieferte Migrationen nie ändern).
 - **Phase 1 abgeschlossen.** Weiter mit **Phase 2** in Teilen (je ein PR): 1. Diagramm-Komponenten (§9.6, §9.5) ·
   2. Auswertung mit großem Umschalter + Überblick (§6.9.1) · 3. Liquidität (§6.9.2) · 4. Suche/Befehlspalette ⌘K (§6.2)
 - **Phase 2 in Teilen:**
@@ -2033,6 +2061,34 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
   Ziehen in der Bausteinliste geht weiter; „PDF“ zeigt fett/kursiv/unterstrichen wie die Vorschau (auch Quittung
   „Formular“); ein Kunde „<b>Test</b>“ erscheint wörtlich; ⌘K und ⌘N funktionieren weiter, auch während ein Text bearbeitet
   wird; Einfügen von formatiertem Text aus einer anderen App kommt als reiner Text an.
+- **Tectonic mitgeliefert** (§3.1, §3.2) – **erledigt (Branch `tectonic-mitgeliefert`)**: Sidecar über
+  `bundle.externalBin` (`binaries/tectonic`), geholt von `scripts/tectonic-holen.sh` (Tectonic 0.17.0, feste SHA-256,
+  idempotent). `tectonic.rs`: `mitgeliefert()` = `tectonic` neben `current_exe()` (`sidecar_neben`, getestet), eine
+  gemeinsame Meldung `NICHT_GEFUNDEN` für Einstellungen und `compile_latex` ohne Terminal-Anleitung (neu installieren
+  oder Pfad wählen). Aufruf weiter mit `--untrusted`. Keine Migration.
+  **Auf dem Mac prüfen:** `npm run tauri dev` lädt beim ersten Mal Tectonic (Zeile „Lade Tectonic 0.17.0 …“), danach
+  nicht mehr; Einstellungen › Daten zeigt „mit Kladdy geliefert“ und den Pfad `…/target/debug/tectonic`, „Prüfen“ ⇒
+  „Tectonic 0.17.0“; „PDF“ auf der Vorlagen-Seite und der Testbeleg setzen ein PDF; mit `npm run tauri build` gebaute
+  `Kladdy.app` enthält `Contents/MacOS/tectonic` und setzt PDFs auch auf einem Mac ohne Homebrew-Tectonic (zweites
+  Benutzerkonto, App aus der `.dmg` nach „Dennoch öffnen“).
+- **Eigene Vorlagen und Quittungsangaben einzeln** (§7.0) – **erledigt (Branch `tectonic-mitgeliefert`)**: mehrere
+  benannte eigene Vorlagen je Art neben den Designs (`src/lib/vorlagen/eigene.ts`, `src/lib/queries/vorlagen.ts` neu:
+  `ladeEigeneVorlagen`, `ladeVorlagenFuerArt`, `ladeAktiveWahl`, `vorlageAnlegen`, `speichereVorlage(id, …)`,
+  `vorlageUmbenennen`, `vorlageEntfernen`, `vorlageWiederherstellen`, `speichereAktiveVorlage`). Migration
+  `0011_vorlagen_eigene` (`vorlagen.archiviert`; alte aktive Kopien ⇒ `vorlagen_design` = `eigen:<id>`, Entwürfe ⇒
+  `vorlage_id`). Quittungsangaben: sechs Schalter, Blatt und LaTeX gleich, Pflichtangaben-Check und Kurzinfo folgen.
+  Hinweis auf Einstellungen › Firma auf der Vorlagen-Seite. `einstellungAendernDirekt` für Einstellungen innerhalb eines
+  Schreibauftrags. Nebenbei behoben: zwei Kacheln im PDF-Raster rutschten durch Rundung untereinander (letzte Spalte
+  nimmt jetzt den Rest der Zeile).
+  **Auf dem Mac prüfen:** Update mit vorhandener „Meine Quittung“ ⇒ Sicherung `vor-migration`, „Meine Quittung“ steht
+  als eigene Vorlage in der Leiste und ist aktiv, falls „Klassisch“ aktiv war; neue Quittung sieht aus wie vorher;
+  „Neue Vorlage“ ⇒ Name „Quittung Garten“, Enter ⇒ gezeigt, nicht aktiv; doppelter oder leerer Name ⇒ Meldung;
+  umbenennen (Stift); „Diese verwenden“ ⇒ Haken wandert, Erfassen-Schublade und Beleg-Maske vorbelegt; Entwurf mit
+  „Quittung Garten“ speichern, neu öffnen ⇒ Auswahl bleibt; entfernen ⇒ Toast „Rückgängig“ holt sie (und den Haken)
+  zurück; ohne Rückgängig zeigt der Entwurf „Quittung Garten (entfernt)“; „Klassisch“ ändern ⇒ „Meine Quittung 2“ entsteht,
+  „Klassisch“ bleibt unverändert; Quittungsangaben: „Datum“ aus ⇒ Vorschau und „PDF“ ohne Datum, Pflichtangaben rot mit
+  Hinweis; alle aus ⇒ Baustein-Kurzinfo „Alle Angaben abgeschaltet – druckt nichts“, nichts auf dem Blatt; Kacheln mit
+  zwei Angaben ⇒ zwei gleich breite Kacheln; Hinweis „Einstellungen › Firma“ öffnet die Firmendaten; alles im Protokoll.
 - **Offen aus Phase 1 (Teil 1+2):** Regelbesteuerung wirkt noch nicht auf Buchungen/Belege.
 - **Aus Phase 1 nachgeholt:** Kategorien bearbeiten, optionale Kategorien und EÜR-Zuordnung pro Jahr – **erledigt (Branch
   `kategorien-euer`, auf dem Ende der Phase-3-Kette)**: Migration `0008_kategorien` (Katalog Abschreibungen (AfA), Bewirtung 70 %, Geschenke, Homeoffice,

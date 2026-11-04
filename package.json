@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "tauri": "tauri",
-    "version:check": "node scripts/version.mjs check"
+    "version:check": "node scripts/version.mjs check",
+    "tectonic": "bash scripts/tectonic-holen.sh"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.3.0",

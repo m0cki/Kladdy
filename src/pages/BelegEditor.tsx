@@ -116,6 +116,7 @@ import {
   type EigenbelegGrund,
 } from '../lib/vorlagen/dokument';
 import { KLEINBETRAG_STANDARD_CENT, pflichtCheck, type Pflichtangabe } from '../lib/vorlagen/pflicht';
+import { waehlbar, wahlFinden, wahlName } from '../lib/vorlagen/eigene';
 import { standardVorlage } from '../lib/vorlagen/standard';
 import { heute as heuteIso } from '../lib/zeitraum';
 import { useUi } from '../store/ui';
@@ -330,8 +331,8 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
   /* ---------- abgeleitet ---------- */
   const doc: BelegDokument = ausgestellt ? ausgestellt.dokument : formularZuDokument(form, { kunden: stamm.kunden, firma: stamm.firma, ustModus: stamm.ustModus, logo: stamm.logo });
   const vorlagen = stamm.vorlagen[art];
-  // nach Design (alte Entwürfe ohne Design: 'klassisch'); dessen eigene Kopie, sonst das Design aus dem Code
-  const gewaehlt = vorlagen.find((v) => v.design === form.vorlageDesign) ?? vorlagen.find((v) => v.aktiv) ?? vorlagen[0];
+  // eigene Vorlage über die ID, sonst das Design (alte Entwürfe ohne Design: 'klassisch'); sonst die aktive
+  const gewaehlt = wahlFinden(vorlagen, { id: form.vorlageId, design: form.vorlageDesign }) ?? vorlagen.find((v) => v.aktiv) ?? vorlagen[0];
   const bausteine: Baustein[] = ausgestellt ? ausgestellt.bausteine : (gewaehlt?.bausteine ?? standardVorlage(art));
   const gedruckt = useMemo(() => bausteineFuer(doc, bausteine).filter((b) => istBausteinTyp(b.typ)), [doc, bausteine]);
   const summe = ausgestellt ? (beleg?.summe_cent ?? 0) : formularSumme(form);
@@ -765,15 +766,15 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
                   <select
                     className="select sm"
                     aria-label="Vorlage"
-                    value={gewaehlt?.design ?? ''}
+                    value={gewaehlt?.schluessel ?? ''}
                     onChange={(e) => {
-                      const v = vorlagen.find((x) => x.design === e.target.value);
+                      const v = vorlagen.find((x) => x.schluessel === e.target.value);
                       if (v) setForm((f) => ({ ...f, vorlageId: v.id, vorlageDesign: v.design }));
                     }}
                   >
-                    {vorlagen.map((v) => (
-                      <option key={v.design} value={v.design}>
-                        {v.name}
+                    {waehlbar(vorlagen, gewaehlt).map((v) => (
+                      <option key={v.schluessel} value={v.schluessel}>
+                        {wahlName(v)}
                       </option>
                     ))}
                   </select>
@@ -785,7 +786,7 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
                 </span>
               )}
               {editierbar ? (
-                <Link className="icon-btn sm" to={`/belege/vorlagen?art=${art}${gewaehlt ? `&design=${gewaehlt.design}` : ''}`} title="Vorlagen bearbeiten" aria-label="Vorlagen bearbeiten">
+                <Link className="icon-btn sm" to={`/belege/vorlagen?art=${art}${gewaehlt && !gewaehlt.archiviert ? `&design=${encodeURIComponent(gewaehlt.schluessel)}` : ''}`} title="Vorlagen bearbeiten" aria-label="Vorlagen bearbeiten">
                   <Pencil />
                 </Link>
               ) : null}

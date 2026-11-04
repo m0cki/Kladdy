@@ -17,7 +17,7 @@ import {
   ladeBeleg,
   ladeKundenAnschrift,
 } from './queries/rechnungen';
-import { ladeAktivesDesign } from './queries/vorlagen';
+import { ladeAktiveWahl } from './queries/vorlagen';
 import { artWechseln, formularAusDokument, formularZuDaten, ART_NAME, type BelegZeile } from './rechnungen';
 import type { Zahlungsart } from './buchungen';
 import { HINWEIS_14B, type Belegart } from './vorlagen/dokument';
@@ -163,8 +163,9 @@ export async function alsEntwurfKopieren(id: number, art?: Belegart): Promise<nu
     if (art && art !== f.art) f = artWechseln(f, art, ziel);
     f = { ...f, datum: heute, leistungVon: heute, leistungBis: '', bezahltAm: null, zielTage: String(ziel[f.art as 'rechnung' | 'angebot'] ?? f.zielTage) };
     if (s.dokument.storno_von) f = { ...f, betreff: '' };
-    // neuer Entwurf ⇒ Design, das neue Belege der Art nehmen (die Maske zeigt dessen eigene Kopie, wenn es eine gibt)
-    f = { ...f, vorlageDesign: await ladeAktivesDesign(f.art) };
+    // neuer Entwurf ⇒ die Vorlage, die neue Belege der Art nehmen (Design oder eigene Vorlage)
+    const aktiv = await ladeAktiveWahl(f.art);
+    f = { ...f, vorlageId: aktiv.id, vorlageDesign: aktiv.design };
     const d = formularZuDaten(f, kunden);
     if (!d.ok) throw new Error(Object.values(d.fehler).join(' '));
     const r = await belegEntwurfSpeichern(null, d.daten);

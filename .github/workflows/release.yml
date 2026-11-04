@@ -132,6 +132,10 @@ jobs:
       - name: Abhängigkeiten installieren
         run: npm ci
 
+      # Tectonic als Sidecar (§3.2). beforeBuildCommand holt es ebenfalls, hier vorab mit klarer Fehlermeldung.
+      - name: Tectonic-Sidecar
+        run: bash scripts/tectonic-holen.sh aarch64-apple-darwin
+
       # Die Release-Commits liegen nicht auf main (geschützt, die Action pusht nur den Tag). Die zuletzt
       # veröffentlichte Version steht deshalb im höchsten Tag, nicht in den Versionsdateien auf main.
       # Ausgangspunkt ist die höhere von beiden; so lässt sich per „set“ auf main auch ein Sprung vorgeben.

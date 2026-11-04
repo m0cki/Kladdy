@@ -7,6 +7,8 @@ dist-ssr
 # Tauri / Rust
 src-tauri/target/
 src-tauri/gen/schemas
+# Tectonic-Sidecar (scripts/tectonic-holen.sh lädt es, §3.2)
+src-tauri/binaries/
 
 # Logs
 logs

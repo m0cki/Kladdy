@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 use tauri::Manager;
 use tauri_plugin_sql::DbInstances;
 
-use crate::tectonic::{eingestellter_pfad, tectonic_finden};
+use crate::tectonic::{NICHT_GEFUNDEN, eingestellter_pfad, tectonic_finden};
 
 /// Zeitlimit für einen Satzlauf (der allererste Lauf lädt Pakete, §7.3).
 pub const ZEITLIMIT: Duration = Duration::from_secs(60);
@@ -484,10 +484,7 @@ pub async fn compile_latex(
         .await
         .map_err(KompilierFehler::einfach)?;
     let Some(fund) = tectonic_finden(eingestellt.as_deref()) else {
-        return Err(KompilierFehler::einfach(
-            "Tectonic wurde nicht gefunden. Im Terminal mit „brew install tectonic“ installieren oder in \
-             Einstellungen › Daten den Pfad wählen.",
-        ));
+        return Err(KompilierFehler::einfach(NICHT_GEFUNDEN));
     };
     let ablage = match &auftrag.ablage {
         Some(name) => Some((

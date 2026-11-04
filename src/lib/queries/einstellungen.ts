@@ -48,15 +48,19 @@ export async function einstellungLesen(schluessel: string): Promise<unknown> {
  * verschiedenen Teilen eines Objekts (z. B. 'vorlagen_design' je Art) überschreiben sich nicht. false = keine Änderung.
  */
 export function einstellungAendern(schluessel: string, aendern: (alt: unknown) => unknown): Promise<boolean> {
-  return nacheinander(async () => {
-    const alt = await einstellungLesen(schluessel);
-    const neu = aendern(alt);
-    const eintrag = protokollFuerEinstellung(schluessel, alt, neu);
-    if (!eintrag) return false;
-    await ausfuehren(SPEICHERN_SQL, [schluessel, JSON.stringify(neu)]);
-    await protokollieren(eintrag);
-    return true;
-  });
+  return nacheinander(() => einstellungAendernDirekt(schluessel, aendern));
+}
+
+/** Wie `einstellungAendern`, aber ohne eigene Warteschlange: nur innerhalb eines `nacheinander`-Auftrags aufrufen
+ *  (z. B. eigene Vorlage anlegen und gleich als aktive eintragen, lib/queries/vorlagen.ts). */
+export async function einstellungAendernDirekt(schluessel: string, aendern: (alt: unknown) => unknown): Promise<boolean> {
+  const alt = await einstellungLesen(schluessel);
+  const neu = aendern(alt);
+  const eintrag = protokollFuerEinstellung(schluessel, alt, neu);
+  if (!eintrag) return false;
+  await ausfuehren(SPEICHERN_SQL, [schluessel, JSON.stringify(neu)]);
+  await protokollieren(eintrag);
+  return true;
 }
 
 /** Speichert eine Einstellung und protokolliert sie. false = keine Änderung. Läuft in der Schreib-Warteschlange. */
