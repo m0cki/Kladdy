@@ -1002,7 +1002,7 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
   return (
     <div className="vl-layout">
       <div className="stack">
-        <section className="card reveal" style={reveal(1)}>
+        <section className={`card reveal vl-liste${palette ? ' offen' : ''}`} style={reveal(1)}>
           <div className="card-head">
             <div>
               <div className="card-title">
