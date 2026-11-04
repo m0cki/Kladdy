@@ -465,3 +465,57 @@ describe('Formatierung im PDF (<b>, <i>, <u>)', () => {
     }
   });
 });
+
+describe('Quittungsangaben: einzelne Angaben abschaltbar', () => {
+  const mit = (design: string, werte: Record<string, unknown>): Baustein[] =>
+    standardVorlage('quittung', design).map((b) => (b.typ === 'quittung_felder' ? ({ ...b, ...werte } as Baustein) : b));
+  const tex = (v: Baustein[]) => mainTex('quittung', v, '#6366f1').tex;
+  const alleAus = { betrag: false, datum: false, zahlungsart: false, worte: false, kunde: false, zweck: false };
+
+  it('Formular ohne Datum: Nr. bleibt, Datum fehlt, Klammern ausgeglichen', () => {
+    const t = tex(mit('formular', { datum: false }));
+    expect(klammernOk(t)).toBe(true);
+    expect(t).toContain(String.raw`\KForm{Nr.}{\KNr}`);
+    expect(t).not.toContain(String.raw`\KForm{Datum}`);
+    expect(t).toContain('Gesamtbetrag:');
+  });
+
+  it('Formular ohne Zahlungsart und Betrag: keine Ankreuzfelder, kein Gesamtbetrag', () => {
+    const t = tex(mit('formular', { zahlungsart: false, betrag: false }));
+    expect(klammernOk(t)).toBe(true);
+    expect(t).not.toContain(String.raw`\KForm{Zahlungsart}`);
+    expect(t).not.toContain('Gesamtbetrag:');
+  });
+
+  it('Kacheln mit einer oder zwei Angaben im Raster: zwei gleiche Spalten', () => {
+    const zwei = tex(mit('klassisch', { zahlungsart: false }));
+    expect(klammernOk(zwei)).toBe(true);
+    expect(zwei).toContain(String.raw`\KFeld{Betrag}`);
+    expect(zwei).toContain(String.raw`\KFeld{Datum}{\Datum}`);
+    expect(zwei).not.toContain(String.raw`\KFeld{Zahlungsart}`);
+    expect(zwei).not.toContain('*135/335');
+    // die zweite Spalte nimmt den Rest: Rundung schiebt sie sonst in die nächste Zeile
+    expect(zwei).toContain(String.raw`{\dimexpr\linewidth-8mm-(\linewidth-8mm)/2\relax}`);
+    const eins = tex(mit('klassisch', { betrag: false, zahlungsart: false, worte: false }));
+    expect(klammernOk(eins)).toBe(true);
+    expect(eins).not.toContain(String.raw`\KFeld{Betrag in Worten}`);
+    expect(eins).toContain(String.raw`\KFeld{Datum}{\Datum}`);
+  });
+
+  it('Kacheln ohne Raster-Angaben: kein leeres Raster, Rest bleibt', () => {
+    const t = tex(mit('klassisch', { betrag: false, datum: false, zahlungsart: false }));
+    expect(klammernOk(t)).toBe(true);
+    expect(t).not.toContain(String.raw`\KFeld{Datum}`);
+    expect(t).toContain(String.raw`\KFeld{Betrag in Worten}`);
+  });
+
+  it('alle Angaben aus: der Baustein druckt nichts, in beiden Stilen', () => {
+    for (const design of ['klassisch', 'formular']) {
+      const t = tex(mit(design, alleAus));
+      expect(klammernOk(t), design).toBe(true);
+      expect(t, design).not.toMatch(/\\KFeld\{(Betrag|Datum|Zahlungsart)/);
+      expect(t, design).not.toContain(String.raw`\KForm{Nr.}`);
+      expect(t, design).not.toContain('Gesamtbetrag:');
+    }
+  });
+});

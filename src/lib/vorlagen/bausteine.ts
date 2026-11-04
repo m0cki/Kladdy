@@ -193,13 +193,18 @@ export const BAUSTEINE: Readonly<Record<BausteinTyp, BausteinDef>> = {
   },
   quittung_felder: {
     name: 'Quittungsangaben',
-    beschreibung: 'Betrag, Datum, Zahlungsart, erhalten von, für',
+    beschreibung: 'Betrag, Datum, Zahlungsart, erhalten von, für – jede Angabe einzeln abschaltbar',
     arten: ['quittung'],
     felder: [
       // Formular: „Datum: … Nr.: …“, „Erhalten von: …“, Zahlungsart zum Ankreuzen (die gewählte mit Kreuz)
       { key: 'stil', label: 'Darstellung', typ: 'select', default: 'kacheln', optionen: [['kacheln', 'Kacheln'], ['formular', 'Formular (Bezeichnung: Wert)']] },
+      // Welche Angaben gedruckt werden (quittungAngaben); fehlt ein Schalter (ältere Vorlagen) ⇒ an
+      { key: 'betrag', label: 'Betrag', typ: 'toggle', default: true },
+      { key: 'datum', label: 'Datum', typ: 'toggle', default: true },
+      { key: 'zahlungsart', label: 'Zahlungsart', typ: 'toggle', default: true },
       { key: 'worte', label: 'Betrag in Worten', typ: 'toggle', default: true },
-      { key: 'zahlungsart', label: 'Zahlungsart anzeigen', typ: 'toggle', default: true },
+      { key: 'kunde', label: 'Erhalten von (Kunde)', typ: 'toggle', default: true },
+      { key: 'zweck', label: 'Für (Leistung)', typ: 'toggle', default: true },
       { key: 'von', label: 'Bezeichnung „erhalten von“', typ: 'text', default: 'Erhalten von' },
       { key: 'fuer', label: 'Bezeichnung „für“', typ: 'text', default: 'Für' },
     ],
@@ -306,6 +311,35 @@ export function aufloesen(b: Baustein): Aufgeloest {
     an: (key) => werte[key] === true,
     texte: () => Object.values(werte).flatMap((v) => (typeof v === 'string' ? [klartext(v)] : [])),
   };
+}
+
+/** Gedruckte Angaben des Bausteins „Quittungsangaben“ (Vorschau, PDF, Pflichtangaben-Check und Bausteinliste).
+ *  `nr`: Der Stil „Formular“ druckt dazu „Nr.: …“, solange der Baustein überhaupt etwas zeigt.
+ *  `leer`: alle Schalter aus ⇒ der Baustein druckt nichts (auch keinen Abstand). */
+export interface QuittungAngaben {
+  formular: boolean;
+  betrag: boolean;
+  datum: boolean;
+  zahlungsart: boolean;
+  worte: boolean;
+  kunde: boolean;
+  zweck: boolean;
+  nr: boolean;
+  leer: boolean;
+}
+
+export function quittungAngaben(b: Pick<Aufgeloest, 'an' | 'text'>): QuittungAngaben {
+  const a = {
+    betrag: b.an('betrag'),
+    datum: b.an('datum'),
+    zahlungsart: b.an('zahlungsart'),
+    worte: b.an('worte'),
+    kunde: b.an('kunde'),
+    zweck: b.an('zweck'),
+  };
+  const leer = !Object.values(a).some(Boolean);
+  const formular = b.text('stil') === 'formular';
+  return { ...a, formular, nr: formular && !leer, leer };
 }
 
 /** Steht der Baustein immer unten (Fußzeile) oder per Einstellung „Am Seitenende“? */

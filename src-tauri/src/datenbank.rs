@@ -101,6 +101,11 @@ pub const MIGRATIONEN: &[MigrationsDatei] = &[
         beschreibung: "vorlagen_basis",
         sql: include_str!("../migrations/0010_vorlagen_basis.sql"),
     },
+    MigrationsDatei {
+        version: 11,
+        beschreibung: "vorlagen_eigene",
+        sql: include_str!("../migrations/0011_vorlagen_eigene.sql"),
+    },
 ];
 
 /// Verbindungs-URL zu einer Datei im App-Verzeichnis, wie sie das Plugin und `Database.load` erwarten.
@@ -1021,6 +1026,121 @@ mod tests {
                     ("rechnung".into(), "klassisch".into()),
                 ]
             );
+            c.close().await.unwrap();
+        });
+        let _ = std::fs::remove_dir_all(&ordner);
+    }
+
+    /// 0011: eingeschaltete Kopien des aktiven Designs werden zur aktiven eigenen Vorlage (Einstellung 'eigen:<id>'),
+    /// abgeschaltete archiviert; Entwürfe zeigen über `vorlage_id` dieselbe Vorlage wie vorher, ausgestellte bleiben.
+    #[test]
+    fn migration_vorlagen_eigene() {
+        let ordner = testordner("vorlagen-eigene");
+        let db = ordner.join("kladdy.db");
+        let davor = MIGRATIONEN
+            .iter()
+            .position(|m| m.beschreibung == "vorlagen_eigene")
+            .unwrap();
+        tauri::async_runtime::block_on(async {
+            migrieren(&db, davor).await;
+            let mut c = verbinden(&db).await;
+            for sql in [
+                // Quittung: aktives Design 'formular' mit Kopie (2), klassische Kopie (1) daneben
+                "INSERT INTO vorlagen (id, name, art, bloecke_json, ist_standard, geaendert_am, basis)
+                 VALUES (1, 'Meine Quittung', 'quittung', '[]', 1, 'a', 'klassisch')",
+                "INSERT INTO vorlagen (id, name, art, bloecke_json, ist_standard, geaendert_am, basis)
+                 VALUES (2, 'Meine Quittung (Formular)', 'quittung', '[]', 1, 'a', 'formular')",
+                // Rechnung: Kopie abgeschaltet („Zurücksetzen“)
+                "INSERT INTO vorlagen (id, name, art, bloecke_json, ist_standard, geaendert_am, basis)
+                 VALUES (3, 'Meine Rechnung', 'rechnung', '[]', 0, 'a', 'klassisch')",
+                // Angebot: Kopie eingeschaltet, Einstellung ohne Angebot ⇒ 'klassisch'
+                "INSERT INTO vorlagen (id, name, art, bloecke_json, ist_standard, geaendert_am, basis)
+                 VALUES (4, 'Mein Angebot', 'angebot', '[]', 1, 'a', 'klassisch')",
+                "INSERT INTO einstellungen (schluessel, wert) VALUES ('vorlagen_design', '{\"quittung\":\"formular\"}')",
+                // Entwürfe: ohne Design (⇒ Kopie 1), mit Design 'formular' (⇒ 2), alte Kopie der Rechnung (⇒ NULL)
+                "INSERT INTO rechnungen (id, art, status, vorlage_id, entwurf_json, erstellt_am, geaendert_am)
+                 VALUES (10, 'quittung', 'entwurf', NULL, NULL, 'a', 'a')",
+                "INSERT INTO rechnungen (id, art, status, vorlage_id, entwurf_json, erstellt_am, geaendert_am)
+                 VALUES (11, 'quittung', 'entwurf', NULL, '{\"vorlage_design\":\"formular\"}', 'a', 'a')",
+                "INSERT INTO rechnungen (id, art, status, vorlage_id, entwurf_json, erstellt_am, geaendert_am)
+                 VALUES (12, 'rechnung', 'entwurf', 3, 'kaputt', 'a', 'a')",
+                // ausgestellt: bleibt
+                "INSERT INTO rechnungen (id, art, nummer, status, vorlage_id, erstellt_am, geaendert_am)
+                 VALUES (13, 'rechnung', 'RE-2026-001', 'offen', 3, 'a', 'a')",
+            ] {
+                sqlx::query(sql).execute(&mut c).await.unwrap();
+            }
+            c.close().await.unwrap();
+
+            migrieren(&db, MIGRATIONEN.len()).await;
+            let mut c = verbinden(&db).await;
+            let archiv: Vec<(i64, i64)> =
+                sqlx::query_as("SELECT id, archiviert FROM vorlagen ORDER BY id")
+                    .fetch_all(&mut c)
+                    .await
+                    .unwrap();
+            assert_eq!(archiv, vec![(1, 0), (2, 0), (3, 1), (4, 0)]);
+            let wert: String = sqlx::query_scalar(
+                "SELECT wert FROM einstellungen WHERE schluessel = 'vorlagen_design'",
+            )
+            .fetch_one(&mut c)
+            .await
+            .unwrap();
+            let wert: serde_json::Value = serde_json::from_str(&wert).unwrap();
+            assert_eq!(
+                wert,
+                serde_json::json!({ "quittung": "eigen:2", "angebot": "eigen:4" })
+            );
+            let entwuerfe: Vec<(i64, Option<i64>)> =
+                sqlx::query_as("SELECT id, vorlage_id FROM rechnungen ORDER BY id")
+                    .fetch_all(&mut c)
+                    .await
+                    .unwrap();
+            assert_eq!(
+                entwuerfe,
+                vec![(10, Some(1)), (11, Some(2)), (12, None), (13, Some(3))]
+            );
+            assert!(
+                sqlx::query("UPDATE vorlagen SET archiviert = 2 WHERE id = 1")
+                    .execute(&mut c)
+                    .await
+                    .is_err()
+            );
+            c.close().await.unwrap();
+        });
+        let _ = std::fs::remove_dir_all(&ordner);
+    }
+
+    /// 0011 ohne Einstellung: gilt eine klassische Kopie, wird die Einstellung angelegt; ohne Kopien bleibt alles leer.
+    #[test]
+    fn migration_vorlagen_eigene_ohne_einstellung() {
+        let ordner = testordner("vorlagen-eigene-leer");
+        let db = ordner.join("kladdy.db");
+        let davor = MIGRATIONEN
+            .iter()
+            .position(|m| m.beschreibung == "vorlagen_eigene")
+            .unwrap();
+        tauri::async_runtime::block_on(async {
+            migrieren(&db, davor).await;
+            let mut c = verbinden(&db).await;
+            sqlx::query(
+                "INSERT INTO vorlagen (id, name, art, bloecke_json, ist_standard, geaendert_am, basis)
+                 VALUES (7, 'Meine Rechnung', 'rechnung', '[]', 1, 'a', 'klassisch')",
+            )
+            .execute(&mut c)
+            .await
+            .unwrap();
+            c.close().await.unwrap();
+            migrieren(&db, MIGRATIONEN.len()).await;
+            let mut c = verbinden(&db).await;
+            let wert: String = sqlx::query_scalar(
+                "SELECT wert FROM einstellungen WHERE schluessel = 'vorlagen_design'",
+            )
+            .fetch_one(&mut c)
+            .await
+            .unwrap();
+            let wert: serde_json::Value = serde_json::from_str(&wert).unwrap();
+            assert_eq!(wert, serde_json::json!({ "rechnung": "eigen:7" }));
             c.close().await.unwrap();
         });
         let _ = std::fs::remove_dir_all(&ordner);

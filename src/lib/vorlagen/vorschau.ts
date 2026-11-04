@@ -8,7 +8,7 @@
  *   fällt die Nummer weg: Blatt und PDF tragen das Wasserzeichen ENTWURF, {nr} druckt „Entwurf“ (wie der Testbeleg).
  *   Logo und Akzentfarbe sind die aktuellen – gezeigt wird, wie die Vorlage heute aussieht.
  * - Auswahl „Beispiel · Letzter Beleg“ je Art im localStorage (wie Darstellung und Updates), Standard: Beispiel.
- *   Im selben Eintrag: das zuletzt gezeigte Design je Art (Vorlagen-Galerie), Standard: das aktive.
+ *   Im selben Eintrag: die zuletzt gezeigte Vorlage je Art (Design oder 'eigen:<id>'), Standard: die aktive.
  * Tests: vorschau.test.ts */
 import { ausgestellterBeleg } from '../belegpdf';
 import type { Firma } from '../firma';
@@ -17,6 +17,7 @@ import { ladeBeleg, ladeKundenAnschrift, type BelegVoll } from '../queries/rechn
 import { formularAusEntwurf, formularZuDokument, type BelegZeile, type KundeAnschrift, type PositionZeile } from '../rechnungen';
 import type { KeyValueStore } from '../settings';
 import { BELEGARTEN, type BelegDokument, type Belegart } from './dokument';
+import { eigeneId } from './eigene';
 import { istDesign } from './standard';
 
 export type Vorschauquelle = 'beispiel' | 'beleg';
@@ -107,16 +108,19 @@ export function speichereQuelle(store: KeyValueStore | undefined, art: Belegart,
   return q;
 }
 
-/** Zuletzt gezeigtes Design je Art (nur gültige; fehlt ⇒ nicht gemerkt, dann zeigt die Seite das aktive). */
+/** Sieht aus wie ein Vorlagen-Schlüssel der Art (Design oder 'eigen:<id>'; ob es die eigene gibt, prüft die Seite). */
+const istSchluessel = (art: Belegart, v: unknown): v is string => istDesign(art, v) || eigeneId(v) != null;
+
+/** Zuletzt gezeigte Vorlage je Art (nur gültige Schlüssel; fehlt ⇒ nicht gemerkt, dann zeigt die Seite die aktive). */
 export function ladeGezeigteDesigns(store: KeyValueStore | undefined): Partial<Record<Belegart, string>> {
   const d = gemerkt(store).design;
   const o: Partial<Record<Belegart, string>> = {};
-  if (istObjekt(d)) for (const a of BELEGARTEN) if (istDesign(a, d[a])) o[a] = d[a];
+  if (istObjekt(d)) for (const a of BELEGARTEN) if (istSchluessel(a, d[a])) o[a] = d[a];
   return o;
 }
 
 export function speichereGezeigtesDesign(store: KeyValueStore | undefined, art: Belegart, design: string): Partial<Record<Belegart, string>> {
-  const d = { ...ladeGezeigteDesigns(store), ...(istDesign(art, design) ? { [art]: design } : {}) };
+  const d = { ...ladeGezeigteDesigns(store), ...(istSchluessel(art, design) ? { [art]: design } : {}) };
   merken(store, 'design', d);
   return d;
 }

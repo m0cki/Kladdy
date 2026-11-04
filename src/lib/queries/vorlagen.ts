@@ -1,16 +1,20 @@
 /* Vorlagen des Baukastens in der Datenbank (ANLEITUNG §5 Tabelle vorlagen, §7.0; Seite pages/Vorlagen.tsx).
  *
- * Bedeutung der Tabelle `vorlagen` (seit Phase 3 Teil 5, Spalte `basis` seit Migration 0010):
- * - Die Standardvorlagen liegen im Code (lib/vorlagen/standard.ts), je Art ein oder mehrere Designs ('klassisch',
- *   bei der Quittung auch 'formular'), nie in der Tabelle. Die Tabelle hält nur eigene Kopien, je (Art, Design) genau
- *   eine Zeile („Meine Quittung“, „Meine Quittung (Formular)“ …); `basis` = Schlüssel des Designs (Standard
- *   'klassisch', so bleiben Zeilen von vor 0010 gültig). Sie entsteht bei der ersten Änderung am Design; jede weitere
- *   Änderung überschreibt `bloecke_json` derselben Zeile. Zeilen mit unbekannter `basis` (neueres Update) bleiben liegen.
- * - `ist_standard` = 1 heißt „diese eigene Kopie gilt statt des mitgelieferten Designs“, 0 = abgeschaltet. Je Zeile,
- *   also je Design. „Zurücksetzen“ setzt 0, statt zu löschen: „Rückgängig“ bleibt möglich, Verweise aus
- *   `rechnungen.vorlage_id` bleiben gültig, und die nächste Änderung nimmt dieselbe Zeile wieder (ist_standard = 1).
- * - Welches Design neue Belege einer Art nehmen, steht in der Einstellung 'vorlagen_design' ({ art: schluessel },
- *   fehlt ⇒ 'klassisch'). Wirksame Vorlage = eigene Kopie dieses Designs (wenn aktiv), sonst das Design selbst.
+ * Bedeutung der Tabelle `vorlagen` (Spalte `basis` seit Migration 0010, `archiviert` seit 0011):
+ * - Die mitgelieferten Designs liegen im Code (lib/vorlagen/standard.ts: 'klassisch', bei der Quittung auch
+ *   'formular'), nie in der Tabelle, und werden nie verändert. Die Tabelle hält **eigene Vorlagen**, beliebig viele je
+ *   Art, jede mit Namen („Meine Quittung“, „Quittung Garten“ …) und `basis` = Design, von dem sie stammt.
+ * - Eine eigene Vorlage entsteht über „Neue Vorlage“ (Name frei, Bausteine der gerade gezeigten) oder bei der ersten
+ *   Änderung an einem Design (Name „Meine Quittung“, „Meine Quittung (Formular)“, bei Bedarf mit Nummer). Jede weitere
+ *   Änderung überschreibt `bloecke_json` derselben Zeile.
+ * - „Entfernen“ löscht nie, sondern setzt `archiviert` = 1: Verweise aus `rechnungen.vorlage_id` (Entwürfe, ausgestellte
+ *   Belege) bleiben gültig, „Rückgängig“ setzt 0. Entfernte sind nicht mehr wählbar; ein Entwurf, der eine nutzt, zeigt
+ *   sie weiter.
+ * - `ist_standard` hat seit 0011 keine Bedeutung mehr (neue Zeilen 0). Bis 0010 hieß 1 „Kopie gilt statt des Designs“;
+ *   die Migration hat das in die Einstellung übertragen (siehe 0011).
+ * - Welche Vorlage neue Belege einer Art nehmen, steht in der Einstellung 'vorlagen_design' ({ art: schluessel },
+ *   Schlüssel 'klassisch' … oder 'eigen:<id>', lib/vorlagen/eigene.ts; fehlt oder ungültig ⇒ das Design bzw.
+ *   'klassisch').
  * - `bloecke_json` = Bausteine wie in lib/vorlagen/bausteine.ts. Beim Lesen fallen unbekannte und für die Art nicht
  *   erlaubte Bausteine weg (`nurErlaubte`).
  * - Ausgestellte Belege frieren ihre Bausteine im `snapshot_json` ein (Beleg-Maske): Spätere Änderungen hier oder ein
@@ -18,60 +22,52 @@
  * Keine GoBD-Daten, aber wie die Einstellungen protokolliert (tabelle 'vorlagen', bei Änderungen nur die geänderten
  * Felder) und aus dem Frontend über die Schreib-Warteschlange (`nacheinander`) geschrieben. Lesen geht direkt (auch
  * innerhalb eines `nacheinander`-Auftrags, z. B. beim Finalisieren, ohne auf sich selbst zu warten).
- * Ohne Datenbank (Browser, npm run dev) gilt immer das klassische Design. Tests: vorlagen.test.ts */
+ * Ohne Datenbank (Browser, npm run dev) gibt es nur die Designs, aktiv ist 'klassisch'. Tests: vorlagen.test.ts */
 import { abfrage, ausfuehren, datenbankVerfuegbar, nacheinander, zeitstempel } from '../db';
 import { bausteineAusJson, type Baustein } from '../vorlagen/bausteine';
-import { STANDARD_NAME, eigenerName, nurErlaubte } from '../vorlagen/baukasten';
+import { eigenerName, nurErlaubte } from '../vorlagen/baukasten';
 import { istBelegart, type Belegart } from '../vorlagen/dokument';
-import { STANDARD_DESIGN, designSchluessel, designsFuer, istDesign, standardVorlage } from '../vorlagen/standard';
-import { einstellungAendern, einstellungLesen } from './einstellungen';
+import {
+  aktiverSchluessel,
+  eigeneId,
+  eigenSchluessel,
+  freierName,
+  istWaehlbar,
+  nameBereinigen,
+  namePruefen,
+  vergebeneNamen,
+  wahlListe,
+  type EigeneVorlage,
+  type VorlagenWahl,
+} from '../vorlagen/eigene';
+import { STANDARD_DESIGN, designSchluessel, istDesign, standardVorlage } from '../vorlagen/standard';
+import { einstellungAendernDirekt, einstellungLesen } from './einstellungen';
 import { aenderungen, protokollieren } from './protokoll';
+
+export type { EigeneVorlage, VorlagenWahl } from '../vorlagen/eigene';
 
 /** Zeile der Tabelle `vorlagen`, wie SQLite sie liefert. */
 export interface VorlageZeile {
   id: number;
   name: string;
   art: string;
-  /** Design der Kopie; fehlt nur in Zeilen ohne die Spalte (Tests) ⇒ 'klassisch' */
+  /** Design der Vorlage; fehlt nur in Zeilen ohne die Spalte (Tests) ⇒ 'klassisch' */
   basis?: string | null;
   bloecke_json: string;
-  ist_standard: number;
+  /** 1 = entfernt; fehlt nur in Zeilen ohne die Spalte ⇒ 0 */
+  archiviert?: number | null;
 }
 
-/** Eigene Kopie eines Designs einer Belegart. */
-export interface EigeneVorlage {
-  id: number;
-  name: string;
-  art: Belegart;
-  /** Schlüssel des Designs (Spalte `basis`) */
-  basis: string;
-  bausteine: Baustein[];
-  /** ist_standard = 1: gilt statt des mitgelieferten Designs */
-  aktiv: boolean;
-}
-
-/** Eine wählbare Vorlage (Beleg-Maske, Erfassen-Schublade): je Design eine, mit den wirksamen Bausteinen. */
-export interface VorlagenWahl {
-  /** null = Design aus dem Code, sonst `vorlagen.id` der eigenen Kopie */
-  id: number | null;
-  /** Schlüssel des Designs */
-  design: string;
-  name: string;
-  bausteine: Baustein[];
-  /** das Design, das für neue Belege der Art gilt (Einstellung 'vorlagen_design'); genau eine je Art */
-  aktiv: boolean;
-}
-
-/** Einstellung: aktives Design je Art, { rechnung: 'klassisch', quittung: 'formular', … } */
+/** Einstellung: aktive Vorlage je Art, { rechnung: 'klassisch', quittung: 'eigen:12', … } */
 export const DESIGN_EINSTELLUNG = 'vorlagen_design';
 
-const ZEILEN_SQL =
-  'SELECT id, name, art, basis, bloecke_json, ist_standard FROM vorlagen WHERE art = $1 ORDER BY ist_standard DESC, geaendert_am DESC, id DESC';
-const ANLEGEN_SQL = 'INSERT INTO vorlagen (name, art, bloecke_json, ist_standard, geaendert_am, basis) VALUES ($1, $2, $3, 1, $4, $5)';
-const AENDERN_SQL = 'UPDATE vorlagen SET bloecke_json = $1, ist_standard = 1, geaendert_am = $2 WHERE id = $3';
-const ABSCHALTEN_SQL = 'UPDATE vorlagen SET ist_standard = 0, geaendert_am = $1 WHERE id = $2';
-
-const basisVon = (z: Pick<VorlageZeile, 'basis'>): string => z.basis || STANDARD_DESIGN;
+const SPALTEN = 'id, name, art, basis, bloecke_json, archiviert';
+const ZEILEN_SQL = `SELECT ${SPALTEN} FROM vorlagen WHERE art = $1 ORDER BY id`;
+const ZEILE_SQL = `SELECT ${SPALTEN} FROM vorlagen WHERE id = $1`;
+const ANLEGEN_SQL = 'INSERT INTO vorlagen (name, art, bloecke_json, ist_standard, geaendert_am, basis, archiviert) VALUES ($1, $2, $3, 0, $4, $5, 0)';
+const BLOECKE_SQL = 'UPDATE vorlagen SET bloecke_json = $1, geaendert_am = $2 WHERE id = $3';
+const NAME_SQL = 'UPDATE vorlagen SET name = $1, geaendert_am = $2 WHERE id = $3';
+const ARCHIV_SQL = 'UPDATE vorlagen SET archiviert = $1, geaendert_am = $2 WHERE id = $3';
 
 /** Zeile lesen; fremde Arten (z. B. 'gutschrift') ⇒ null. */
 export function vorlageAusZeile(z: VorlageZeile): EigeneVorlage | null {
@@ -80,130 +76,164 @@ export function vorlageAusZeile(z: VorlageZeile): EigeneVorlage | null {
     id: z.id,
     name: z.name,
     art: z.art,
-    basis: basisVon(z),
+    basis: z.basis || STANDARD_DESIGN,
     bausteine: nurErlaubte(bausteineAusJson(z.bloecke_json), z.art),
-    aktiv: !!z.ist_standard,
+    archiviert: !!z.archiviert,
   };
 }
 
-/** Alle Zeilen der Art (eines Designs), die aktiven (sonst die zuletzt geänderte) zuerst. */
-const zeilen = async (art: Belegart, basis?: string): Promise<VorlageZeile[]> => {
-  const alle = await abfrage<VorlageZeile>(ZEILEN_SQL, [art]);
-  return basis === undefined ? alle : alle.filter((z) => basisVon(z) === basis);
-};
-
-/* ---------- Aktives Design je Art (Einstellung 'vorlagen_design') ---------- */
-
-/** Gespeicherten Wert lesen: { art: schluessel }; Unbekanntes und Fehlendes ⇒ 'klassisch'. */
-export function designsAusWert(wert: unknown): Record<Belegart, string> {
-  const o = wert && typeof wert === 'object' && !Array.isArray(wert) ? (wert as Record<string, unknown>) : {};
-  return {
-    rechnung: designSchluessel('rechnung', o.rechnung),
-    angebot: designSchluessel('angebot', o.angebot),
-    quittung: designSchluessel('quittung', o.quittung),
-    eigenbeleg: designSchluessel('eigenbeleg', o.eigenbeleg),
-  };
-}
-
-/** Design, das neue Belege der Art nehmen. Ohne Datenbank 'klassisch'. */
-export async function ladeAktivesDesign(art: Belegart): Promise<string> {
-  if (!datenbankVerfuegbar()) return STANDARD_DESIGN;
-  return designsAusWert(await einstellungLesen(DESIGN_EINSTELLUNG))[art];
-}
-
-/** Design für neue Belege der Art festlegen (protokolliert). Andere Arten bleiben, wie sie sind. false = keine Änderung. */
-export function speichereAktivesDesign(art: Belegart, schluessel: string): Promise<boolean> {
-  if (!istDesign(art, schluessel)) return Promise.reject(new Error(`Unbekanntes Design „${schluessel}“.`));
-  return einstellungAendern(DESIGN_EINSTELLUNG, (alt) => {
-    const o = alt && typeof alt === 'object' && !Array.isArray(alt) ? (alt as Record<string, unknown>) : {};
-    return { ...o, [art]: schluessel };
-  });
-}
-
-/* ---------- Lesen (auch für die Beleg-Maske) ---------- */
-
-/** Aktive eigene Kopie eines Designs der Art oder null (dann gilt das Design aus dem Code). Ohne Datenbank immer null. */
-export async function ladeEigeneVorlage(art: Belegart, basis: string = STANDARD_DESIGN): Promise<EigeneVorlage | null> {
-  if (!datenbankVerfuegbar()) return null;
-  const z = (await zeilen(art, basis))[0];
-  const v = z ? vorlageAusZeile(z) : null;
-  return v?.aktiv ? v : null;
-}
-
-/** Aktive eigene Kopien aller (bekannten) Designs der Art, je Design höchstens eine. */
-export async function ladeEigeneVorlagen(art: Belegart): Promise<Map<string, EigeneVorlage>> {
-  const m = new Map<string, EigeneVorlage>();
-  if (!datenbankVerfuegbar()) return m;
-  for (const z of await zeilen(art)) {
+const zeilenDerArt = async (art: Belegart): Promise<EigeneVorlage[]> =>
+  (await abfrage<VorlageZeile>(ZEILEN_SQL, [art])).flatMap((z) => {
     const v = vorlageAusZeile(z);
-    if (v?.aktiv && istDesign(art, v.basis) && !m.has(v.basis)) m.set(v.basis, v);
-  }
-  return m;
+    return v ? [v] : [];
+  });
+
+async function zeileLesen(id: number): Promise<EigeneVorlage & { json: string }> {
+  const z = (await abfrage<VorlageZeile>(ZEILE_SQL, [id]))[0];
+  const v = z ? vorlageAusZeile(z) : null;
+  if (!z || !v) throw new Error('Diese Vorlage gibt es nicht (mehr).');
+  return { ...v, json: z.bloecke_json };
 }
 
-/** Bausteine, die für neue Belege der Art gelten: aktives Design, als eigene Kopie, wenn es eine gibt. */
-export async function ladeAktiveBausteine(art: Belegart): Promise<Baustein[]> {
-  const design = await ladeAktivesDesign(art);
-  const v = await ladeEigeneVorlage(art, design);
-  return v ? v.bausteine : standardVorlage(art, design);
+function ohneJson(z: EigeneVorlage & { json: string }): EigeneVorlage {
+  const { id, name, art, basis, bausteine, archiviert } = z;
+  return { id, name, art, basis, bausteine, archiviert };
 }
 
-/** Wählbare Vorlagen der Art: je Design eine (eigene Kopie, sonst das Design aus dem Code); genau eine ist `aktiv`. */
-export async function ladeVorlagenFuerArt(art: Belegart): Promise<VorlagenWahl[]> {
-  const [eigene, aktiv] = await Promise.all([ladeEigeneVorlagen(art), ladeAktivesDesign(art)]);
-  const designs = designsFuer(art);
-  return designs.map((d) => {
-    const v = eigene.get(d.schluessel);
-    return {
-      id: v?.id ?? null,
-      design: d.schluessel,
-      name: v?.name ?? (designs.length > 1 ? d.name : STANDARD_NAME),
-      bausteine: v?.bausteine ?? standardVorlage(art, d.schluessel),
-      aktiv: d.schluessel === aktiv,
-    };
+/* ---------- Aktive Vorlage je Art (Einstellung 'vorlagen_design') ---------- */
+
+const istObjekt = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+
+/** Gespeicherter Wert für eine Art (roh, noch nicht geprüft). */
+export const wertFuerArt = (wert: unknown, art: Belegart): unknown => (istObjekt(wert) ? wert[art] : undefined);
+
+/** Alle eigenen Vorlagen der Art, auch entfernte (`archiviert`). Ohne Datenbank keine. */
+export async function ladeEigeneVorlagen(art: Belegart): Promise<EigeneVorlage[]> {
+  if (!datenbankVerfuegbar()) return [];
+  return zeilenDerArt(art);
+}
+
+/** Schlüssel der Vorlage, die neue Belege der Art nehmen. Ohne Datenbank 'klassisch'. */
+export async function ladeAktivenSchluessel(art: Belegart, eigene?: readonly EigeneVorlage[]): Promise<string> {
+  if (!datenbankVerfuegbar()) return STANDARD_DESIGN;
+  const [wert, liste] = await Promise.all([einstellungLesen(DESIGN_EINSTELLUNG), eigene ?? zeilenDerArt(art)]);
+  return aktiverSchluessel(art, wertFuerArt(wert, art), liste);
+}
+
+async function aktivSetzen(art: Belegart, schluessel: string): Promise<boolean> {
+  return einstellungAendernDirekt(DESIGN_EINSTELLUNG, (alt) => ({ ...(istObjekt(alt) ? alt : {}), [art]: schluessel }));
+}
+
+/** Vorlage für neue Belege der Art festlegen (protokolliert). Andere Arten bleiben. false = keine Änderung. */
+export function speichereAktiveVorlage(art: Belegart, schluessel: string): Promise<boolean> {
+  return nacheinander(async () => {
+    if (!istWaehlbar(art, schluessel, await zeilenDerArt(art))) throw new Error('Diese Vorlage gibt es nicht (mehr).');
+    return aktivSetzen(art, schluessel);
   });
 }
+
+/* ---------- Lesen (auch für Beleg-Maske, Erfassen-Schublade, Termine) ---------- */
+
+/** Wählbare Vorlagen der Art: Designs, dann eigene (entfernte mit `archiviert`); genau eine ist `aktiv`. */
+export async function ladeVorlagenFuerArt(art: Belegart): Promise<VorlagenWahl[]> {
+  const eigene = await ladeEigeneVorlagen(art);
+  return wahlListe(art, eigene, await ladeAktivenSchluessel(art, eigene));
+}
+
+/** Die aktive Vorlage der Art (für neue Entwürfe, z. B. Duplizieren). */
+export async function ladeAktiveWahl(art: Belegart): Promise<VorlagenWahl> {
+  const liste = await ladeVorlagenFuerArt(art);
+  return liste.find((v) => v.aktiv) ?? liste[0];
+}
+
+/** Bausteine, die für neue Belege der Art gelten. */
+export const ladeAktiveBausteine = async (art: Belegart): Promise<Baustein[]> => (await ladeAktiveWahl(art)).bausteine;
 
 /* ---------- Schreiben (Vorlagen-Seite) ---------- */
 
-/**
- * Bausteine als eigene Kopie eines Designs der Art speichern und einschalten: legt die Zeile beim ersten Mal an, sonst
- * wird die vorhandene überschrieben (auch eine abgeschaltete – so funktioniert „Rückgängig“ nach „Zurücksetzen“).
- * Ändert nicht, welches Design neue Belege nehmen. Ohne Änderung wird weder geschrieben noch protokolliert.
- */
-export function speichereVorlage(art: Belegart, bausteine: readonly Baustein[], basis: string = STANDARD_DESIGN): Promise<EigeneVorlage> {
-  if (!istDesign(art, basis)) return Promise.reject(new Error(`Unbekanntes Design „${basis}“.`));
+export interface AnlegenOptionen {
+  /** Design, von dem die Vorlage stammt (bei einer Kopie einer eigenen: deren Basis) */
+  basis: string;
+  /** fehlt ⇒ „Meine Quittung“ (bzw. „Meine Quittung (Formular)“), bei Bedarf mit Nummer */
+  name?: string;
+  /** gleich als aktive Vorlage der Art eintragen (erste Änderung am aktiven Design: neue Belege nehmen die Änderung) */
+  aktivieren?: boolean;
+}
+
+/** Neue eigene Vorlage anlegen (protokolliert). Name wird geprüft (nicht leer, nicht doppelt in der Art). */
+export function vorlageAnlegen(art: Belegart, bausteine: readonly Baustein[], o: AnlegenOptionen): Promise<EigeneVorlage> {
+  if (!istDesign(art, o.basis)) return Promise.reject(new Error(`Unbekanntes Design „${o.basis}“.`));
   return nacheinander(async () => {
+    const vergeben = vergebeneNamen(art, await zeilenDerArt(art));
+    const name = o.name === undefined ? freierName(eigenerName(art, o.basis), vergeben) : nameBereinigen(o.name);
+    const fehler = namePruefen(name, vergeben);
+    if (fehler) throw new Error(fehler);
     const json = JSON.stringify(nurErlaubte(bausteine, art));
-    const jetzt = zeitstempel();
-    const alt = (await zeilen(art, basis))[0];
-    if (!alt) {
-      const name = eigenerName(art, basis);
-      const { id } = await ausfuehren(ANLEGEN_SQL, [name, art, json, jetzt, basis]);
-      if (id == null) throw new Error('Die eigene Vorlage wurde nicht angelegt.');
-      await protokollieren({ tabelle: 'vorlagen', datensatzId: id, aktion: 'neu', neu: { name, art, basis, bloecke_json: json, ist_standard: 1 } });
-      return { id, name, art, basis, bausteine: bausteineAusJson(json), aktiv: true };
-    }
-    const diff = aenderungen({ bloecke_json: alt.bloecke_json, ist_standard: alt.ist_standard ? 1 : 0 }, { bloecke_json: json, ist_standard: 1 });
-    if (diff) {
-      await ausfuehren(AENDERN_SQL, [json, jetzt, alt.id]);
-      await protokollieren({ tabelle: 'vorlagen', datensatzId: alt.id, aktion: 'geaendert', ...diff });
-    }
-    return { id: alt.id, name: alt.name, art, basis, bausteine: bausteineAusJson(json), aktiv: true };
+    const { id } = await ausfuehren(ANLEGEN_SQL, [name, art, json, zeitstempel(), o.basis]);
+    if (id == null) throw new Error('Die eigene Vorlage wurde nicht angelegt.');
+    await protokollieren({ tabelle: 'vorlagen', datensatzId: id, aktion: 'neu', neu: { name, art, basis: o.basis, bloecke_json: json } });
+    if (o.aktivieren) await aktivSetzen(art, eigenSchluessel(id));
+    return { id, name, art, basis: o.basis, bausteine: bausteineAusJson(json), archiviert: false };
   });
 }
 
-/** „Zurücksetzen“: eigene Kopie eines Designs abschalten (ist_standard = 0), danach gilt das Design aus dem Code.
- *  Andere Designs der Art bleiben. false = es war keine aktiv. */
-export function vorlageZuruecksetzen(art: Belegart, basis: string = STANDARD_DESIGN): Promise<boolean> {
+/** Bausteine einer eigenen Vorlage speichern. Ohne Änderung wird weder geschrieben noch protokolliert. */
+export function speichereVorlage(id: number, bausteine: readonly Baustein[]): Promise<EigeneVorlage> {
   return nacheinander(async () => {
-    const aktive = (await zeilen(art, basis)).filter((z) => z.ist_standard);
-    if (!aktive.length) return false;
-    const jetzt = zeitstempel();
-    for (const z of aktive) {
-      await ausfuehren(ABSCHALTEN_SQL, [jetzt, z.id]);
-      await protokollieren({ tabelle: 'vorlagen', datensatzId: z.id, aktion: 'geaendert', alt: { ist_standard: 1 }, neu: { ist_standard: 0 } });
+    const alt = await zeileLesen(id);
+    const json = JSON.stringify(nurErlaubte(bausteine, alt.art));
+    const diff = aenderungen({ bloecke_json: alt.json }, { bloecke_json: json });
+    if (diff) {
+      await ausfuehren(BLOECKE_SQL, [json, zeitstempel(), id]);
+      await protokollieren({ tabelle: 'vorlagen', datensatzId: id, aktion: 'geaendert', ...diff });
     }
-    return true;
+    return { ...ohneJson(alt), bausteine: bausteineAusJson(json) };
   });
 }
+
+/** Eigene Vorlage umbenennen (geprüft wie beim Anlegen). */
+export function vorlageUmbenennen(id: number, name: string): Promise<EigeneVorlage> {
+  return nacheinander(async () => {
+    const alt = await zeileLesen(id);
+    const neu = nameBereinigen(name);
+    const fehler = namePruefen(neu, vergebeneNamen(alt.art, await zeilenDerArt(alt.art), id));
+    if (fehler) throw new Error(fehler);
+    if (neu !== alt.name) {
+      await ausfuehren(NAME_SQL, [neu, zeitstempel(), id]);
+      await protokollieren({ tabelle: 'vorlagen', datensatzId: id, aktion: 'geaendert', alt: { name: alt.name }, neu: { name: neu } });
+    }
+    return { ...ohneJson(alt), name: neu };
+  });
+}
+
+/**
+ * Eigene Vorlage entfernen: nie löschen, nur `archiviert` = 1 (Belege und Entwürfe verweisen weiter auf sie). War sie
+ * die aktive, nehmen neue Belege wieder ihr Design. `warAktiv` für „Rückgängig“.
+ */
+export function vorlageEntfernen(id: number): Promise<{ vorlage: EigeneVorlage; warAktiv: boolean }> {
+  return nacheinander(async () => {
+    const v = ohneJson(await zeileLesen(id));
+    if (v.archiviert) return { vorlage: v, warAktiv: false };
+    const warAktiv = eigeneId(wertFuerArt(await einstellungLesen(DESIGN_EINSTELLUNG), v.art)) === id;
+    await ausfuehren(ARCHIV_SQL, [1, zeitstempel(), id]);
+    await protokollieren({ tabelle: 'vorlagen', datensatzId: id, aktion: 'geaendert', alt: { archiviert: 0 }, neu: { archiviert: 1 } });
+    if (warAktiv) await aktivSetzen(v.art, designSchluessel(v.art, v.basis));
+    return { vorlage: { ...v, archiviert: true }, warAktiv };
+  });
+}
+
+/** „Rückgängig“ nach dem Entfernen: wieder wählbar, auf Wunsch wieder aktiv. */
+export function vorlageWiederherstellen(id: number, aktivieren = false): Promise<EigeneVorlage> {
+  return nacheinander(async () => {
+    const v = ohneJson(await zeileLesen(id));
+    if (v.archiviert) {
+      await ausfuehren(ARCHIV_SQL, [0, zeitstempel(), id]);
+      await protokollieren({ tabelle: 'vorlagen', datensatzId: id, aktion: 'geaendert', alt: { archiviert: 1 }, neu: { archiviert: 0 } });
+    }
+    if (aktivieren) await aktivSetzen(v.art, eigenSchluessel(id));
+    return { ...v, archiviert: false };
+  });
+}
+
+/** Bausteine des Designs, von dem eine eigene Vorlage stammt („Zurücksetzen“). */
+export const basisBausteine = (v: Pick<EigeneVorlage, 'art' | 'basis'>): Baustein[] => standardVorlage(v.art, v.basis);

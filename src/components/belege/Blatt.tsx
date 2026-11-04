@@ -14,7 +14,7 @@
  * Stile: src/styles/blatt.css */
 import { Fragment, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react';
 import { formatBetrag } from '../../lib/money';
-import { BAUSTEINE, istTextFeld, istUmrandet, istUnten, sichtbare, type Aufgeloest, type Baustein, type BausteinTyp } from '../../lib/vorlagen/bausteine';
+import { BAUSTEINE, istTextFeld, istUmrandet, istUnten, quittungAngaben, sichtbare, type Aufgeloest, type Baustein, type BausteinTyp } from '../../lib/vorlagen/bausteine';
 import { ersetzteZeilen, type Segment } from '../../lib/vorlagen/formatierung';
 import { FormatEditor } from './FormatEditor';
 import {
@@ -413,6 +413,9 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
   },
   quittung_felder(b, x) {
     const { doc, empf: e } = x;
+    // jede Angabe einzeln abschaltbar; alle aus ⇒ nichts (wie im PDF)
+    const a = quittungAngaben(b);
+    if (a.leer) return null;
     const pos = doc.positionen;
     const fuer =
       pos.length > 1 ? (
@@ -423,21 +426,23 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
       ) : (
         zeilen(quittungFuer(doc))
       );
-    const za = b.an('zahlungsart');
-    if (b.text('stil') === 'formular') {
+    const kunde = (
+      <>
+        {e.anzeige}
+        {e.zeilen.length ? `, ${e.zeilen.join(', ')}` : ''}
+      </>
+    );
+    if (a.formular) {
       const weg = gedruckterZahlungsweg(doc);
       return (
         <div className="blk-form">
           <div className="blk-form-kopf">
-            <FormZeile label="Datum">{datumText(doc.datum)}</FormZeile>
+            {a.datum && <FormZeile label="Datum">{datumText(doc.datum)}</FormZeile>}
             <FormZeile label="Nr.">{doc.nummer || <span className="blk-leer">Entwurf</span>}</FormZeile>
           </div>
-          <FormZeile label={feld(b, x, 'von')}>
-            {e.anzeige}
-            {e.zeilen.length ? `, ${e.zeilen.join(', ')}` : ''}
-          </FormZeile>
-          <FormZeile label={feld(b, x, 'fuer')}>{fuer}</FormZeile>
-          {za && (
+          {a.kunde && <FormZeile label={feld(b, x, 'von')}>{kunde}</FormZeile>}
+          {a.zweck && <FormZeile label={feld(b, x, 'fuer')}>{fuer}</FormZeile>}
+          {a.zahlungsart && (
             <FormZeile label="Zahlungsart">
               {ZAHLUNGSWEGE.map((z) => (
                 <span key={z} className="blk-kreuz">
@@ -447,10 +452,12 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
               ))}
             </FormZeile>
           )}
-          <div className="blk-form-summe">
-            <b>Gesamtbetrag:</b> <b>{formatBetrag(x.summe)}</b>
-          </div>
-          {b.an('worte') && (
+          {a.betrag && (
+            <div className="blk-form-summe">
+              <b>Gesamtbetrag:</b> <b>{formatBetrag(x.summe)}</b>
+            </div>
+          )}
+          {a.worte && (
             <p className="blk-form-worte">
               <span>in Worten:</span> {betragInWorten(x.summe)}
             </p>
@@ -458,21 +465,30 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
         </div>
       );
     }
+    // Kacheln: drei nebeneinander (1,35 : 1 : 1), sonst zwei gleich breite Spalten wie im PDF (raster)
+    const kacheln = [
+      a.betrag && (
+        <Feld key="betrag" label="Betrag">
+          <b className="blk-big">{formatBetrag(x.summe)}</b>
+        </Feld>
+      ),
+      a.datum && (
+        <Feld key="datum" label="Datum">
+          {datumText(doc.datum)}
+        </Feld>
+      ),
+      a.zahlungsart && (
+        <Feld key="zahlungsart" label="Zahlungsart">
+          {zahlungswegText(gedruckterZahlungsweg(doc))}
+        </Feld>
+      ),
+    ].filter(Boolean);
     return (
       <>
-        <div className={`blk-grid ${za ? 'c3' : 'c2'}`}>
-          <Feld label="Betrag">
-            <b className="blk-big">{formatBetrag(x.summe)}</b>
-          </Feld>
-          <Feld label="Datum">{datumText(doc.datum)}</Feld>
-          {za && <Feld label="Zahlungsart">{zahlungswegText(gedruckterZahlungsweg(doc))}</Feld>}
-        </div>
-        {b.an('worte') && <Feld label="Betrag in Worten">{betragInWorten(x.summe)}</Feld>}
-        <Feld label={feld(b, x, 'von')}>
-          {e.anzeige}
-          {e.zeilen.length ? `, ${e.zeilen.join(', ')}` : ''}
-        </Feld>
-        <Feld label={feld(b, x, 'fuer')}>{fuer}</Feld>
+        {kacheln.length > 0 && <div className={`blk-grid ${kacheln.length === 3 ? 'c3' : 'c2'}`}>{kacheln}</div>}
+        {a.worte && <Feld label="Betrag in Worten">{betragInWorten(x.summe)}</Feld>}
+        {a.kunde && <Feld label={feld(b, x, 'von')}>{kunde}</Feld>}
+        {a.zweck && <Feld label={feld(b, x, 'fuer')}>{fuer}</Feld>}
       </>
     );
   },

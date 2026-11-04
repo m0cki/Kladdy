@@ -104,7 +104,7 @@
 .vl-code .tx-k { color: var(--accent); font-weight: 600; }
 .vl-code .tx-b { color: var(--series-2); }
 
-/* ---------- Designs der Art (Vorlagen-Galerie, nur bei mehreren) ---------- */
+/* ---------- Leiste: Designs und eigene Vorlagen der Art ---------- */
 .vl-designs { display: flex; align-items: center; gap: 10px 16px; flex-wrap: wrap; margin-bottom: var(--gap); }
 .vl-designs .seg button .ic { color: var(--accent); }
 .vl-design-tag { font-size: .66rem; font-weight: 600; color: var(--muted); padding: 1px 6px; border-radius: 99px; border: 1px solid var(--border-strong); }
@@ -114,6 +114,16 @@
 .vl-design-aktiv > .ic { width: 15px; height: 15px; color: var(--accent); }
 .vl-design-btn { padding: 4px 10px; font-size: .78rem; }
 .vl-design-btn .ic { width: 14px; height: 14px; }
+.vl-design-tools { display: inline-flex; align-items: center; gap: 4px; }
+.vl-name { flex-basis: 100%; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: .8rem; color: var(--text-2); }
+.vl-name .input { width: min(280px, 100%); }
+.vl-name-fehler { flex-basis: 100%; color: var(--neg); font-size: .76rem; }
+
+/* Hinweis auf die Firmendaten unter den Einstellungen eines Bausteins */
+.vl-firma { display: flex; align-items: flex-start; gap: 6px; margin-top: 12px; }
+.vl-firma > .ic { width: 14px; height: 14px; flex: none; margin-top: 2px; }
+.vl-firma a { color: var(--accent); }
+.vl-firma code { font-family: var(--mono); font-size: .7rem; }
 
 @media (max-width: 1100px) {
   .vl-layout { grid-template-columns: minmax(0, 1fr); }

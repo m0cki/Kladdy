@@ -43,10 +43,10 @@ const ctx: ErtragKontext = {
   kennwerte: new Map([[2026, { kleinbetragsrechnung_cent: 25_000 }]]),
   vorlagen: {
     quittung: [
-      { id: null, design: 'klassisch', name: 'Klassisch', bausteine: standardVorlage('quittung'), aktiv: true },
-      { id: null, design: 'formular', name: 'Formular', bausteine: standardVorlage('quittung', 'formular'), aktiv: false },
+      { schluessel: 'klassisch', id: null, design: 'klassisch', name: 'Klassisch', bausteine: standardVorlage('quittung'), aktiv: true },
+      { schluessel: 'formular', id: null, design: 'formular', name: 'Formular', bausteine: standardVorlage('quittung', 'formular'), aktiv: false },
     ],
-    rechnung: [{ id: 7, design: 'klassisch', name: 'Meine Rechnung', bausteine: standardVorlage('rechnung'), aktiv: true }],
+    rechnung: [{ schluessel: 'eigen:7', id: 7, design: 'klassisch', name: 'Meine Rechnung', bausteine: standardVorlage('rechnung'), aktiv: true }],
   },
   zahlungszielTage: 14,
   heute: HEUTE,
