@@ -26,10 +26,16 @@ export function firmenZeilen(text: string): FirmenZeile[] {
 }
 
 /** Wird die Zeile gedruckt? Ohne Platzhalter ja, sonst nur, wenn mindestens einer einen Wert hat. Eine Zeile nur aus
- * {nr} gilt als Zeile ohne Platzhalter. */
-export const zeileSichtbar = (z: FirmenZeile, werte: Readonly<Record<PlatzhalterName, string>>): boolean =>
-  !z.platzhalter.length || z.platzhalter.some((p) => !!werte[p].trim());
+ * {nr} gilt als Zeile ohne Platzhalter. Ein Platzhalter aus `luecken` (Blanko: Schreiblinie) zählt als Wert. */
+export const zeileSichtbar = (
+  z: FirmenZeile,
+  werte: Readonly<Record<PlatzhalterName, string>>,
+  luecken: ReadonlySet<PlatzhalterName> = new Set(),
+): boolean => !z.platzhalter.length || z.platzhalter.some((p) => luecken.has(p) || !!werte[p].trim());
 
 /** Zeilen, die gedruckt werden (noch mit Platzhaltern). */
-export const sichtbareZeilen = (text: string, werte: Readonly<Record<PlatzhalterName, string>>): FirmenZeile[] =>
-  firmenZeilen(text).filter((z) => zeileSichtbar(z, werte));
+export const sichtbareZeilen = (
+  text: string,
+  werte: Readonly<Record<PlatzhalterName, string>>,
+  luecken: ReadonlySet<PlatzhalterName> = new Set(),
+): FirmenZeile[] => firmenZeilen(text).filter((z) => zeileSichtbar(z, werte, luecken));

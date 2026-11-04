@@ -271,22 +271,34 @@ export function zeilenMarkup(markup: string): string[] {
 
 /* ---------- Ersetzen für die Vorschau (unabhängig von HTML) ---------- */
 
-/** Ein Stück der fertigen Zeile: Text mit Formatierung; `entwurf` = fehlende Nummer ({nr} im Entwurf, grau „Entwurf“). */
+/** Ein Stück der fertigen Zeile: Text mit Formatierung; `entwurf` = fehlende Nummer ({nr} im Entwurf, grau „Entwurf“);
+ *  `luecke` = Schreiblinie statt eines Werts (Blanko-Formular, `text` leer). */
 export interface Segment extends Stil {
   text: string;
   entwurf: boolean;
+  luecke?: true;
 }
 
-type Druckzeichen = Stil & { z: string; entwurf: boolean };
+type Druckzeichen = Stil & { z: string; entwurf: boolean; luecke?: true };
+const besonders = (c: Druckzeichen): boolean => c.entwurf || !!c.luecke;
 
 /**
  * Platzhalter ersetzen wie `ersetzen` in dokument.ts, aber mit Formatierung: Umbrüche als `\r\n` vereinheitlicht,
  * Leerzeichen vor Umbrüchen und Leerzeilen am Rand entfernt. Ergebnis: Zeilen aus Segmenten, null = nichts zu drucken.
+ * `luecken`: Platzhalter, die eine Schreiblinie werden (Blanko-Formular, dokument.ts `luecken`).
  */
-export function ersetzteZeilen(markup: string, werte: Readonly<Record<PlatzhalterName, string>>): Segment[][] | null {
+export function ersetzteZeilen(
+  markup: string,
+  werte: Readonly<Record<PlatzhalterName, string>>,
+  luecken: ReadonlySet<PlatzhalterName> = new Set(),
+): Segment[][] | null {
   const z: Druckzeichen[] = [];
   for (const l of parsen(markup)) {
     const s = stilVon(l);
+    if (l.art === 'platzhalter' && luecken.has(l.name)) {
+      z.push({ z: '\u0000', entwurf: false, luecke: true, ...s });
+      continue;
+    }
     if (l.art === 'platzhalter' && l.name === 'nr' && !werte.nr) {
       z.push({ z: '\u0000', entwurf: true, ...s });
       continue;
@@ -298,7 +310,7 @@ export function ersetzteZeilen(markup: string, werte: Readonly<Record<Platzhalte
   const weg = new Array<boolean>(z.length).fill(false);
   for (let i = 0; i < z.length; i++) {
     if (z[i].z !== '\n') continue;
-    for (let j = i - 1; j >= 0 && (z[j].z === ' ' || z[j].z === '\t') && !z[j].entwurf; j--) weg[j] = true;
+    for (let j = i - 1; j >= 0 && (z[j].z === ' ' || z[j].z === '\t') && !besonders(z[j]); j--) weg[j] = true;
   }
   let rest = z.filter((_, i) => !weg[i]);
   let a = 0;
@@ -306,7 +318,7 @@ export function ersetzteZeilen(markup: string, werte: Readonly<Record<Platzhalte
   while (a < b && rest[a].z === '\n') a++;
   while (b > a && rest[b - 1].z === '\n') b--;
   rest = rest.slice(a, b);
-  if (!rest.some((c) => c.entwurf || c.z.trim())) return null;
+  if (!rest.some((c) => besonders(c) || c.z.trim())) return null;
   const zeilen: Segment[][] = [[]];
   for (const c of rest) {
     const zeile = zeilen[zeilen.length - 1];
@@ -314,12 +326,16 @@ export function ersetzteZeilen(markup: string, werte: Readonly<Record<Platzhalte
       zeilen.push([]);
       continue;
     }
+    if (c.luecke) {
+      zeile.push({ text: '', entwurf: false, luecke: true, ...stilVon(c) });
+      continue;
+    }
     if (c.entwurf) {
       zeile.push({ text: 'Entwurf', entwurf: true, ...stilVon(c) });
       continue;
     }
     const v = zeile[zeile.length - 1];
-    if (v && !v.entwurf && gleicherStil(v, c)) v.text += c.z;
+    if (v && !v.entwurf && !v.luecke && gleicherStil(v, c)) v.text += c.z;
     else zeile.push({ text: c.z, entwurf: false, ...stilVon(c) });
   }
   return zeilen;

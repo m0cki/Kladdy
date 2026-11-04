@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Baustein } from '../vorlagen/bausteine';
-import { BEISPIEL_FIRMA, testbeleg } from '../vorlagen/beispiel';
+import { BEISPIEL_FIRMA, blankobeleg, testbeleg } from '../vorlagen/beispiel';
 import { BELEGARTEN, type BelegDokument } from '../vorlagen/dokument';
 import { standardVorlage } from '../vorlagen/standard';
 import { MAKRO_NAMEN, datenTex, makroWerte, positionenTex } from './daten';
@@ -517,5 +517,100 @@ describe('Quittungsangaben: einzelne Angaben abschaltbar', () => {
       expect(t, design).not.toContain(String.raw`\KForm{Nr.}`);
       expect(t, design).not.toContain('Gesamtbetrag:');
     }
+  });
+});
+
+describe('Blanko-Formular zum Ausfüllen von Hand', () => {
+  const blanko = (art: 'quittung' | 'eigenbeleg' = 'quittung') => blankobeleg(art, BEISPIEL_FIRMA, 'klein');
+  /** main.tex ohne Präambel (dort stehen die Hilfsbefehle immer) */
+  const rumpf = (t: string) => t.slice(t.indexOf(String.raw`\begin{document}`));
+  const mit = (design: string, werte: Record<string, unknown>): Baustein[] =>
+    standardVorlage('quittung', design).map((b) => (b.typ === 'quittung_felder' ? ({ ...b, ...werte } as Baustein) : b));
+
+  it('Quittung (beide Designs): Schreiblinien statt Werten, kein Wasserzeichen, Firmendaten bleiben', () => {
+    for (const design of ['klassisch', 'formular']) {
+      const { main, daten } = belegTex(blanko(), standardVorlage('quittung', design), '#6366f1');
+      const t = rumpf(main.tex);
+      expect(klammernOk(main.tex), design).toBe(true);
+      expect(t, design).not.toContain('KWasserzeichen');
+      expect(t, design).not.toContain('ENTWURF');
+      for (const m of ['Gesamt', 'Datum', 'BetragInWorten', 'KundeAnzeige', 'QuittungFuer', 'Zahlungsart', 'KNr', 'Nummer', 'UnterschriftDatum'])
+        expect(t, `${design}: \\${m}`).not.toMatch(new RegExp(String.raw`\\${m}(?![A-Za-z])`));
+      expect(t, design).toContain(String.raw`\KSchreib`);
+      expect(t, design).toContain(String.raw`\KSchreib[€]`);
+      // Ankreuzfelder alle leer
+      expect(t, design).toContain(String.raw`\KKaestchen{0}`);
+      expect(t, design).not.toContain(String.raw`\KAnkreuz`);
+      // Firmendaten und Steuerhinweis wie immer
+      expect(t, design).toContain('§ 19 UStG');
+      expect(makro(daten, 'Steuernummer')).toBe(BEISPIEL_FIRMA.steuernummer);
+      expect(makro(daten, 'Nummer')).toBe('');
+    }
+    // Formular: Nr. und Datum als Linie, Klassisch: „Nr. {nr}“ im Titel als kurze Lücke
+    expect(mainTex('quittung', standardVorlage('quittung', 'formular'), '#6366f1', { blanko: true }).tex).toContain(String.raw`\KForm{Nr.}{\KSchreib}`);
+    expect(mainTex('quittung', standardVorlage('quittung'), '#6366f1', { blanko: true }).tex).toContain(String.raw`Nr. \KLuecke{}`);
+  });
+
+  it('Unterschrift: „Ort, Datum“ bleibt leer, die Linie bleibt', () => {
+    const t = mainTex('quittung', standardVorlage('quittung'), '#6366f1', { blanko: true }).tex;
+    expect(t).not.toContain(String.raw`\FirmaStadt, }\UnterschriftDatum`);
+    expect(t).toContain('Ort, Datum');
+    expect(mainTex('quittung', standardVorlage('quittung'), '#6366f1').tex).toContain(String.raw`\UnterschriftDatum`);
+  });
+
+  it('einzelne Angaben abgeschaltet: fehlen auch im Blanko-Formular', () => {
+    const k = mainTex('quittung', mit('klassisch', { zahlungsart: false, worte: false }), '#6366f1', { blanko: true }).tex;
+    expect(klammernOk(k)).toBe(true);
+    expect(k).not.toContain(String.raw`\KFeld{Zahlungsart}`);
+    expect(k).not.toContain(String.raw`\KFeld{Betrag in Worten}`);
+    expect(k).toContain(String.raw`\KFeld{Betrag}{\KSchreib[€]}`);
+    const f = mainTex('quittung', mit('formular', { datum: false, betrag: false }), '#6366f1', { blanko: true }).tex;
+    expect(klammernOk(f)).toBe(true);
+    expect(f).not.toContain(String.raw`\KForm{Datum}`);
+    expect(f).not.toContain('Gesamtbetrag:');
+    expect(f).toContain(String.raw`\KForm{Nr.}{\KSchreib}`);
+    expect(rumpf(mainTex('quittung', mit('klassisch', { betrag: false, datum: false, zahlungsart: false, worte: false, kunde: false, zweck: false }), '#6366f1', { blanko: true }).tex)).not.toContain(
+      String.raw`\KFeld`,
+    );
+  });
+
+  it('Platzhalter im Text: Werte des Belegs als \\KLuecke, Firmendaten als Makro; Firmenkopf-Zeile mit Lücke bleibt', () => {
+    expect(textTex('Am {datum} für {kunde}, {firma}', true, true)).toEqual({ tex: String.raw`Am \KLuecke{} für \KLuecke{}, \Firma{}`, leer: null });
+    expect(textTex('{summe}', true, true).leer).toBeNull();
+    expect(textTex('{summe}', true).leer).toEqual(['Gesamt']);
+    const v: Baustein[] = [{ typ: 'firmenblock', zeilen: 'Datum: {datum}\n{telefon}' }, { typ: 'text', text: '{betreff}' }];
+    const t = mainTex('quittung', v, '#6366f1', { blanko: true }).tex;
+    expect(t).toContain(String.raw`Datum: \KLuecke{}\par`);
+    expect(t).not.toContain(String.raw`\ifdefempty{\Datum}`);
+    expect(t).toContain(String.raw`\ifdefempty{\FirmaTelefon}`);
+    expect(t).not.toContain(String.raw`\Betreff`);
+  });
+
+  it('weitere Bausteine: Anschrift, Positionen, Summe, Betrag in Worten als leere Zeilen', () => {
+    const v: Baustein[] = [{ typ: 'anschrift_meta' }, { typ: 'positionen' }, { typ: 'summe' }, { typ: 'betrag_worte' }];
+    const t = rumpf(mainTex('quittung', v, '#6366f1', { blanko: true }).tex);
+    expect(klammernOk(t)).toBe(true);
+    expect(t).toContain(String.raw`\KMeta{Quittungs-Nr.}{\KLuecke}`);
+    expect(t.split(String.raw`\noindent\KSchreib\par`).length - 1).toBe(3);
+    expect(t.split(String.raw`\Position{}{}{}{}{}{}`).length - 1).toBe(4);
+    expect(t).toContain(String.raw`\KLuecke\ €`);
+    expect(t).not.toMatch(/\\(Gesamt|BetragInWorten|Positionen|KundeAnzeige|Nummer)(?![A-Za-z])/);
+  });
+
+  it('Eigenbeleg: Schreiblinien, Zahlungsart zum Ankreuzen, kein „Gebucht als“', () => {
+    const { main } = belegTex(blanko('eigenbeleg'), standardVorlage('eigenbeleg'), '#6366f1');
+    const t = rumpf(main.tex);
+    expect(klammernOk(main.tex)).toBe(true);
+    expect(t).not.toContain('KWasserzeichen');
+    expect(t).toContain(String.raw`\KFeld{Zahlungsempfänger}{\KSchreib}`);
+    expect(t).toContain(String.raw`\KKaestchen{0}`);
+    expect(t).not.toMatch(/\\(Gesamt|Datum|EigenbelegGrund|GebuchtAls|KundeName|Betreff)(?![A-Za-z])/);
+  });
+
+  it('ohne Blanko unverändert: Wasserzeichen und Werte', () => {
+    const t = mainTex('quittung', standardVorlage('quittung'), '#6366f1').tex;
+    expect(t).toContain('KWasserzeichen{ENTWURF}');
+    expect(rumpf(t)).not.toContain(String.raw`\KSchreib`);
+    expect(rumpf(t)).not.toContain(String.raw`\KLuecke`);
   });
 });

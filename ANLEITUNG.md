@@ -1054,7 +1054,33 @@ kursiv oder unterstrichen setzen (`src/lib/vorlagen/formatierung.ts`).
   Darunter der **Pflichtangaben-Check** (§ 34a UStDV): Entfernt man z. B. den § 19-Hinweis, wird das sofort rot markiert.
 - **Rechts:** Live-Vorschau auf Papier. Klick auf einen Bereich im Blatt wählt den Baustein aus, Klick auf einen Text
   bearbeitet ihn direkt (siehe Formatierung). Vorschau mit Beispieldaten
-  oder einem echten Beleg. Knopf „PDF“.
+  oder einem echten Beleg, bei Quittung und Eigenbeleg auch „Blanko“ (siehe unten). Knopf „PDF“.
+- **Blanko-Formular zum Ausfüllen von Hand** (Quittung und Eigenbeleg): Umschalter „Beispiel · Letzter Beleg · Blanko“
+  über der Vorschau (immer da, „Letzter Beleg“ nur, wenn es einen gibt; je Art gemerkt, `kladdy.vorlagen.v1`). Gedacht
+  zum Ausdrucken und Ausfüllen mit dem Stift; Rechnung und Angebot (Positionen, Zahlungsaufforderung) bieten es nicht an.
+  - **Gedruckt wie immer:** alles aus den Firmendaten (Firmenkopf, Kopf mit Logo, Absenderzeile, Fußzeile, Steuernummer,
+    Inhaber, Anschrift), Titel, Steuerhinweis (§ 19), Freitexte und die Standardtexte der Art (`{schlusstext}` =
+    § 14b-Hinweis). `{art}` bleibt „Quittung“ bzw. „Eigenbeleg“.
+  - **Schreiblinien statt Werten:** Quittungsangaben „Kacheln“ = Bezeichnung, darunter eine Linie über die Breite der
+    Kachel bzw. Zeile (7 mm hoch, Betrag mit „€“ dahinter); „Formular“ = „Datum: ___ | Nr.: ___“, „Erhalten von: ___“
+    usw., Linie bis zum Zeilenende. Zahlungsart: alle Kästchen leer (Kacheln: kleiner, darf umbrechen). Die Schalter der
+    Quittungsangaben gelten weiter. Eigenbeleg-Angaben ebenso (Grund als Linie, ohne „Gebucht als“). Anschrift &
+    Belegdaten: drei Linien für den Empfänger, rechts kurze Linien; Positionen: vier leere Zeilen; Gesamtbetrag und
+    Betrag in Worten: Linie. Platzhalter mit Werten des Belegs (`{kunde}`, `{nr}`, `{datum}`, `{leistungsdatum}`,
+    `{faellig}`, `{summe}`, `{betrag_worte}`, `{betreff}`, `{zahlungsziel}`) werden eine kurze Linie (30 mm), z. B.
+    „Nr. ___“ im Titel; eine Firmenkopf-Zeile mit so einem Platzhalter bleibt stehen.
+  - **Unterschrift:** „Ort, Datum“ bleibt leer (auch mit „vorausfüllen“), die Linien bleiben.
+  - **Kein Beleg:** kein Wasserzeichen, kein „Entwurf“, keine Nummer, nichts gespeichert oder abgelegt (GoBD: Nummern
+    erst beim Ausstellen). PDF heißt `Kladdy-Blanko-Quittung.pdf`. Unter der Vorschau ein Hinweis: von Hand
+    ausgefüllte Quittungen trotzdem buchen (Durchschlag oder Kopie aufbewahren, Einnahme über „+ Erfassen“), beim
+    Eigenbeleg die Ausgabe.
+  - **Pflichtangaben-Check:** prüft weiter, ob die Vorlage jede Angabe druckt, und die Firmendaten; Werte des Belegs
+    gelten als offen („wird von Hand eingetragen“, Nummer „von Hand fortlaufend eintragen“, Kunde „Anschrift Pflicht
+    über 250 €“). Fußzeile „Geprüft für die Blanko-Vorlage (Werte werden von Hand eingetragen)“.
+  - **Technik:** `BelegDokument.blanko` (nie gespeichert), gebaut von `blankobeleg` (`src/lib/vorlagen/beispiel.ts`);
+    Vorschau über `luecken(doc)` (`dokument.ts`) und `ersetzteZeilen(…, luecken)`, PDF über
+    `mainTex(art, bausteine, akzent, { blanko: true })` mit `\KLuecke` (kurze Linie) und `\KSchreib[…]` (Linie bis zum
+    Zeilenende) in main.tex; daten.tex wie immer (Firmendaten).
 - Die erste Änderung an einem Design legt automatisch eine **eigene Kopie** an. „Zurücksetzen“ stellt das Design
   wieder her (mit Rückgängig). Gespeichert wird automatisch.
 - **Experten-Ansicht „LaTeX“** (nur lesen): zeigt den automatisch erzeugten LaTeX-Code.
@@ -2089,6 +2115,15 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
   „Klassisch“ bleibt unverändert; Quittungsangaben: „Datum“ aus ⇒ Vorschau und „PDF“ ohne Datum, Pflichtangaben rot mit
   Hinweis; alle aus ⇒ Baustein-Kurzinfo „Alle Angaben abgeschaltet – druckt nichts“, nichts auf dem Blatt; Kacheln mit
   zwei Angaben ⇒ zwei gleich breite Kacheln; Hinweis „Einstellungen › Firma“ öffnet die Firmendaten; alles im Protokoll.
+- **Blanko-Quittung zum Ausfüllen von Hand** (§7.0) – **erledigt (Branch `tectonic-mitgeliefert`)**: Vorschau-Quelle
+  „Blanko“ für Quittung und Eigenbeleg (Blatt und PDF: Firmendaten gedruckt, Werte als Schreiblinien, Kästchen leer,
+  kein Wasserzeichen, keine Nummer), Pflichtangaben-Check im Blanko-Modus, Hinweis zum Buchen. Tests:
+  `src/lib/vorlagen/blanko.test.ts`, `latex.test.ts` („Blanko-Formular“).
+  **Auf dem Mac prüfen:** Vorlagen › Quittung ⇒ Umschalter „Blanko“ (auch ohne Belege); Klassisch und Formular zeigen
+  Linien statt Werten, alle Kästchen leer, „Ort, Datum“ leer, kein ENTWURF; Steuernummer, Anschrift, § 19-Hinweis da;
+  „PDF“ ⇒ `Kladdy-Blanko-Quittung.pdf` sieht aus wie die Vorschau, Linien lang genug zum Schreiben; Quittungsangabe
+  „Datum“ aus ⇒ fehlt auch im Blanko, Pflichtangaben rot; Pflichtangaben sonst ohne Rot, Uhr-Symbol bei den
+  Werten; Eigenbeleg ebenso; Rechnung und Angebot ohne „Blanko“; Auswahl bleibt nach Neustart je Art.
 - **Offen aus Phase 1 (Teil 1+2):** Regelbesteuerung wirkt noch nicht auf Buchungen/Belege.
 - **Aus Phase 1 nachgeholt:** Kategorien bearbeiten, optionale Kategorien und EÜR-Zuordnung pro Jahr – **erledigt (Branch
   `kategorien-euer`, auf dem Ende der Phase-3-Kette)**: Migration `0008_kategorien` (Katalog Abschreibungen (AfA), Bewirtung 70 %, Geschenke, Homeoffice,

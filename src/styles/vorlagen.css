@@ -91,6 +91,7 @@
 /* Blatt höher als das Fenster (A4): in der Bühne blättern, statt unten abgeschnitten zu kleben */
 .vl-right .vl-desk { max-height: calc(100vh - var(--topbar-h) - 90px); overflow-y: auto; }
 .vl-pdf-hinweis { margin: -4px 0 0; }
+.vl-blanko-hinweis { margin: 8px 0 0; }
 .vl-pdf-fehler > span { flex: 1; min-width: 0; }
 .vl-pdf-fehler > .icon-btn { margin: -6px -6px 0 0; }
 

@@ -12,7 +12,9 @@
  *   der Pflichtangaben-Check (§2.3) mit den Daten der Vorschau – ohne „Steuerhinweis (§ 19)“ sofort rot.
  * - Rechts: Live-Vorschau mit Beispieldaten (eigene Firmendaten, sobald eingetragen) oder – Umschalter „Beispiel ·
  *   Letzter Beleg“, nur wenn es einen gibt, je Art gemerkt – mit dem letzten Beleg der Art in den aktuellen Bausteinen
- *   (lib/vorlagen/vorschau.ts: nur gelesen, ohne Nummer ⇒ Wasserzeichen ENTWURF). Klick ins Blatt wählt den
+ *   (lib/vorlagen/vorschau.ts: nur gelesen, ohne Nummer ⇒ Wasserzeichen ENTWURF). Bei Quittung und Eigenbeleg
+ *   zusätzlich „Blanko“: Formular zum Ausdrucken und Ausfüllen von Hand (beispiel.ts `blankobeleg`: Firmendaten
+ *   gedruckt, Werte als Schreiblinien, kein Wasserzeichen, keine Nummer, nichts gespeichert). Klick ins Blatt wählt den
  *   Baustein; Klick auf einen Text aus einer Einstellung bearbeitet ihn direkt im Blatt (FormatEditor: fett, kursiv,
  *   unterstrichen, Platzhalter als Chips; Esc oder Klick daneben beendet). Die Einstellungskarte nutzt denselben Editor.
  *   Jede Eingabe läuft über `einstellen` (Autosave, eigene Kopie, Protokoll wie bisher). „PDF“ setzt das Blatt mit Tectonic wie der Testbeleg (Entwurf, keine Nummer, nichts wird abgelegt) und
@@ -111,7 +113,7 @@ import {
   zurueckEinfuegen,
   zusammenfassung,
 } from '../lib/vorlagen/baukasten';
-import { BEISPIEL_FIRMA, beispielbeleg, firmaOderBeispiel } from '../lib/vorlagen/beispiel';
+import { BEISPIEL_FIRMA, beispielbeleg, blankobeleg, firmaOderBeispiel, hatBlanko } from '../lib/vorlagen/beispiel';
 import { ARTEN, BELEGARTEN, PLATZHALTER, istBelegart, type BelegDokument, type Belegart, type PlatzhalterName } from '../lib/vorlagen/dokument';
 import { pflichtCheck, type Pflichtangabe } from '../lib/vorlagen/pflicht';
 import {
@@ -196,12 +198,18 @@ const RUECKGAENGIG = 'vorlage-rueckgaengig';
 const GRUNDLAGE: Readonly<Record<Belegart, string>> = { rechnung: '§ 34a UStDV', quittung: '§ 33/§ 34a UStDV', angebot: '', eigenbeleg: '' };
 const KEINE_OPTIONEN: readonly (readonly [string, string])[] = [];
 const TX_KLASSE: Readonly<Record<TexTeilArt, string>> = { kommentar: 'tx-c', befehl: 'tx-k', klammer: 'tx-b', text: '' };
+/** Hinweis unter dem Blanko-Formular: von Hand ausgefüllt heißt nicht gebucht */
+const BLANKO_HINWEIS: Readonly<Record<Belegart, string>> = {
+  quittung: 'Von Hand ausgefüllte Quittungen trotzdem buchen: Durchschlag oder Kopie aufbewahren und die Einnahme über „+ Erfassen“ eintragen.',
+  eigenbeleg: 'Ausgefüllte Eigenbelege aufbewahren und die Ausgabe über „+ Erfassen“ eintragen.',
+  rechnung: '',
+  angebot: '',
+};
 /** „Neue Quittungen verwenden …“ */
 const MEHRZAHL: Readonly<Record<Belegart, string>> = { rechnung: 'Rechnungen', quittung: 'Quittungen', angebot: 'Angebote', eigenbeleg: 'Eigenbelege' };
-const QUELLEN: readonly SegOption<Vorschauquelle>[] = [
-  { value: 'beispiel', label: 'Beispiel' },
-  { value: 'beleg', label: 'Letzter Beleg' },
-];
+const QUELLE_BEISPIEL: SegOption<Vorschauquelle> = { value: 'beispiel', label: 'Beispiel' };
+const QUELLE_BELEG: SegOption<Vorschauquelle> = { value: 'beleg', label: 'Letzter Beleg' };
+const QUELLE_BLANKO: SegOption<Vorschauquelle> = { value: 'blanko', label: 'Blanko' };
 
 const speicher = (): Storage | undefined => {
   try {
@@ -816,6 +824,9 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
 
   const logo = useFirmenlogo((s) => s.name);
   const mitBeleg = quelle === 'beleg' && letzter != null;
+  /** Blanko-Formular zum Ausfüllen von Hand (nur Quittung und Eigenbeleg) */
+  const blanko = quelle === 'blanko' && hatBlanko(art);
+  const quellen = [QUELLE_BEISPIEL, ...(letzter ? [QUELLE_BELEG] : []), ...(hatBlanko(art) ? [QUELLE_BLANKO] : [])];
   const belegId = mitBeleg ? letzter.id : null;
 
   // Letzten Beleg lesen wie die Beleg-Maske (nichts wird geschrieben); weg oder Fehler ⇒ zurück zu den Beispieldaten
@@ -845,7 +856,13 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
   const echtDoc = belegId != null && echt?.id === belegId ? echt.doc : null;
   const laedt = belegId != null && !echtDoc;
   // aktuelles Firmenlogo auch beim echten Beleg: gezeigt wird, wie die Vorlage heute aussieht
-  const doc = useMemo(() => ({ ...(echtDoc ?? beispielbeleg(art, basis.firma, basis.ust, heute())), logo: logo || null }), [echtDoc, art, basis, logo]);
+  const doc = useMemo(
+    () => ({
+      ...(echtDoc ?? (blanko ? blankobeleg(art, basis.firma, basis.ust) : beispielbeleg(art, basis.firma, basis.ust, heute()))),
+      logo: logo || null,
+    }),
+    [echtDoc, blanko, art, basis, logo],
+  );
   const pflicht = useMemo(() => pflichtCheck(doc, bausteine), [doc, bausteine]);
   const eigeneFirma = basis.firma !== BEISPIEL_FIRMA;
 
@@ -1005,7 +1022,7 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
   const pdfErzeugen = async () => {
     setPdf({ status: 'laeuft' });
     const tex = belegTex(doc, bausteine, accent, await belegLogo(doc));
-    const name = `Kladdy-Vorlage-${ARTEN[art].label}.pdf`;
+    const name = blanko ? `Kladdy-Blanko-${ARTEN[art].label}.pdf` : `Kladdy-Vorlage-${ARTEN[art].label}.pdf`;
     try {
       await kompiliere({ main: tex.main.tex, daten: tex.daten, assets: tex.assets }, name);
     } catch (e) {
@@ -1170,15 +1187,22 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
           setze={(key, wert) => setzen(sel, key, wert)}
           schieben={(richtung) => schieben(sel, richtung, false)}
         />
-        <PflichtKarte art={art} liste={pflicht} eigeneFirma={eigeneFirma} mitBeleg={mitBeleg} />
+        <PflichtKarte art={art} liste={pflicht} eigeneFirma={eigeneFirma} quelle={blanko ? 'blanko' : mitBeleg ? 'beleg' : 'beispiel'} />
       </div>
 
       <div className="vl-right reveal" style={reveal(2)}>
         <div className="vl-toolbar">
           <Seg options={ANSICHTEN} value={ansicht} onChange={setAnsicht} ariaLabel="Ansicht" />
           <span className="spacer" />
-          {letzter && <Seg options={QUELLEN} value={mitBeleg ? 'beleg' : 'beispiel'} onChange={quelleWaehlen} ariaLabel="Daten der Vorschau" />}
-          {mitBeleg ? (
+          {quellen.length > 1 && (
+            <Seg options={quellen} value={blanko ? 'blanko' : mitBeleg ? 'beleg' : 'beispiel'} onChange={quelleWaehlen} ariaLabel="Daten der Vorschau" />
+          )}
+          {blanko ? (
+            <span className="vl-doc" title="Zum Ausdrucken und Ausfüllen von Hand – ohne Nummer, es wird nichts gespeichert">
+              <FileText />
+              Blanko zum Ausfüllen{eigeneFirma ? ' · deine Firmendaten' : ''}
+            </span>
+          ) : mitBeleg ? (
             <span className="vl-doc" title="Gezeigt als Entwurf ohne Nummer in den aktuellen Bausteinen – der Beleg selbst bleibt unverändert">
               {laedt ? <LoaderCircle className="ic spin" /> : <FileText />}
               {[letzter.nummer ?? 'Entwurf', letzter.kunde_name, letzter.nummer && 'als Entwurf'].filter(Boolean).join(' · ')}
@@ -1194,9 +1218,11 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
             className="btn ghost"
             disabled={laeuft || laedt || !nativ}
             title={
-              nativ
-                ? `Mit Tectonic als PDF setzen und öffnen (Entwurf ${mitBeleg ? 'ohne Nummer mit dem letzten Beleg' : 'mit Beispieldaten'}, wird nicht abgelegt)`
-                : 'Nur in der Mac-App'
+              !nativ
+                ? 'Nur in der Mac-App'
+                : blanko
+                  ? `Blanko-${ARTEN[art].label} als PDF setzen und öffnen (zum Ausfüllen von Hand, ohne Nummer, wird nicht abgelegt)`
+                  : `Mit Tectonic als PDF setzen und öffnen (Entwurf ${mitBeleg ? 'ohne Nummer mit dem letzten Beleg' : 'mit Beispieldaten'}, wird nicht abgelegt)`
             }
             onClick={() => void pdfErzeugen()}
           >
@@ -1219,8 +1245,9 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
             className="vl-desk"
           />
         ) : (
-          <LatexAnsicht art={art} bausteine={bausteine} accent={accent} />
+          <LatexAnsicht art={art} bausteine={bausteine} accent={accent} blanko={blanko} />
         )}
+        {blanko && <p className="hint vl-blanko-hinweis">{BLANKO_HINWEIS[art]}</p>}
       </div>
     </div>
   );
@@ -1357,7 +1384,7 @@ function BausteinKarte({ b, index, anzahl, setze, schieben }: KarteProps) {
 
 /* ================= Pflichtangaben-Check (§2.3) ================= */
 
-function PflichtKarte({ art, liste, eigeneFirma, mitBeleg }: { art: Belegart; liste: readonly Pflichtangabe[]; eigeneFirma: boolean; mitBeleg: boolean }) {
+function PflichtKarte({ art, liste, eigeneFirma, quelle }: { art: Belegart; liste: readonly Pflichtangabe[]; eigeneFirma: boolean; quelle: Vorschauquelle }) {
   const fehlt = liste.filter((p) => !p.ok).length;
   const stand = fehlt ? `${fehlt} ${fehlt === 1 ? 'Angabe fehlt' : 'Angaben fehlen'}` : 'alles drin';
   return (
@@ -1387,8 +1414,12 @@ function PflichtKarte({ art, liste, eigeneFirma, mitBeleg }: { art: Belegart; li
         </ul>
       )}
       <p className="hint vl-check-fuss">
-        {mitBeleg ? 'Geprüft mit dem letzten Beleg' : `Geprüft mit Beispieldaten und ${eigeneFirma ? 'deinen Firmendaten' : 'einer Beispielfirma'}`} – es zählt nur, was die
-        Bausteine auch drucken.
+        {quelle === 'blanko'
+          ? 'Geprüft für die Blanko-Vorlage (Werte werden von Hand eingetragen)'
+          : quelle === 'beleg'
+            ? 'Geprüft mit dem letzten Beleg'
+            : `Geprüft mit Beispieldaten und ${eigeneFirma ? 'deinen Firmendaten' : 'einer Beispielfirma'}`}{' '}
+        – es zählt nur, was die Bausteine auch drucken.
       </p>
     </section>
   );
@@ -1430,8 +1461,8 @@ function PdfHinweis({ pdf, schliessen }: { pdf: Exclude<PdfLauf, null>; schliess
   );
 }
 
-function LatexAnsicht({ art, bausteine, accent }: { art: Belegart; bausteine: readonly Baustein[]; accent: string }) {
-  const teile = useMemo(() => texTeile(mainTex(art, bausteine, accent).tex), [art, bausteine, accent]);
+function LatexAnsicht({ art, bausteine, accent, blanko }: { art: Belegart; bausteine: readonly Baustein[]; accent: string; blanko: boolean }) {
+  const teile = useMemo(() => texTeile(mainTex(art, bausteine, accent, { blanko }).tex), [art, bausteine, accent, blanko]);
   return (
     <section className="card flush vl-latex">
       <div className="set-note">

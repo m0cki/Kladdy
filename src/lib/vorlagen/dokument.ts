@@ -7,6 +7,8 @@
  * - Geld nur in Cent. Menge darf Nachkommastellen haben (Spalte `menge REAL`); der Positionsbetrag wird ganzzahlig
  *   über Tausendstel gerechnet und kaufmännisch auf Cent gerundet.
  * - `nummer` null = Entwurf (Nummern gibt es erst beim Ausstellen).
+ * - `blanko` = Formular zum Ausfüllen von Hand (Vorlagen-Seite, §7.0): Firmendaten gedruckt, Werte des Belegs als
+ *   Schreiblinien, kein Wasserzeichen. Nie gespeichert, nie mit Nummer.
  * Tests: vorlagen.test.ts */
 import type { Zahlungsart } from '../buchungen';
 import type { Firma } from '../firma';
@@ -112,6 +114,9 @@ export interface BelegDokument {
   ust_modus: UstModus;
   /** Stornobeleg: Verweis auf das Original (Titel „Stornorechnung“ usw., Beträge negativ, kein Zahlungsaufruf) */
   storno_von?: { nummer: string; datum: string } | null;
+  /** Blanko-Formular zum Ausfüllen von Hand (nur Vorschau/PDF der Vorlagen-Seite, nie gespeichert): Werte des Belegs
+   * werden Schreiblinien, Firmendaten bleiben, kein Wasserzeichen und kein „Entwurf“ (beispiel.ts `blankobeleg`) */
+  blanko?: boolean;
 }
 
 /* ---------- Rechnen (nur Ganzzahlen) ---------- */
@@ -216,7 +221,8 @@ export function quittungFuer(doc: Pick<BelegDokument, 'betreff' | 'positionen'>)
 export const unterschriftDatum = (doc: Pick<BelegDokument, 'art' | 'datum' | 'ausgestellt_am'>): string =>
   datumText(doc.art === 'eigenbeleg' ? (doc.ausgestellt_am ?? doc.datum) : doc.datum);
 
-export const istEntwurf = (doc: Pick<BelegDokument, 'nummer' | 'storniert'>): boolean => !doc.storniert && !doc.nummer;
+/** Entwurf ⇒ Wasserzeichen ENTWURF. Ein Blanko-Formular ist kein Beleg (keine Nummer, aber auch kein Entwurf). */
+export const istEntwurf = (doc: Pick<BelegDokument, 'nummer' | 'storniert' | 'blanko'>): boolean => !doc.storniert && !doc.nummer && !doc.blanko;
 
 /** Titel der Belegart; ein Stornobeleg heißt „Stornorechnung“, „Storno-Quittung“ bzw. „Storno-Eigenbeleg“. */
 export function belegTitel(doc: Pick<BelegDokument, 'art' | 'storno_von'>): string {
@@ -275,8 +281,33 @@ export function zerlegen(text: string): Textteil[] {
   return teile;
 }
 
-/** Werte aller Platzhalter für ein Dokument (Klartext, unmaskiert). */
+/** Platzhalter mit Werten des Belegs (nicht der Firma): im Blanko-Formular eine Schreiblinie statt eines Werts.
+ *  {art}, {einleitung} und {schlusstext} bleiben Text (Belegart bzw. Standardtexte der Art). */
+export const BELEG_PLATZHALTER: ReadonlySet<PlatzhalterName> = new Set<PlatzhalterName>([
+  'kunde',
+  'nr',
+  'datum',
+  'leistungsdatum',
+  'faellig',
+  'summe',
+  'betrag_worte',
+  'betreff',
+  'zahlungsziel',
+]);
+const KEINE_LUECKEN: ReadonlySet<PlatzhalterName> = new Set();
+
+/** Platzhalter, die als Schreiblinie gedruckt werden (nur im Blanko-Formular, sonst keine). */
+export const luecken = (doc: Pick<BelegDokument, 'blanko'>): ReadonlySet<PlatzhalterName> => (doc.blanko ? BELEG_PLATZHALTER : KEINE_LUECKEN);
+
+/** Werte aller Platzhalter für ein Dokument (Klartext, unmaskiert). Blanko: Werte des Belegs leer (Vorschau und PDF
+ *  drucken dort eine Linie, siehe `luecken`). */
 export function platzhalterWerte(doc: BelegDokument): Record<PlatzhalterName, string> {
+  const w = platzhalterWerteRoh(doc);
+  if (doc.blanko) for (const n of BELEG_PLATZHALTER) w[n] = '';
+  return w;
+}
+
+function platzhalterWerteRoh(doc: BelegDokument): Record<PlatzhalterName, string> {
   const F = doc.firma;
   const s = belegSumme(doc);
   return {

@@ -92,7 +92,8 @@ export function belegAssets(doc: BelegDokument, bausteine: readonly Baustein[], 
   return assets;
 }
 
-/** Beide Dateien für einen Beleg und die Bilder dazu (`kompiliere({ main: main.tex, daten, assets })`). `logo`: Bytes
+/** Beide Dateien für einen Beleg und die Bilder dazu (`kompiliere({ main: main.tex, daten, assets })`); ein
+ * Blanko-Formular (`doc.blanko`) setzt main.tex mit Schreiblinien statt Werten. `logo`: Bytes
  * des Firmenlogos (`belegLogo(doc)`); ohne sie bleibt \LogoDatei leer, damit nie eine fehlende Datei eingebunden wird. */
 export function belegTex(
   doc: BelegDokument,
@@ -101,7 +102,7 @@ export function belegTex(
   logo: Uint8Array | null = null,
 ): { main: MainTex; daten: string; assets: TexAsset[] } {
   const d = doc.logo && !logo ? { ...doc, logo: null } : doc;
-  return { main: mainTex(d.art, bausteine, akzent), daten: datenTex(d), assets: belegAssets(d, bausteine, logo) };
+  return { main: mainTex(d.art, bausteine, akzent, { blanko: !!d.blanko }), daten: datenTex(d), assets: belegAssets(d, bausteine, logo) };
 }
 
 /** Bytes des Firmenlogos eines Belegs für den PDF-Satz (null = keins). Fehlt die Datei, scheitert das bei einem

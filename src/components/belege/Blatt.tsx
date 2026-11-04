@@ -10,6 +10,8 @@
  *   gelesen wird sie im Vorlagentext vor dem Ersetzen der Platzhalter, Werte bleiben immer Text.
  * - Vorlagen-Seite (`bearbeitung`): Ein Text aus einer Einstellung (.blk-tx, data-feld = Schlüssel, im .blk mit
  *   data-blk = Index) wird per Klick an derselben Stelle zum FormatEditor. Feste Texte („Rechnungs-Nr.“ usw.) nicht.
+ * - Blanko-Formular (`doc.blanko`, Vorlagen-Seite): Firmendaten wie immer, Werte des Belegs als Schreiblinien (auch
+ *   Platzhalter wie {datum}, dokument.ts `luecken`), Ankreuzfelder leer, „Ort, Datum“ leer, kein Wasserzeichen.
  * - BlattVorschau skaliert das Blatt auf die verfügbare Breite (wie mount() im Prototyp).
  * Stile: src/styles/blatt.css */
 import { Fragment, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react';
@@ -28,6 +30,7 @@ import {
   gedruckterZahlungsweg,
   istEntwurf,
   leistungLabel,
+  luecken,
   leistungText,
   mengeText,
   platzhalterWerte,
@@ -60,9 +63,9 @@ function zeilen(text: string): ReactNode {
   ));
 }
 
-/** Ein Stück Text mit Formatierung; fehlende Nummer grau „Entwurf“. */
+/** Ein Stück Text mit Formatierung; fehlende Nummer grau „Entwurf“, im Blanko-Formular eine kurze Schreiblinie. */
 function segment(s: Segment, key: number): ReactNode {
-  let n: ReactNode = s.entwurf ? <span className="blk-leer">Entwurf</span> : s.text;
+  let n: ReactNode = s.luecke ? <Luecke /> : s.entwurf ? <span className="blk-leer">Entwurf</span> : s.text;
   if (s.unterstrichen) n = <u>{n}</u>;
   if (s.kursiv) n = <em>{n}</em>;
   if (s.fett) n = <strong>{n}</strong>;
@@ -83,6 +86,8 @@ export interface BlattBearbeitung {
 interface Ctx {
   doc: BelegDokument;
   werte: Record<PlatzhalterName, string>;
+  /** Platzhalter, die als Schreiblinie gedruckt werden (nur Blanko-Formular) */
+  luecken: ReadonlySet<PlatzhalterName>;
   empf: Empfaenger;
   summe: number;
   editable: boolean;
@@ -95,7 +100,7 @@ interface Ctx {
 
 /** Platzhalter ersetzen wie `ersetzen` (Ränder getrimmt), mit Formatierung, fehlende Nummer grau; null = nichts zu drucken. */
 function ph(text: string, x: Ctx): ReactNode | null {
-  const z = ersetzteZeilen(text, x.werte);
+  const z = ersetzteZeilen(text, x.werte, x.luecken);
   if (!z) return null;
   return z.map((zeile, i) => (
     <Fragment key={i}>
@@ -150,6 +155,21 @@ function Feld({ label, children }: { label: ReactNode; children: ReactNode }) {
   );
 }
 
+/** Kurze Schreiblinie im Text (Platzhalter im Blanko-Formular), wie \KLuecke im PDF */
+function Luecke() {
+  return <span className="blk-luecke" />;
+}
+
+/** Schreiblinie über die ganze Breite zum Ausfüllen von Hand (Blanko-Formular), wie \KSchreib im PDF; `euro` = „€“ dahinter */
+function Schreiben({ euro = false }: { euro?: boolean }) {
+  return (
+    <span className="blk-schreib">
+      <i />
+      {euro && <span>€</span>}
+    </span>
+  );
+}
+
 /** Ankreuzfeld (Quittung „Formular“): angekreuzt mit einem Kreuz – nie nur über Farbe. */
 function Kaestchen({ an }: { an: boolean }) {
   return (
@@ -160,14 +180,42 @@ function Kaestchen({ an }: { an: boolean }) {
   );
 }
 
-/** „Bezeichnung: Wert“ (Quittung „Formular“) */
-function FormZeile({ label, children }: { label: ReactNode; children: ReactNode }) {
+/** Zahlungswege zum Ankreuzen; `weg` = angekreuzter (null = keiner, Blanko-Formular) */
+function Kreuze({ weg }: { weg: string | null }) {
+  return ZAHLUNGSWEGE.map((z) => (
+    <span key={z} className="blk-kreuz">
+      <Kaestchen an={weg === z} />
+      {zahlungswegText(z)}
+    </span>
+  ));
+}
+
+/** „Bezeichnung: Wert“ (Quittung „Formular“); `schreib` = Wert ist eine Schreiblinie (Blanko-Formular) */
+function FormZeile({ label, children, schreib = false }: { label: ReactNode; children: ReactNode; schreib?: boolean }) {
   return (
-    <div className="blk-form-z">
+    <div className={`blk-form-z${schreib ? ' schreib' : ''}`}>
       <b>{label}:</b> {children}
     </div>
   );
 }
+
+function MetaTabelle({ rows }: { rows: readonly [string, ReactNode][] }) {
+  return (
+    <table className="blk-meta">
+      <tbody>
+        {rows.map(([l, v]) => (
+          <tr key={l}>
+            <td>{l}</td>
+            <td>{v}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+/** Leere Zeilen der Positionstabelle im Blanko-Formular (wie im PDF) */
+const BLANKO_POSITIONEN = 4;
 
 function PosMini({ positionen }: { positionen: readonly BelegPosition[] }) {
   return (
@@ -185,6 +233,93 @@ function PosMini({ positionen }: { positionen: readonly BelegPosition[] }) {
         ))}
       </tbody>
     </table>
+  );
+}
+
+/** Quittungsangaben im Blanko-Formular: dieselben Angaben und Stile, statt Werten Schreiblinien, Kästchen leer. */
+function quittungBlanko(b: Aufgeloest, x: Ctx): ReactNode {
+  const a = quittungAngaben(b);
+  if (a.formular) {
+    return (
+      <div className="blk-form">
+        <div className="blk-form-kopf">
+          {a.datum && (
+            <FormZeile label="Datum" schreib>
+              <Schreiben />
+            </FormZeile>
+          )}
+          <FormZeile label="Nr." schreib>
+            <Schreiben />
+          </FormZeile>
+        </div>
+        {a.kunde && (
+          <FormZeile label={feld(b, x, 'von')} schreib>
+            <Schreiben />
+          </FormZeile>
+        )}
+        {a.zweck && (
+          <FormZeile label={feld(b, x, 'fuer')} schreib>
+            <Schreiben />
+          </FormZeile>
+        )}
+        {a.zahlungsart && (
+          <FormZeile label="Zahlungsart">
+            <Kreuze weg={null} />
+          </FormZeile>
+        )}
+        {a.betrag && (
+          <div className="blk-form-summe schreib">
+            <b>Gesamtbetrag:</b>
+            <Schreiben euro />
+          </div>
+        )}
+        {a.worte && (
+          <p className="blk-form-worte schreib">
+            <span>in Worten:</span>
+            <Schreiben />
+          </p>
+        )}
+      </div>
+    );
+  }
+  const kacheln = [
+    a.betrag && (
+      <Feld key="betrag" label="Betrag">
+        <Schreiben euro />
+      </Feld>
+    ),
+    a.datum && (
+      <Feld key="datum" label="Datum">
+        <Schreiben />
+      </Feld>
+    ),
+    a.zahlungsart && (
+      <Feld key="zahlungsart" label="Zahlungsart">
+        <span className="blk-kreuze">
+          <Kreuze weg={null} />
+        </span>
+      </Feld>
+    ),
+  ].filter(Boolean);
+  return (
+    <>
+      {kacheln.length > 0 && <div className={`blk-grid ${kacheln.length === 3 ? 'c3' : 'c2'}`}>{kacheln}</div>}
+      {a.worte && (
+        <Feld label="Betrag in Worten">
+          <Schreiben />
+        </Feld>
+      )}
+      {a.kunde && (
+        <Feld label={feld(b, x, 'von')}>
+          <Schreiben />
+        </Feld>
+      )}
+      {a.zweck && (
+        <Feld label={feld(b, x, 'fuer')}>
+          <Schreiben />
+        </Feld>
+      )}
+    </>
   );
 }
 
@@ -206,7 +341,7 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
   firmenblock(b, x) {
     const name = feld(b, x, 'name');
     const zeilenVon = (key: string) => {
-      const z = sichtbareZeilen(b.text(key), x.werte).map((zeile, i) => <div key={i}>{ph(zeile.text, x)}</div>);
+      const z = sichtbareZeilen(b.text(key), x.werte, x.luecken).map((zeile, i) => <div key={i}>{ph(zeile.text, x)}</div>);
       return feld(b, x, key, z.length ? z : null, true);
     };
     const untertitel = zeilenVon('untertitel');
@@ -232,6 +367,24 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
     const { doc, empf: e } = x;
     const A = ARTEN[doc.art];
     const rows: [string, ReactNode][] = [];
+    if (doc.blanko) {
+      // Blanko: drei Zeilen für den Empfänger, rechts kurze Linien für Nummer, Datum usw.
+      if (b.an('nr')) rows.push([A.nrLabel, <Luecke />]);
+      if (b.an('datum')) rows.push(['Datum', <Luecke />]);
+      if (b.an('leistung') && doc.art !== 'angebot') rows.push(['Leistungsdatum', <Luecke />]);
+      if (b.an('kundennr')) rows.push(['Kunden-Nr.', <Luecke />]);
+      if (b.an('faellig')) rows.push([doc.art === 'angebot' ? 'Gültig bis' : 'Fällig am', <Luecke />]);
+      return (
+        <>
+          <div className="blk-adr">
+            <Schreiben />
+            <Schreiben />
+            <Schreiben />
+          </div>
+          {rows.length > 0 && <MetaTabelle rows={rows} />}
+        </>
+      );
+    }
     if (b.an('nr')) rows.push([A.nrLabel, doc.nummer ? <b>{doc.nummer}</b> : <span className="blk-leer">Entwurf</span>]);
     if (b.an('datum')) rows.push(['Datum', datumText(doc.datum)]);
     if (b.an('leistung') && doc.art !== 'angebot' && doc.leistung_von) rows.push([leistungLabel(doc), leistungText(doc)]);
@@ -241,18 +394,7 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
     return (
       <>
         <div className="blk-adr">{adr.length ? adr.map((l, i) => <div key={i}>{l}</div>) : <div className="blk-leer">Empfänger</div>}</div>
-        {rows.length > 0 && (
-          <table className="blk-meta">
-            <tbody>
-              {rows.map(([l, v]) => (
-                <tr key={l}>
-                  <td>{l}</td>
-                  <td>{v}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        {rows.length > 0 && <MetaTabelle rows={rows} />}
       </>
     );
   },
@@ -305,7 +447,17 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
           </tr>
         </thead>
         <tbody>
-          {pos.length ? (
+          {x.doc.blanko ? (
+            Array.from({ length: BLANKO_POSITIONEN }, (_, i) => (
+              <tr key={i} className="blanko">
+                {mitPos && <td className="r p" />}
+                <td className="l">{'\u00a0'}</td>
+                <td className="r" />
+                {mitEp && <td className="r" />}
+                <td className="r" />
+              </tr>
+            ))
+          ) : pos.length ? (
             pos.map((p, i) => (
               <tr key={i}>
                 {mitPos && <td className="r p">{i + 1}</td>}
@@ -333,12 +485,27 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
     return (
       <div className="blk-summe-row">
         <span>{feld(b, x, 'label')}</span>
-        <b>{formatBetrag(x.summe)}</b>
+        <b>
+          {x.doc.blanko ? (
+            <>
+              <Luecke /> €
+            </>
+          ) : (
+            formatBetrag(x.summe)
+          )}
+        </b>
       </div>
     );
   },
   betrag_worte(b, x) {
     const label = feld(b, x, 'label');
+    if (x.doc.blanko)
+      return (
+        <p className="blk-worte schreib">
+          {label && <span>{label}:</span>}
+          <Schreiben />
+        </p>
+      );
     return (
       <p className="blk-worte">
         {label && <span>{label}:</span>} {betragInWorten(x.summe)}
@@ -416,6 +583,7 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
     // jede Angabe einzeln abschaltbar; alle aus ⇒ nichts (wie im PDF)
     const a = quittungAngaben(b);
     if (a.leer) return null;
+    if (doc.blanko) return quittungBlanko(b, x);
     const pos = doc.positionen;
     const fuer =
       pos.length > 1 ? (
@@ -444,12 +612,7 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
           {a.zweck && <FormZeile label={feld(b, x, 'fuer')}>{fuer}</FormZeile>}
           {a.zahlungsart && (
             <FormZeile label="Zahlungsart">
-              {ZAHLUNGSWEGE.map((z) => (
-                <span key={z} className="blk-kreuz">
-                  <Kaestchen an={weg === z} />
-                  {zahlungswegText(z)}
-                </span>
-              ))}
+              <Kreuze weg={weg} />
             </FormZeile>
           )}
           {a.betrag && (
@@ -495,6 +658,42 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
   eigenbeleg_felder(b, x) {
     const { doc, empf: e } = x;
     const sub = feld(b, x, 'untertitel');
+    if (doc.blanko) {
+      return (
+        <>
+          {sub && <p className="blk-sub">{sub}</p>}
+          <div className="blk-grid c3">
+            <Feld label="Betrag">
+              <Schreiben euro />
+            </Feld>
+            <Feld label="Datum der Zahlung">
+              <Schreiben />
+            </Feld>
+            <Feld label="Zahlungsart">
+              <span className="blk-kreuze">
+                <Kreuze weg={null} />
+              </span>
+            </Feld>
+          </div>
+          {b.an('worte') && (
+            <Feld label="Betrag in Worten">
+              <Schreiben />
+            </Feld>
+          )}
+          <div className="blk-grid c2">
+            <Feld label="Zahlungsempfänger">
+              <Schreiben />
+            </Feld>
+            <Feld label="Grund für den Eigenbeleg">
+              <Schreiben />
+            </Feld>
+          </div>
+          <Feld label="Gegenstand / Zweck der Ausgabe">
+            <Schreiben />
+          </Feld>
+        </>
+      );
+    }
     const gebucht = gebuchtText(doc);
     return (
       <>
@@ -536,7 +735,8 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
     }
     const ort = x.doc.firma.ort.trim();
     const datum = unterschriftDatum(x.doc);
-    const vor = b.an('vorbelegen') && datum ? [ort, datum].filter(Boolean).join(', ') : '';
+    // Blanko: „Ort, Datum“ schreibt man von Hand (das Datum hat das Formular nicht)
+    const vor = b.an('vorbelegen') && datum && !x.doc.blanko ? [ort, datum].filter(Boolean).join(', ') : '';
     return (
       <div className="blk-sign">
         <div>
@@ -604,6 +804,7 @@ export function Blatt({ doc, bausteine, editable = false, ausgewaehlt = null, on
   const basis: Ctx = {
     doc,
     werte: platzhalterWerte(doc),
+    luecken: luecken(doc),
     empf: empfaenger(doc),
     summe: belegSumme(doc),
     editable,
