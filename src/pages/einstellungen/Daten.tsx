@@ -126,8 +126,8 @@ function TectonicKarte({ stand, neuLaden }: { stand: TectonicStand; neuLaden: ()
           <div className="set-note warn">
             <TriangleAlert />
             <span>
-              <b>Tectonic wurde nicht gefunden.</b> Im Terminal mit <span className="mono">brew install tectonic</span> installieren
-              oder das Programm über „Pfad wählen …“ angeben. Ohne Tectonic entstehen keine PDFs.
+              <b>Tectonic wurde nicht gefunden.</b> Es gehört eigentlich zu Kladdy: Bitte Kladdy neu installieren oder das
+              Programm über „Pfad wählen …“ angeben. Ohne Tectonic entstehen keine PDFs.
             </span>
           </div>
         )}
@@ -150,7 +150,7 @@ function TectonicKarte({ stand, neuLaden }: { stand: TectonicStand; neuLaden: ()
           ) : null}
         </div>
         <p className="hint">
-          Gesucht wird in dieser Reihenfolge: mit Kladdy geliefert (später), /opt/homebrew/bin/tectonic, /usr/local/bin/tectonic,
+          Gesucht wird in dieser Reihenfolge: mit Kladdy geliefert, /opt/homebrew/bin/tectonic, /usr/local/bin/tectonic,
           sonst der eigene Pfad.
         </p>
       </SetRow>

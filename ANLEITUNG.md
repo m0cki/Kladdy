@@ -57,7 +57,7 @@
    ```bash
    xcode-select --install                                   # Apple-Entwicklerwerkzeuge
    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-   brew install node tectonic                               # Node (LTS ≥ 22) + LaTeX-Engine
+   brew install node                                        # Node (LTS ≥ 22); Tectonic holt npm run tectonic (§3.2)
    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh   # Rust (für Tauri)
    curl -fsSL https://claude.ai/install.sh | bash           # Claude Code, falls noch nicht installiert
    ```
@@ -352,7 +352,9 @@ Die **Datenbank nicht in iCloud Drive** legen (Sync kann SQLite beschädigen). B
   Dateiauswahl, danach dieselbe Schublade wie beim Datei-Drop, Export …, Nach Updates suchen …), **Bearbeiten-Menü
   unbedingt behalten**, sonst funktionieren ⌘C/⌘V/⌘Z in Eingabefeldern nicht. Darstellung (Hell/Dunkel ⇧⌘L, Seitenleiste ⌘\).
 - **Tectonic finden:** Mac-Apps erben den `PATH` der Shell nicht. In dieser Reihenfolge suchen: mitgeliefertes Sidecar
-  (sobald gebündelt, §3.2), `/opt/homebrew/bin/tectonic`, `/usr/local/bin/tectonic`, sonst Pfad in den Einstellungen.
+  (§3.2, liegt als `tectonic` neben der App-Datei: `Kladdy.app/Contents/MacOS/tectonic`, in der Entwicklung
+  `src-tauri/target/debug/tectonic`), `/opt/homebrew/bin/tectonic`, `/usr/local/bin/tectonic`, sonst Pfad in den
+  Einstellungen.
 - **Browser-Features:** Mindestens macOS 14. `color-mix()` geht. `oklch(from …)` (relative Farben) erst ab Safari 18,
   daher den `color-mix`-Fallback für `--accent-2` behalten. `backdrop-filter` zusätzlich mit `-webkit-`-Präfix.
 - **Bauen:** `npm run tauri build` erzeugt `src-tauri/target/release/bundle/macos/Kladdy.app` und eine `.dmg`.
@@ -455,6 +457,14 @@ Tauri signiert sie mit. **Nicht** einfach die Homebrew-Datei kopieren: Sie lädt
 (harfbuzz, icu4c, freetype …), die es auf anderen Macs nicht gibt. Ein eigenständiges Binary nehmen (z. B. aus den
 GitHub-Releases von Tectonic) und mit `otool -L` prüfen, dass nur System-Bibliotheken verlinkt sind. Tectonic lädt beim
 ersten PDF einmalig seine TeX-Pakete aus dem Internet und cacht sie (Hinweis in der App: „Erstes PDF dauert etwas länger“).
+**Umgesetzt:** `scripts/tectonic-holen.sh` (`npm run tectonic`) lädt das offizielle Release **Tectonic 0.17.0**
+(`tectonic-0.17.0-aarch64-apple-darwin.tar.gz`, SHA-256 `a3f1cac7…d45667`, fest im Skript samt Prüfsumme des
+entpackten Programms; `otool -L`: nur System-Frameworks, `libc++`, `libiconv`, `libSystem`; `minos` 11.0) nach
+`src-tauri/binaries/tectonic-<target-triple>` (nicht im Repository). Es läuft automatisch über `beforeDevCommand` und
+`beforeBuildCommand` (Tauri setzt `TAURI_ENV_TARGET_TRIPLE`), in der CI vor `cargo clippy` und im Release vor dem Bauen;
+ohne die Datei bricht schon `tauri-build` ab („resource path … doesn't exist“), wer `cargo` direkt aufruft, vorher
+einmal `npm run tectonic`. Neue Version: `VERSION` und die vier Prüfsummen im Skript ändern, vorher selbst nachrechnen.
+Der Paket-Cache liegt im Standardort von Tectonic (`~/Library/Caches/TectonicProject.Tectonic`).
 
 ---
 
@@ -1699,7 +1709,7 @@ Hat der Nutzer ein **Firmenlogo** hochgeladen (§6.10), steht dort stattdessen s
 
 Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nennt die Abnahme-Punkte → du startest die App (`npm run tauri dev`) und prüfst → Commit.
 
-### Stand (18.10.2026)
+### Stand (04.11.2026)
 - **Veröffentlicht:** v1.0.0 (13.10.2026) mit Phase 0, Einstellungs-Seite, Updater, CI und Release-Action
   (Ablauf: `RELEASE.md`; nur von Hand, Release-Commits liegen nur auf den Tags, `main` behält 0.1.0).
 - **Phase 1 in Teilen (je ein PR):**
@@ -2033,6 +2043,16 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
   Ziehen in der Bausteinliste geht weiter; „PDF“ zeigt fett/kursiv/unterstrichen wie die Vorschau (auch Quittung
   „Formular“); ein Kunde „<b>Test</b>“ erscheint wörtlich; ⌘K und ⌘N funktionieren weiter, auch während ein Text bearbeitet
   wird; Einfügen von formatiertem Text aus einer anderen App kommt als reiner Text an.
+- **Tectonic mitgeliefert** (§3.1, §3.2) – **erledigt (Branch `tectonic-mitgeliefert`)**: Sidecar über
+  `bundle.externalBin` (`binaries/tectonic`), geholt von `scripts/tectonic-holen.sh` (Tectonic 0.17.0, feste SHA-256,
+  idempotent). `tectonic.rs`: `mitgeliefert()` = `tectonic` neben `current_exe()` (`sidecar_neben`, getestet), eine
+  gemeinsame Meldung `NICHT_GEFUNDEN` für Einstellungen und `compile_latex` ohne Terminal-Anleitung (neu installieren
+  oder Pfad wählen). Aufruf weiter mit `--untrusted`. Keine Migration.
+  **Auf dem Mac prüfen:** `npm run tauri dev` lädt beim ersten Mal Tectonic (Zeile „Lade Tectonic 0.17.0 …“), danach
+  nicht mehr; Einstellungen › Daten zeigt „mit Kladdy geliefert“ und den Pfad `…/target/debug/tectonic`, „Prüfen“ ⇒
+  „Tectonic 0.17.0“; „PDF“ auf der Vorlagen-Seite und der Testbeleg setzen ein PDF; mit `npm run tauri build` gebaute
+  `Kladdy.app` enthält `Contents/MacOS/tectonic` und setzt PDFs auch auf einem Mac ohne Homebrew-Tectonic (zweites
+  Benutzerkonto, App aus der `.dmg` nach „Dennoch öffnen“).
 - **Offen aus Phase 1 (Teil 1+2):** Regelbesteuerung wirkt noch nicht auf Buchungen/Belege.
 - **Aus Phase 1 nachgeholt:** Kategorien bearbeiten, optionale Kategorien und EÜR-Zuordnung pro Jahr – **erledigt (Branch
   `kategorien-euer`, auf dem Ende der Phase-3-Kette)**: Migration `0008_kategorien` (Katalog Abschreibungen (AfA), Bewirtung 70 %, Geschenke, Homeoffice,

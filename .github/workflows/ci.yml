@@ -20,8 +20,8 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # Rust nur prüfen, wenn sich src-tauri/ (oder diese Datei) geändert hat. Mac-Runner sind knapp und
-  # warten oft minutenlang auf Zuteilung; Linux-Runner starten sofort. Ein übersprungener Job zählt als grün,
+  # Rust nur prüfen, wenn sich src-tauri/, diese Datei oder scripts/tectonic-holen.sh geändert hat. Mac-Runner sind
+  # knapp und warten oft minutenlang auf Zuteilung; Linux-Runner starten sofort. Ein übersprungener Job zählt als grün,
   # release.yml muss dafür nichts wissen.
   changes:
     name: Detect changes
@@ -46,7 +46,7 @@ jobs:
           fi
           DATEIEN="$(git diff --name-only "${BASIS}...${GITHUB_SHA}")"
           echo "$DATEIEN"
-          if grep -Eq '^(src-tauri/|\.github/workflows/ci\.yml$)' <<< "$DATEIEN"; then
+          if grep -Eq '^(src-tauri/|scripts/tectonic-holen\.sh$|\.github/workflows/ci\.yml$)' <<< "$DATEIEN"; then
             echo "rust=true" >> "$GITHUB_OUTPUT"
           else
             echo "rust=false" >> "$GITHUB_OUTPUT"
@@ -102,6 +102,10 @@ jobs:
       # (das echte Frontend baut der Linux-Job, der Release-Build baut alles vollständig).
       - name: Placeholder dist/
         run: mkdir -p dist
+
+      # tauri-build verlangt das Sidecar aus bundle.externalBin (§3.2); das Skript prüft die Prüfsumme
+      - name: Tectonic-Sidecar
+        run: bash scripts/tectonic-holen.sh
 
       - name: cargo fmt --check
         working-directory: src-tauri

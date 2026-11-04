@@ -43,6 +43,12 @@ erscheint nur kurz nach dem Startversuch; fehlt er, Schritt 4 wiederholen.
 Unter macOS 14 Sonoma geht es auch kürzer: Kladdy im Programme-Ordner mit **Rechtsklick → Öffnen** starten und im
 Dialog **Öffnen** wählen. Ab macOS 15 Sequoia ist nur noch der Weg über die Systemeinstellungen möglich.
 
+## PDFs
+
+Kladdy bringt die Satz-Engine [Tectonic](https://tectonic-typesetting.github.io) mit, es muss nichts zusätzlich
+installiert werden. Beim ersten PDF lädt Tectonic einmalig die nötigen TeX-Pakete aus dem Internet, das kann einige
+Minuten dauern.
+
 ## Updates
 
 Kladdy prüft beim Start auf neue Versionen und installiert sie auf Wunsch selbst.

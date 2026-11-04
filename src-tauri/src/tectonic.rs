@@ -1,7 +1,8 @@
 //! Tectonic finden und prüfen (ANLEITUNG §3.1 „Tectonic finden“, §6.10 Einstellungen › Daten).
 //!
-//! - Mac-Apps erben den `PATH` der Shell nicht. Reihenfolge: mitgeliefertes Sidecar (sobald gebündelt, §3.2),
-//!   `/opt/homebrew/bin/tectonic`, `/usr/local/bin/tectonic`, sonst der Pfad aus den Einstellungen (`tectonic_pfad`).
+//! - Mac-Apps erben den `PATH` der Shell nicht. Reihenfolge: mitgeliefertes Sidecar (§3.2, `bundle.externalBin`,
+//!   liegt als `tectonic` neben der App-Datei), `/opt/homebrew/bin/tectonic`, `/usr/local/bin/tectonic`, sonst der
+//!   Pfad aus den Einstellungen (`tectonic_pfad`).
 //! - `tectonic_finden` ist die eine Stelle dafür; `compile_latex` (Phase 3) benutzt sie ebenso.
 //! - Prüfen startet `<pfad> --version` direkt (keine Shell, keine Argumente vom Nutzer außer dem Pfad selbst) mit
 //!   Zeitlimit; hängt das Programm, wird es beendet.
@@ -19,6 +20,13 @@ use crate::datenbank::db_fehler;
 
 /// Feste Orte von Homebrew (Apple Silicon, dann Intel).
 pub const KANDIDATEN: &[&str] = &["/opt/homebrew/bin/tectonic", "/usr/local/bin/tectonic"];
+
+/// Dateiname des Sidecars neben der App-Datei (Tauri entfernt beim Kopieren das `-<target-triple>`).
+pub const SIDECAR_NAME: &str = "tectonic";
+
+/// Meldung, wenn nirgends ein Tectonic liegt (Einstellungen › Daten, `compile_latex`).
+pub const NICHT_GEFUNDEN: &str = "Tectonic wurde nicht gefunden. Es gehört eigentlich zu Kladdy: Bitte Kladdy neu \
+     installieren oder in Einstellungen › Daten über „Pfad wählen …“ ein Tectonic angeben.";
 
 /// Zeitlimit für `tectonic --version`.
 const PRUEF_ZEIT: Duration = Duration::from_secs(10);
@@ -79,9 +87,18 @@ pub fn finden_in(
         .or_else(|| eingestellt.and_then(|p| fund(p, Quelle::Einstellung)))
 }
 
-/// Mitgeliefertes Sidecar. Noch nicht gebündelt (Phase 7, §3.2): dann hier den Pfad neben der App-Datei liefern.
+/// Ort des Sidecars zur App-Datei `exe` (rein, testbar): derselbe Ordner, Name `tectonic`.
+/// Gebaut: `Kladdy.app/Contents/MacOS/tectonic`; Entwicklung: `src-tauri/target/debug/tectonic` (kopiert tauri-build).
+pub fn sidecar_neben(exe: &Path) -> Option<PathBuf> {
+    exe.parent().map(|ordner| ordner.join(SIDECAR_NAME))
+}
+
+/// Mitgeliefertes Sidecar neben der laufenden App-Datei (ob es dort liegt, prüft `finden_in`).
 fn mitgeliefert() -> Option<PathBuf> {
-    None
+    std::env::current_exe()
+        .ok()
+        .as_deref()
+        .and_then(sidecar_neben)
 }
 
 /// Tectonic für diesen Rechner; `eingestellt` = Wert von `tectonic_pfad` (None = automatisch).
@@ -217,10 +234,7 @@ pub async fn tectonic_pruefen(
 ) -> Result<TectonicPruefung, String> {
     let eingestellt = eingestellter_pfad(&instanzen).await?;
     let Some(fund) = tectonic_finden(eingestellt.as_deref()) else {
-        return Err(
-            "Tectonic wurde nicht gefunden. Im Terminal mit „brew install tectonic“ installieren oder den Pfad wählen."
-                .into(),
-        );
+        return Err(NICHT_GEFUNDEN.into());
     };
     let pfad = PathBuf::from(&fund.pfad);
     let version = tauri::async_runtime::spawn_blocking(move || version(&pfad, PRUEF_ZEIT))
@@ -327,6 +341,24 @@ mod tests {
             ["/opt/homebrew/bin/tectonic", "/usr/local/bin/tectonic"]
         );
         let _ = std::fs::remove_dir_all(&o);
+    }
+
+    #[test]
+    fn sidecar_liegt_neben_der_app_datei() {
+        assert_eq!(
+            sidecar_neben(Path::new("/Applications/Kladdy.app/Contents/MacOS/kladdy")),
+            Some(PathBuf::from(
+                "/Applications/Kladdy.app/Contents/MacOS/tectonic"
+            ))
+        );
+        assert_eq!(
+            sidecar_neben(Path::new("/x/src-tauri/target/debug/kladdy")),
+            Some(PathBuf::from("/x/src-tauri/target/debug/tectonic"))
+        );
+        assert_eq!(sidecar_neben(Path::new("/")), None);
+        // Die echte Suche fragt die laufende Datei (hier das Testprogramm) und liefert einen absoluten Pfad
+        let echt = mitgeliefert().expect("current_exe");
+        assert!(echt.is_absolute() && echt.ends_with(SIDECAR_NAME));
     }
 
     #[test]
