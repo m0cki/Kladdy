@@ -192,7 +192,7 @@ export interface KundenInfo {
   seit: string;
   geplant: number;
   angebote: number;
-  /** Sortierschlüssel „zuletzt da“ (absteigend): neu angelegt ohne Einträge ganz oben, dann nur kommende Termine
+  /** Sortierschlüssel „zuletzt da“ (absteigend): neu angelegt ohne Einträge ganz oben, dann alle mit kommendem Termin
    *  (nächster zuerst), dann nach letztem Besuch bzw. jüngstem vergangenen Eintrag */
   sortKey: string;
   /** normalisierte Stammdaten und Notiz */
@@ -254,8 +254,9 @@ function auswerten(k: KundeZeile, zeilen: readonly VerlaufZeile[], heute: string
   const seit = fruehester && fruehester < angelegt ? fruehester : angelegt;
 
   let sortKey: string;
-  if (zuletzt) sortKey = zuletzt;
-  else if (naechster) sortKey = '9' + String(99_999_999 - Number(naechster.z.datum.replace(/-/g, '')));
+  // wer einen kommenden Termin hat, steht oben (nächster zuerst) – auch Stammkunden; die Spalte zeigt „nächster: …“
+  if (naechster) sortKey = '9' + String(99_999_999 - Number(naechster.z.datum.replace(/-/g, '')));
+  else if (zuletzt) sortKey = zuletzt;
   else if (vergangen.length) sortKey = vergangen[0].z.datum;
   else if (eintraege.length) sortKey = eintraege[eintraege.length - 1].z.datum;
   else sortKey = '9999' + k.erstellt_am;

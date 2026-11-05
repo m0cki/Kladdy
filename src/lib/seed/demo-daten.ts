@@ -618,6 +618,15 @@ export function demoDaten(heute: string, seed: number = DEMO_SEED): DemoDaten {
     zahlungsart: 'bank',
   });
 
+  /* Nur gebucht, Papierquittung im Ordner (Erfassen › „Nur buchen“): Belegnummer „Papier“, kein Beleg aus Kladdy */
+  {
+    const d = werktag(plusTage(heute, -1), -1);
+    const k = privat[privat.length - 1];
+    if (imZeitraum(d) && k) {
+      buche({ typ: 'einnahme', datum: d, betrag: 4500, kat: DEMO_KATEGORIE.dienstleistung, k, zahlungsart: 'bar', text: 'Rasenmähen Vorgarten', belegnr: 'Papier' });
+    }
+  }
+
   /* ---------- Termine ---------- */
   // Erledigt: gut die Hälfte der Quittungen der letzten sechs Wochen hatte einen Termin
   const juengste = belege.filter((r) => r.art === 'quittung' && r.datum >= plusTage(heute, -42) && r.datum <= heute);

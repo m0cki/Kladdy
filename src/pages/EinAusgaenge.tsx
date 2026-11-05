@@ -7,11 +7,13 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { PAPIER_BELEG } from '../lib/ertrag';
 import {
   ArrowLeftRight,
   Ban,
   CalendarDays,
   Eye,
+  FileText,
   FileUp,
   Funnel,
   Lock,
@@ -514,6 +516,12 @@ function Zeile({ b, q }: { b: BuchungZeile; q: string }) {
               <Link className="bu-nr-chip" to={`/belege/${b.rechnung_id}`} title="Beleg öffnen">
                 <Hl text={nr} q={q} />
               </Link>
+            ) : nr === PAPIER_BELEG ? (
+              // „Nur buchen“ mit Papierquittung: der Zettel trägt die Buchungsnummer
+              <span className="bu-papier" title="Papierquittung im Ordner – auf dem Zettel steht diese Buchungsnummer">
+                <FileText />
+                Papierquittung
+              </span>
             ) : (
               <span className="bu-nr" title={nr}>
                 <Hl text={nr} q={q} />

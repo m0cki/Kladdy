@@ -28,46 +28,7 @@
  * Logik in lib/vorlagen/baukasten.ts, Stile in styles/vorlagen.css. */
 import { Fragment, useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent, type RefObject } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import {
-  ArrowDown,
-  ArrowUp,
-  Blocks,
-  Building2,
-  Check,
-  CircleCheck,
-  Clock,
-  Eye,
-  EyeOff,
-  FileText,
-  GripVertical,
-  Heading,
-  Info,
-  Landmark,
-  List,
-  LoaderCircle,
-  Lock,
-  Mail,
-  Minus,
-  MoveVertical,
-  PanelTop,
-  Pencil,
-  Plus,
-  Printer,
-  QrCode,
-  Receipt,
-  RotateCcw,
-  Send,
-  Sigma,
-  Signature,
-  SquareDashed,
-  Stamp,
-  Trash2,
-  TriangleAlert,
-  Type,
-  Users,
-  X,
-  type LucideIcon,
-} from 'lucide-react';
+import { ArrowDown, ArrowUp, Blocks, Building2, Check, CircleCheck, Clock, Eye, EyeOff, FileText, GripVertical, Heading, Info, Landmark, List, LoaderCircle, Lock, Mail, Minus, MoveVertical, Package, PanelTop, Pencil, Plus, Printer, QrCode, Receipt, RotateCcw, Send, Sigma, Signature, SquareDashed, Stamp, Trash2, TriangleAlert, Type, Users, X, type LucideIcon } from 'lucide-react';
 import { BlattVorschau, type BlattBearbeitung } from '../components/belege/Blatt';
 import { FormatEditor, type FormatEditorHandle } from '../components/belege/FormatEditor';
 import { PageHead, reveal } from '../components/ui/PageHead';
@@ -1062,8 +1023,8 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
                 ) : (
                   <span className="vl-stand">
                     <span className="vl-stand-chip">
-                      <Pencil />
-                      Mitgeliefert
+                      <Package />
+                      Mitgelieferte Vorlage
                     </span>
                     <span>Deine erste Änderung wird automatisch „Meine {ARTEN[art].label}“.</span>
                   </span>
