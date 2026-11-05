@@ -487,18 +487,6 @@ function VorlagenLeiste({ art, liste, wahl, aktiv, vergeben, waehlen, verwenden,
   const mitDb = datenbankVerfuegbar();
   const [eingabe, setEingabe] = useState<NamensEingabe | null>(null);
   const eigen = wahl.id != null;
-  const optionen: SegOption<string>[] = liste
-    .filter((v) => !v.archiviert)
-    .map((v) => ({
-      value: v.schluessel,
-      label: (
-        <>
-          {v.aktiv && <CircleCheck aria-label="für neue Belege" />}
-          {v.name}
-          {v.id != null && <small className="vl-design-tag">eigene</small>}
-        </>
-      ),
-    }));
   const aktivName = liste.find((v) => v.schluessel === aktiv)?.name ?? '';
   const fehler = eingabe?.gezeigt ? namePruefen(eingabe.wert, vergeben(eingabe.modus === 'umbenennen' ? (wahl.id ?? undefined) : undefined)) : null;
   const nurMac = 'Nur in der Mac-App';
@@ -518,7 +506,17 @@ function VorlagenLeiste({ art, liste, wahl, aktiv, vergeben, waehlen, verwenden,
   return (
     <div className="vl-designs reveal" style={reveal(1)}>
       <span className="vl-quelle-l">Vorlage</span>
-      <Seg options={optionen} value={wahl.schluessel} onChange={waehlen} ariaLabel="Vorlage" />
+      {/* Auswahlfeld statt dritter Umschalter-Reihe: Belegart (Reiter) › Vorlage (Liste) › Vorschau */}
+      <select className="select vl-wahl" aria-label="Vorlage" value={wahl.schluessel} onChange={(e) => waehlen(e.target.value)}>
+        {liste
+          .filter((v) => !v.archiviert)
+          .map((v) => (
+            <option key={v.schluessel} value={v.schluessel}>
+              {v.name}
+              {v.id != null ? ' (eigene)' : ''}
+            </option>
+          ))}
+      </select>
       <div className="vl-design-tools">
         <button
           type="button"
@@ -1030,7 +1028,7 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
                   </span>
                 )}
                 <span className="vl-legende">
-                  <span className="vl-ph-txt">Firma</span> = setzt Kladdy ein · <Lock className="ic vl-leg-ic" /> Pflicht = bleibt im Beleg, Text änderbar
+                  Angaben in ‹ › füllt Kladdy beim Ausstellen aus. Bausteine mit <Lock className="ic vl-leg-ic" /> bleiben im Beleg – ihren Text kannst du ändern.
                 </span>
               </div>
             </div>

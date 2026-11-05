@@ -223,3 +223,8 @@
 .sheet.editable .blk-logo-slot { opacity: 0; transition: opacity .15s; }
 .sheet.editable .blk:hover .blk-logo-slot, .sheet.editable .blk.blk-sel .blk-logo-slot { opacity: 1; }
 .sheet .blk-buchnr { margin: 1mm 0 2mm; }
+.sheet .blk-abstand.blk-sel, .sheet .blk-trennlinie.blk-sel { position: relative; }
+.sheet .blk-abstand.blk-sel::after, .sheet .blk-trennlinie.blk-sel::after { content: 'Abstand'; position: absolute; inset: 0; display: grid; place-items: center;
+  font: 600 8pt var(--font); color: var(--accent); letter-spacing: .02em; pointer-events: none; }
+.sheet .blk-trennlinie.blk-sel::after { content: 'Trennlinie'; }
+@media print { .sheet .blk-abstand::after, .sheet .blk-trennlinie::after { display: none; } }

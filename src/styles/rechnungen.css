@@ -344,3 +344,4 @@
 .bl-angaben[open] > summary .ic { transform: rotate(90deg); }
 .bl-angaben[open] > summary { border-bottom: 1px solid var(--border); }
 .bl-angaben > .bl-fs { padding: 12px; display: grid; gap: 12px; }
+.bl-tabsl .bl-zr, .bl-tabsl > .zr-leiste { margin-left: auto; }

@@ -270,3 +270,4 @@
 /* Platzhalter nicht nur über die Farbe: in ‹ › wie ein Feld zum Einsetzen */
 .vl-ph-txt::before { content: '‹'; opacity: .7; }
 .vl-ph-txt::after { content: '›'; opacity: .7; }
+.vl-wahl { width: auto; min-width: 200px; max-width: 280px; height: 40px; font-weight: 600; }
