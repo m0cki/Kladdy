@@ -21,7 +21,7 @@ export interface ZahlungswegInfo {
 /** Nur Zahlungsweg, keine Konten (§6 Grundsätze). Kartenzahlung läuft übers Konto ⇒ Überweisung. */
 export const ZAHLUNGSWEGE: readonly ZahlungswegInfo[] = [
   { id: 'bar', name: 'Bar', text: 'Bargeld' },
-  { id: 'bank', name: 'Überweisung', text: 'oder Karte' },
+  { id: 'bank', name: 'Überweisung', text: 'aufs Konto' },
   { id: 'paypal', name: 'PayPal', text: 'online' },
 ];
 

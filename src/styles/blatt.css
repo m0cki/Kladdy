@@ -218,3 +218,7 @@
 /* Vorlagen: direkt bearbeitbare Texte im Blatt sind leise unterstrichen (Klick bearbeitet sie) */
 .sheet.editable .blk-tx { text-decoration: underline dotted color-mix(in oklab, var(--accent) 50%, transparent); text-underline-offset: 2px; text-decoration-thickness: 1px; cursor: text; }
 .sheet.editable .blk-tx:hover { background: color-mix(in oklab, var(--accent) 8%, transparent); }
+@media screen { .sheet .sh-mark { display: none; } }
+/* ohne Logo: der Platzhalter erscheint erst, wenn man auf den Kopf zeigt oder ihn wählt */
+.sheet.editable .blk-logo-slot { opacity: 0; transition: opacity .15s; }
+.sheet.editable .blk:hover .blk-logo-slot, .sheet.editable .blk.blk-sel .blk-logo-slot { opacity: 1; }

@@ -428,6 +428,17 @@ export function demoDaten(heute: string, seed: number = DEMO_SEED): DemoDaten {
     return x;
   };
   const termin = (t: Omit<T, 'seq' | 'notiz' | 'status' | 'eingetragen'> & Partial<Pick<T, 'notiz' | 'status' | 'eingetragen'>>): T => {
+    // zu einem Termin fährt man hin: Kunden mit Termin haben eine Adresse (ohne Zufall, damit der Rest gleich bleibt)
+    if (!t.k.strasse) {
+      const [plz, ort] = ORTE[t.k.seq % ORTE.length];
+      Object.assign(t.k, { strasse: `${STRASSEN[t.k.seq % STRASSEN.length]} ${(t.k.seq % 58) + 1}`, plz, ort });
+    }
+    // eine Person, ein Termin zur Zeit: überschneidet er sich an diesem Tag ⇒ nächste freie Standardzeit
+    const belegt = (von: string, bis: string) => termine.some((o) => o.datum === t.datum && o.status !== 'abgesagt' && o.von < bis && von < o.bis);
+    if (belegt(t.von, t.bis)) {
+      const frei = ZEITEN.find(([v, b]) => !belegt(v, b));
+      if (frei) t = { ...t, von: frei[0], bis: frei[1] };
+    }
     const x: T = { notiz: null, status: 'geplant', eingetragen: plusTage(t.datum < heute ? t.datum : heute, -z.ganz(2, 9)), ...t, seq: ++seq };
     termine.push(x);
     return x;
@@ -469,8 +480,13 @@ export function demoDaten(heute: string, seed: number = DEMO_SEED): DemoDaten {
       const nBasis = s === 'sommer' ? z.ganz(10, 13) : s === 'herbst' ? z.ganz(8, 11) : z.ganz(4, 6);
       const nQ = Math.round(nBasis * wachstum);
       const passend = LEISTUNGEN.filter((l) => l[6] === 'immer' || l[6] === s || (s === 'herbst' && l[6] === 'sommer' && m === 9));
+      const laufend = y === Y && m === M;
+      const bisTag = laufend ? Math.max(1, +heute.slice(8, 10)) : 28;
       for (let i = 0; i < nQ; i++) {
-        const d = datumIn(y, m, z.ganz(1, 28));
+        // im laufenden Monat nur die Tage bis heute (sonst fehlen am Monatsanfang alle Einnahmen), etwa jede zweite
+        const tag = z.ganz(1, 28);
+        if (laufend && i % 2) continue;
+        const d = datumIn(y, m, laufend ? 1 + ((tag - 1) % bisTag) : tag);
         if (!imZeitraum(d)) continue;
         const [text, einheit, mMin, mMax, pMin, pMax] = z.pick(passend);
         const menge = z.ganz(mMin, mMax);

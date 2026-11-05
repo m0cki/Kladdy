@@ -453,7 +453,14 @@ function Liste({
         </div>
         {r.zeilen.length ? (
           <p className="bu-foot">
-            <span>{anzahlText(r.zeilen.length)}</span>
+            <span>
+              {anzahlText(r.zeilen.length)}
+              {r.zeilen.some((b) => sperre(b)) ? (
+                <span className="bu-foot-legende">
+                  <Lock /> festgeschrieben – ändern nur per Storno
+                </span>
+              ) : null}
+            </span>
             <Summenzeile zeilen={r.zeilen} label={zeitraumLabel} />
           </p>
         ) : null}

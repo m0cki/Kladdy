@@ -4,7 +4,7 @@
  * Optik und Verhalten wie referenz/prototyp/js/pages/belege.js (renderListe); Logik in lib/rechnungen.ts. */
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowRight, Blocks, Check, ChevronDown, ChevronLeft, ChevronRight, Clock, FileText, Handshake, Info, Paperclip, Printer, Receipt, Search, Stamp, TriangleAlert, type LucideIcon } from 'lucide-react';
+import { ArrowLeftRight, ArrowRight, Blocks, Check, ChevronDown, ChevronLeft, ChevronRight, Clock, FileText, Handshake, Info, Paperclip, Printer, Receipt, Search, Stamp, TriangleAlert, type LucideIcon } from 'lucide-react';
 import { speichereQuelle } from '../lib/vorlagen/vorschau';
 import { pdfOeffnenFuer } from '../lib/belegaktionen';
 import { anzahlText } from '../lib/buchungen';
@@ -179,7 +179,7 @@ function NeuMenue({ naechste }: { naechste: Partial<Record<Belegart, string>> })
         <ChevronDown />
       </button>
       <div className="bl-menu" role="menu" aria-label="Neuer Beleg">
-        <div className="bl-menu-head">Nächste Nummer</div>
+        <div className="bl-menu-head">Neuer Beleg</div>
         {NEU.map(({ art, sub }, i) => {
           const Icon = ART_SYMBOL[art];
           return (
@@ -206,10 +206,25 @@ function NeuMenue({ naechste }: { naechste: Partial<Record<Belegart, string>> })
           </span>
           <span />
         </button>
-        <p className="bl-menu-foot">
-          <Info />
-          <span>Nur buchen, ohne Beleg aus Kladdy: „+ Erfassen“ (⌘N).</span>
-        </p>
+        <div className="bl-menu-sep" role="separator" />
+        <div className="bl-menu-head">Ohne Beleg aus Kladdy</div>
+        <button
+          type="button"
+          className="bl-mi"
+          role="menuitem"
+          tabIndex={-1}
+          onClick={() => {
+            setOffen(false);
+            erfassen({ typ: 'einnahme' });
+          }}
+        >
+          <ArrowLeftRight />
+          <span>
+            <b>Nur buchen</b>
+            <small>Einnahme mit Buchungsnummer – Papierquittung oder Datei dazu</small>
+          </span>
+          <span />
+        </button>
       </div>
     </div>
   );

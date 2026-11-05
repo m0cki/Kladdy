@@ -1068,6 +1068,9 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
                     <span>Deine erste Änderung speichert Kladdy automatisch als „Meine {ARTEN[art].label}“.</span>
                   </span>
                 )}
+                <span className="vl-legende">
+                  <span className="vl-ph-txt">Türkis</span> = Angaben, die Kladdy beim Ausstellen einsetzt (z. B. Firma, Kunde, Datum)
+                </span>
               </div>
             </div>
             {wahl.id != null && (
@@ -1128,7 +1131,7 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
                       <small>
                         {zerlegen(zusammenfassung(b)).map((t, k) =>
                           t.art === 'text' ? t.text : (
-                            <span key={k} className="vl-ph-mini">
+                            <span key={k} className="vl-ph-txt" title="Setzt Kladdy beim Ausstellen ein">
                               {PLATZHALTER_KURZ[t.name]}
                             </span>
                           ),

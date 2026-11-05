@@ -264,7 +264,7 @@ export function faelligText(z: BelegZeile, heute: string): { text: string; klass
     return n < 0 ? { text: 'abgelaufen', klasse: 'muted' } : { text: `gültig noch ${n} T.`, klasse: '' };
   }
   if (z.status === 'bezahlt') {
-    const wie = z.art === 'eigenbeleg' ? 'gebucht' : z.art === 'quittung' ? zahlungswegKurz(z.zahlungsart) : 'bezahlt';
+    const wie = z.art === 'eigenbeleg' ? 'gebucht' : z.art === 'quittung' && z.zahlungsart ? zahlungswegKurz(z.zahlungsart) : 'bezahlt';
     const am = z.bezahlt_am ?? z.datum;
     return { text: `${wie}${am ? ` · ${datumText(am).slice(0, 6)}` : ''}`, klasse: 'muted' };
   }

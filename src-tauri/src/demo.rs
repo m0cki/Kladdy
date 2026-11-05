@@ -513,7 +513,13 @@ pub async fn fuellen(
         }
 
         let mut beleg_ids = Vec::with_capacity(d.belege.len());
-        for r in &d.belege {
+        for (ri, r) in d.belege.iter().enumerate() {
+            // Zahlungsweg wie beim Bezahlt-Markieren in rechnungen.rs: der der (ersten) Buchung zu diesem Beleg
+            let zahlungsart = if r.status == "bezahlt" {
+                d.buchungen.iter().find(|b| b.beleg == Some(ri) && b.storno_von.is_none()).map(|b| b.zahlungsart.as_str())
+            } else {
+                None
+            };
             // Ausgestellt: Nummer aus dem Kreis und Kundendaten als Schnappschuss (wie beim Finalisieren)
             let (name, adresse, kundennummer) = match &r.nummer {
                 Some(nr) => {
@@ -533,9 +539,9 @@ pub async fn fuellen(
             // Trigger festgeschrieben (Migration 0007), genau wie beim Ausstellen in rechnungen.rs.
             let id = sqlx::query(
                 "INSERT INTO rechnungen (art, nummer, status, kunde_id, kunde_name, kunde_adresse, kunde_nummer, datum,
-                   leistung_von, faellig_am, betreff, schlusstext, summe_cent, termin_id, bezahlt_am, erstellt_am,
-                   geaendert_am)
-                 VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                   leistung_von, faellig_am, betreff, schlusstext, summe_cent, termin_id, bezahlt_am, zahlungsart,
+                   erstellt_am, geaendert_am)
+                 VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             )
             .bind(&r.art)
             .bind(&r.status)
@@ -553,6 +559,7 @@ pub async fn fuellen(
             .bind(summe(&r.positionen))
             .bind(r.termin.map(|t| termin_ids[t]))
             .bind(&r.bezahlt_am)
+            .bind(zahlungsart)
             .bind(erstellt)
             .bind(geaendert)
             .execute(&mut *tx)

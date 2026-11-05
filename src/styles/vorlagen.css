@@ -251,3 +251,18 @@
 .vl-karte.kompakt .field { flex-direction: row; align-items: center; gap: 10px; }
 .vl-karte.kompakt .field label { margin: 0; }
 .vl-karte.kompakt .field .select { width: auto; min-width: 160px; height: 34px; font-size: .86rem; }
+
+/* Platzhalter in der Liste: farbiger Text (Pillen nur beim Bearbeiten) */
+.vl-ph-txt { color: var(--accent-text); font-weight: 600; }
+/* Abstand und Trennlinie: feine Trennzeile – Griff und Symbol erst beim Zeigen */
+.vl-blk.leise { min-height: 0; }
+.vl-blk.leise .vl-grip, .vl-blk.leise .vl-ic { opacity: 0; transition: opacity .15s; }
+.vl-blk.leise:hover .vl-grip, .vl-blk.leise:hover .vl-ic, .vl-blk.leise.on .vl-grip, .vl-blk.leise.on .vl-ic,
+.vl-blk.leise:focus-within .vl-grip { opacity: 1; }
+.vl-blk.leise .vl-meta small { display: none; }
+.vl-blk.leise .vl-meta { display: flex; align-items: center; gap: 10px; }
+.vl-blk.leise .vl-meta b { color: var(--muted); font-size: .74rem; font-weight: 500; }
+.vl-blk.leise .vl-meta::after { content: ''; flex: 1; border-top: 1px dashed var(--border-strong); }
+/* Stand der Vorlage: Hinweis, kein Knopf */
+.vl-stand-chip:not(.eigen) { background: transparent; padding-left: 0; color: var(--text); }
+.vl-legende { display: block; margin-top: 6px; font-size: .78rem; line-height: 1.5; color: var(--text-2); }

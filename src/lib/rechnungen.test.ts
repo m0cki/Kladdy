@@ -152,6 +152,8 @@ describe('Liste', () => {
     expect(faelligText(zeile({ faellig_am: HEUTE }), HEUTE).text).toBe('heute fällig');
     expect(faelligText(zeile({ faellig_am: '2026-10-23' }), HEUTE).text).toBe('in 1 Tag');
     expect(faelligText(zeile({ art: 'quittung', status: 'bezahlt', zahlungsart: 'bar', bezahlt_am: '2026-10-05' }), HEUTE).text).toBe('bar · 05.10.');
+    // ohne gespeicherten Zahlungsweg nicht einfach „bar“ behaupten
+    expect(faelligText(zeile({ art: 'quittung', status: 'bezahlt', zahlungsart: null, bezahlt_am: '2026-10-05' }), HEUTE).text).toBe('bezahlt · 05.10.');
     expect(faelligText(zeile({ status: 'entwurf', nummer: null, termin_id: 2, termin_datum: '2026-10-24', termin_von: '09:00' }), HEUTE).text).toBe(
       'Termin 24.10. · 09:00',
     );
