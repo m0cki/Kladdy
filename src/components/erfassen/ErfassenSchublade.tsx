@@ -72,6 +72,7 @@ import {
   ertragSchluessel,
   ertragStart,
   maskenPfad,
+  naechsteBelegNummer,
   rechnungOffen,
   type Ertrag,
   type ErtragsArt,
@@ -96,6 +97,7 @@ import { storniere, storniereMitNachfrage } from '../../lib/storno';
 import { ART_LABEL, erfassenHinweis, ertragAusEntwurf, ertragBezug, vorbelegungMitBezug, type ErfassenBezug } from '../../lib/termine';
 import { heute, imZeitraum, istDatum, zeitraum } from '../../lib/zeitraum';
 import { useUi, type Toast, type ToastAction } from '../../store/ui';
+import { akzentPapier } from '../../lib/settings';
 import { Drawer } from '../ui/Drawer';
 import { EmptyState } from '../ui/EmptyState';
 import { Seg } from '../ui/Seg';
@@ -269,7 +271,7 @@ export function ErfassenSchublade() {
       const f: Formular = z ? formularAus(z) : leeresFormular(s, v);
       if (!aktiv) return;
       const esOk = es && typeof es !== 'string' ? es : null;
-      const e0: Ertrag = { ...ertragStart(v, esOk?.belegArt ?? 'quittung'), ...(b?.entwurf ? ertragAusEntwurf(b.entwurf) : {}) };
+      const e0: Ertrag = { ...ertragStart(v, esOk?.belegArt ?? 'quittung', esOk?.einnahmeWeg ?? 'beleg'), ...(b?.entwurf ? ertragAusEntwurf(b.entwurf) : {}) };
       const e: Ertrag = esOk ? e0 : { ...e0, weg: 'ohne' };
       setStamm(s);
       setBezug(b);
@@ -480,7 +482,7 @@ export function ErfassenSchublade() {
         setSpeichert(true);
         try {
           const res = await belegAusstellen(entwurfId, v.daten, {
-            dokument: { ...v.dokument, akzent: ui.settings.accent },
+            dokument: { ...v.dokument, akzent: akzentPapier(ui.settings) },
             bausteine: v.gedruckt,
             kategorie_id: r.daten.kategorie_id,
             heute: h,
@@ -572,11 +574,14 @@ export function ErfassenSchublade() {
   /* ---------- Kopf und Fuß ---------- */
   const typ = form?.typ ?? 'ausgabe';
   const titel = bearbeitung ? (nurLesen ? 'Buchung ansehen' : 'Buchung bearbeiten') : `${typName(typ)} erfassen`;
+  const naechsteBuchung = !zeile && !bearbeitung && ertragStamm && form ? naechsteBelegNummer(ertragStamm.kreise, 'buchung', heute(), heute()) : null;
   const sub = zeile
     ? `Nr. ${zeile.nummer}${sp === 'storniert' ? ' · storniert' : sp === 'beleg' || sp === 'festgeschrieben' ? ' · festgeschrieben' : ''}`
     : bearbeitung
       ? undefined
-      : 'Nr. wird beim Speichern vergeben';
+      : naechsteBuchung
+        ? `wird Buchung ${naechsteBuchung}`
+        : 'Nr. wird beim Speichern vergeben';
   const icon = nurLesen ? Lock : bearbeitung ? Pencil : ArrowLeftRight;
 
   const stornoKnopf =
@@ -679,7 +684,7 @@ export function ErfassenSchublade() {
   );
 
   return (
-    <Drawer open={open} onClose={erfassenSchliessen} title={titel} sub={sub} icon={icon} width={520} foot={fuss} className="bu-drawer">
+    <Drawer open={open} onClose={erfassenSchliessen} title={titel} sub={sub} icon={icon} width={900} foot={fuss} className="bu-drawer">
       <>
         {laden.status === 'ohne-db' ? (
           <section>
@@ -807,7 +812,7 @@ const Fehler = ({ text }: { text?: string }) =>
 
 const TIP_DATUM = 'Für die EÜR zählt der Tag, an dem das Geld geflossen ist (Zufluss-/Abflussprinzip, § 11 EStG) – nicht das Rechnungsdatum.';
 const TIP_RECHNUNGSDATUM = 'Datum der Rechnung. Die Einnahme wird erst erfasst, wenn das Geld eingeht – dann zählt der Zahlungstag (§ 11 EStG).';
-const TIP_NR = 'Bei Ausgaben die Rechnungs- oder Bonnummer des Geschäfts. Eigene Quittungen und Rechnungen (QU-/RE-…) bekommen ihre Nummer beim Ausstellen.';
+const TIP_NR = 'Bei Ausgaben die Rechnungs- oder Bonnummer des Geschäfts. Bei Einnahmen ohne Beleg aus Kladdy z. B. die Nummer einer handschriftlichen Quittung. Quittungen und Rechnungen aus Kladdy (QU-/RE-…) bekommen ihre Nummer beim Ausstellen.';
 
 function FormularInhalt(props: InhaltProps) {
   const { form, stamm, zeile, sp, belege, nimmtBelege, fehler, katVorschlag, erkannt, set, fehlerWeg, onTyp, onKategorie, vorschlagen } = props;
@@ -890,6 +895,8 @@ function FormularInhalt(props: InhaltProps) {
         </div>
       ) : null}
 
+      <div className="bu-spalten">
+      <div className="bu-spalte">
       <section className="bu-sec-betrag">
         <Seg
           className={`full ${ro ? 'bu-locked' : ''}`}
@@ -1016,7 +1023,7 @@ function FormularInhalt(props: InhaltProps) {
           {mitNr ? (
             <div className="field">
               <label className="field-label" htmlFor="bf-belegnummer" title={TIP_NR}>
-                Beleg-Nr.
+                {ausgabe ? 'Beleg-Nr.' : 'Nr. auf der Papierquittung'}
                 <span className="q" aria-hidden="true">
                   ?
                 </span>
@@ -1027,7 +1034,7 @@ function FormularInhalt(props: InhaltProps) {
                 className="input bu-nr-in"
                 autoComplete="off"
                 spellCheck={false}
-                placeholder="z. B. Bon 4711"
+                placeholder={ausgabe ? 'z. B. Bon 4711' : 'optional'}
                 value={form.belegnummer}
                 readOnly={ro}
                 onChange={(e) => set('belegnummer', e.target.value)}
@@ -1141,7 +1148,9 @@ function FormularInhalt(props: InhaltProps) {
           </details>
         ) : null}
       </section>
+      </div>
 
+      <div className="bu-spalte">
       {offenRechnung ? null : (
         <section>
           <h3>Bezahlt per</h3>
@@ -1206,6 +1215,8 @@ function FormularInhalt(props: InhaltProps) {
           </p>
         ) : null}
       </section>
+      </div>
+      </div>
     </>
   );
 }

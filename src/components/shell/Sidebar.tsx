@@ -134,10 +134,10 @@ function EinstellungsMenue({ pathname }: { pathname: string }) {
             const active = isActive(pathname, to);
             return (
               <li key={id} className={`sb-item sb-nav ${active ? 'active' : ''}`}>
-                <Link to={to} title={phase ? `${label} (kommt mit Phase ${phase})` : label} aria-current={active ? 'page' : undefined}>
+                <Link to={to} title={phase ? `${label} – noch nicht fertig, kommt mit einem der nächsten Updates` : label} aria-current={active ? 'page' : undefined}>
                   <Icon />
                   <span className="sb-label">{label}</span>
-                  {phase ? <span className="sb-badge phase">Phase {phase}</span> : null}
+                  {phase ? <span className="sb-badge phase">geplant</span> : null}
                 </Link>
               </li>
             );

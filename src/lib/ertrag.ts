@@ -50,14 +50,16 @@ export interface Ertrag {
   offenId: number | null;
 }
 
-/** Start: vom Aufrufer vorgewählter Beleg ⇒ „Beleg erstellen“; mit mitgebrachter Datei (Drop) ⇒ „Ohne eigenen Beleg“.
+/** Start: vom Aufrufer vorgewählter Beleg ⇒ „Beleg erstellen“; mit mitgebrachter Datei (Drop) ⇒ „Nur buchen“; sonst
+ *  die Einstellung „Neue Einnahme“ (`standardWeg`).
  *  Zu einem Termin ist eine Rechnung standardmäßig „noch offen“ (nach dem Termin zahlt der Kunde meist später). */
 export function ertragStart(
   v: { beleg?: ErtragsArt; belege?: readonly unknown[]; termin?: number; entwurf?: number },
   belegArt: ErtragsArt,
+  standardWeg: 'beleg' | 'ohne' = 'beleg',
 ): Ertrag {
   return {
-    weg: v.beleg ? 'beleg' : v.belege?.length ? 'ohne' : 'beleg',
+    weg: v.beleg ? 'beleg' : v.belege?.length ? 'ohne' : v.termin != null || v.entwurf != null ? 'beleg' : standardWeg,
     art: v.beleg ?? belegArt,
     bezahlt: v.termin == null && v.entwurf == null,
     vorlage: null,
@@ -73,8 +75,9 @@ export const ertragSchluessel = (e: Ertrag): string => JSON.stringify([e.adresse
 /** Eine Rechnung, die erst beim Zahlungseingang zur Einnahme wird. */
 export const rechnungOffen = (e: Pick<Ertrag, 'weg' | 'art' | 'bezahlt'>): boolean => e.weg === 'beleg' && e.art === 'rechnung' && !e.bezahlt;
 
-/** Nummer, die der Beleg beim Ausstellen bekommt (Jahr des Belegdatums, nie rückwärts – wie Rust). */
-export function naechsteBelegNummer(kreise: readonly Nummernkreis[], art: Belegart, datum: string, heute: string): string | null {
+/** Nummer, die der Beleg beim Ausstellen bzw. die Buchung beim Speichern bekommt (Jahr des Datums, nie rückwärts – wie
+ *  Rust). Nur eine Vorschau: vergeben wird erst in Rust. */
+export function naechsteBelegNummer(kreise: readonly Nummernkreis[], art: Belegart | 'buchung', datum: string, heute: string): string | null {
   const kreis = kreise.find((k) => k.id === art);
   if (!kreis) return null;
   const jahr = Number((istDatum(datum) ? datum : heute).slice(0, 4));

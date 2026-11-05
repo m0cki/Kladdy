@@ -10,7 +10,7 @@
 /* ============ Wochenstreifen ============ */
 .tm-woche { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 22px; padding: 12px 16px 14px; border-bottom: 1px solid var(--border); }
 .tm-wo { min-width: 0; }
-.tm-wo-h { display: flex; align-items: baseline; gap: 8px; margin: 0 6px 6px; font-size: .66rem; font-weight: 650; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.tm-wo-h { display: flex; align-items: baseline; gap: 8px; margin: 0 6px 6px; font-size: .8rem; font-weight: 650; color: var(--text-2); }
 .tm-wo-h span { font-weight: 550; letter-spacing: .02em; text-transform: none; opacity: .75; }
 .tm-wo-d { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
 .tm-d { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; padding: 6px 2px 7px; border-radius: 11px; color: var(--text-2); transition: background .15s, color .15s, box-shadow .15s; }
@@ -27,20 +27,20 @@
 .tm-d.frei b { font-weight: 500; color: var(--muted); }
 .tm-d.vorbei { opacity: .55; }
 .tm-d.heute { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent-line); color: var(--text); opacity: 1; }
-.tm-d.heute small, .tm-d.heute b { color: var(--accent); }
+.tm-d.heute small, .tm-d.heute b { color: var(--accent-text); }
 
 /* ============ Agenda ============ */
 .tm-agenda { padding: 2px 0 10px; }
 .tm-tag { scroll-margin-top: calc(var(--topbar-h) + 14px); }
 .tm-tag-h { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 7px; padding: 16px 20px 6px; font-size: .8rem; font-weight: 500; letter-spacing: 0; color: var(--muted); border-radius: 8px; }
 .tm-tag-h b { font-size: .92rem; font-weight: 680; letter-spacing: -.01em; color: var(--text); }
-.tm-tag.heute .tm-tag-h b { color: var(--accent); }
+.tm-tag.heute .tm-tag-h b { color: var(--accent-text); }
 .tm-ping { animation: tmPing 1.4s var(--ease); }
 @keyframes tmPing { 0%, 35% { background: var(--accent-soft); } }
 /* Je Tag ein Raster; die Zeilen sind Subgrids → Zeit, Betrag, Beleg-Chip und Aktionen stehen untereinander */
 .tm-items { list-style: none; margin: 0; padding: 0 8px; display: grid; grid-template-columns: 62px 32px minmax(0, 1fr) auto auto auto; column-gap: 14px; }
 .tm-frei { grid-column: 1 / -1; padding: 6px 12px 10px 24px; font-size: .84rem; color: var(--muted); }
-.tm-trenner { display: flex; align-items: center; gap: 12px; margin: 18px 20px 0; font-size: .66rem; font-weight: 650; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); }
+.tm-trenner { display: flex; align-items: center; gap: 12px; margin: 18px 20px 0; font-size: .8rem; font-weight: 650; color: var(--text-2); }
 .tm-trenner::before, .tm-trenner::after { content: ""; flex: 1; border-top: 1px dashed var(--border-strong); }
 
 /* Eine Zeile je Termin: Zeit · Monogramm · Kunde/Leistung/Adresse · Betrag · Beleg · Aktionen */
@@ -66,13 +66,13 @@
 .tm-main { grid-column: 3; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .tm-l1 { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .tm-kunde { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .92rem; font-weight: 640; border-radius: 5px; text-align: left; }
-button.tm-kunde:hover { color: var(--accent); text-decoration: underline; }
+button.tm-kunde:hover { color: var(--accent-text); text-decoration: underline; }
 .tm-l2 { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 14px; min-width: 0; font-size: .8rem; color: var(--text-2); }
 .tm-leist { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tm-adr { display: inline-flex; align-items: center; gap: 4px; min-width: 0; max-width: 100%; font-size: inherit; color: var(--muted); border-radius: 5px; text-align: left; transition: color .15s; }
 .tm-adr span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tm-adr .ic { width: 14px; height: 14px; flex: none; }
-.tm-adr:hover { color: var(--accent); }
+.tm-adr:hover { color: var(--accent-text); }
 .tm-adr:hover span { text-decoration: underline; }
 .tm-ntz { display: inline-grid; place-items: center; flex: none; width: 24px; height: 24px; border-radius: 7px; color: var(--warn); cursor: help; transition: background .15s; }
 .tm-ntz .ic { width: 15px; height: 15px; }
@@ -87,7 +87,7 @@ button.tm-kunde:hover { color: var(--accent); text-decoration: underline; }
   border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2); transition: border-color .15s, color .15s, background .15s; }
 .tm-chip .ic { width: 13px; height: 13px; color: var(--muted); }
 .tm-chip.vor { border-style: dashed; border-color: var(--accent-line); background: var(--accent-soft); color: var(--text); }
-.tm-chip.vor .ic { color: var(--accent); }
+.tm-chip.vor .ic { color: var(--accent-text); }
 .tm-chip.ok { font-family: var(--mono); color: var(--text); border-color: color-mix(in oklab, var(--pos) 40%, transparent); background: color-mix(in oklab, var(--pos) 10%, transparent); }
 .tm-chip.ok .tm-ok { color: var(--pos); width: 14px; height: 14px; }
 .tm-chip.ok small { font-family: var(--font); font-size: .66rem; color: var(--muted); }
@@ -101,7 +101,7 @@ button.tm-kunde:hover { color: var(--accent); text-decoration: underline; }
 .tm-chip.ohne { color: var(--text-2); }
 .tm-chip.ohne .ic { color: var(--pos); }
 a.tm-chip:hover, button.tm-chip:hover { border-color: var(--accent-line); color: var(--text); }
-a.tm-chip:hover .ic { color: var(--accent); }
+a.tm-chip:hover .ic { color: var(--accent-text); }
 
 .tm-acts { grid-column: 6; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 .tm-acts:empty { display: none; }
@@ -143,7 +143,7 @@ a.tm-chip:hover .ic { color: var(--accent); }
 @keyframes tmPop { from { opacity: 0; transform: translateY(-4px) scale(.985); } }
 :root[data-motion="off"] .tm-menu { animation: none; }
 .tm-mi { display: grid; grid-template-columns: 20px minmax(0, 1fr); align-items: center; gap: 11px; width: 100%; padding: 8px 10px; border-radius: 11px; text-align: left; color: var(--text); transition: background .15s; }
-.tm-mi > .ic { width: 18px; height: 18px; color: var(--accent); }
+.tm-mi > .ic { width: 18px; height: 18px; color: var(--accent-text); }
 .tm-mi span { display: flex; flex-direction: column; min-width: 0; }
 .tm-mi b { font-size: .86rem; font-weight: 650; }
 .tm-mi small { font-size: .72rem; line-height: 1.35; color: var(--muted); }
@@ -167,7 +167,7 @@ input[type="time"].input { font-variant-numeric: tabular-nums; }
 .tm-wann-hint > span { display: flex; align-items: flex-start; gap: 6px; }
 .tm-wann-hint .ic { width: 14px; height: 14px; flex: none; margin-top: 1px; }
 .tm-kunde-hint { display: flex; flex-direction: column; gap: 6px; }
-.tm-neuk { color: var(--accent); }
+.tm-neuk { color: var(--accent-text); }
 /* Gleiche Namen: wer ist gemeint? (je Treffer ein Knopf mit Nummer und Ort) */
 .tm-kwahl { display: flex; flex-direction: column; gap: 4px; }
 .tm-kw { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; padding: 7px 10px; border-radius: 10px; text-align: left; font-size: .8rem; color: var(--text-2);
@@ -176,7 +176,7 @@ input[type="time"].input { font-variant-numeric: tabular-nums; }
 .tm-kw span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tm-kw .ic { width: 14px; height: 14px; flex: none; }
 .tm-kw:hover, .tm-kw:focus-visible { border-color: var(--accent-line); background: var(--accent-soft); color: var(--text); outline: none; }
-.tm-kw.neu { color: var(--accent); background: none; border-style: dashed; }
+.tm-kw.neu { color: var(--accent-text); background: none; border-style: dashed; }
 .tm-klink { white-space: nowrap; } /* „Doch K-0012 nehmen“ */
 .tm-knotiz { display: flex; align-items: flex-start; gap: 7px; padding: 7px 10px; border-radius: 10px; font-size: .78rem; color: var(--text-2);
   background: color-mix(in oklab, var(--warn) 10%, var(--surface-2)); border: 1px solid color-mix(in oklab, var(--warn) 34%, var(--border)); }
@@ -197,7 +197,7 @@ input[type="time"].input { font-variant-numeric: tabular-nums; }
 .tm-kurz small { font-size: .78rem; color: var(--muted); }
 .tm-note { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; border-radius: 12px; font-size: .8rem; line-height: 1.45; color: var(--text-2);
   background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent-line); }
-.tm-note .ic { width: 16px; height: 16px; flex: none; margin-top: 1px; color: var(--accent); }
+.tm-note .ic { width: 16px; height: 16px; flex: none; margin-top: 1px; color: var(--accent-text); }
 .tm-note.warn { background: color-mix(in oklab, var(--warn) 10%, transparent); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--warn) 35%, transparent); }
 .tm-note.warn .ic { color: var(--warn); }
 

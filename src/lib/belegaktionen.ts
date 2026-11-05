@@ -3,6 +3,7 @@
  * `datenGeaendert`, damit Listen und Zähler neu laden. Nach Ausstellen und Storno setzt Tectonic das PDF aus dem
  * Schnappschuss und Rust legt es ab – scheitert das, bleibt der Beleg gültig und das PDF lässt sich nachholen. */
 import { useUi } from '../store/ui';
+import { akzentPapier } from './settings';
 import { ausgestellterBeleg, belegPdfOeffnen, pdfErzeugenUndAblegen } from './belegpdf';
 import { fehlerText } from './fehler';
 import { ladeBelegEinstellungen, ladeFirma, ladeUstModus } from './queries/einstellungen';
@@ -26,7 +27,7 @@ import { heute as heuteIso, plusTage } from './zeitraum';
 type Ziel = Pick<BelegZeile, 'id' | 'nummer' | 'art'>;
 
 const ui = () => useUi.getState();
-const akzent = () => useUi.getState().settings.accent;
+const akzent = () => akzentPapier(useUi.getState().settings);
 const nr = (z: Ziel) => z.nummer ?? 'Entwurf';
 
 function fehler(was: string, e: unknown): void {

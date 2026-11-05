@@ -16,6 +16,7 @@ import {
   neuesFormular,
   parseMenge,
   passtReiter,
+  reiterAusAdresse,
   positionenAus,
   preisEingabe,
   statusMenue,
@@ -74,11 +75,16 @@ describe('Status', () => {
     expect(statusSchluessel(zeile({ status: 'storniert' }), HEUTE)).toBe('storniert');
   });
 
-  it('Reiter: Offen = offene Rechnungen + Vorbereitungen für geplante Termine, Bezahlt ohne Angebote', () => {
+  it('Reiter: Ausgestellt mit Nummer, Offen = offene Rechnungen, Entwürfe ohne Nummer, Bezahlt ohne Angebote', () => {
     expect(passtReiter(zeile({}), 'offen')).toBe(true);
+    expect(passtReiter(zeile({}), 'ausgestellt')).toBe(true);
     expect(passtReiter(zeile({ art: 'quittung', status: 'bezahlt' }), 'offen')).toBe(false);
-    expect(passtReiter(zeile({ status: 'entwurf', nummer: null, termin_id: 4, termin_status: 'geplant' }), 'offen')).toBe(true);
-    expect(passtReiter(zeile({ status: 'entwurf', nummer: null, termin_id: 4, termin_status: 'erledigt' }), 'offen')).toBe(false);
+    expect(passtReiter(zeile({ status: 'entwurf', nummer: null, termin_id: 4, termin_status: 'geplant' }), 'offen')).toBe(false);
+    expect(passtReiter(zeile({ status: 'entwurf', nummer: null, termin_id: 4, termin_status: 'geplant' }), 'entwuerfe')).toBe(true);
+    expect(passtReiter(zeile({ status: 'entwurf', nummer: null }), 'ausgestellt')).toBe(false);
+    expect(reiterAusAdresse('alle')).toBe('ausgestellt');
+    expect(reiterAusAdresse('offen')).toBe('offen');
+    expect(reiterAusAdresse('xyz')).toBeNull();
     expect(passtReiter(zeile({ art: 'quittung', status: 'bezahlt' }), 'bezahlt')).toBe(true);
     expect(passtReiter(zeile({ art: 'angebot', status: 'bezahlt' }), 'bezahlt')).toBe(false);
     expect(passtReiter(zeile({ art: 'storno', status: 'storniert' }), 'bezahlt')).toBe(false);
@@ -113,28 +119,30 @@ describe('Liste', () => {
   const nr = { feld: 'nr', richtung: -1 } as const;
 
   it('Zeitraum nach Belegdatum, „Offen“ und Suche über alle Zeiträume', () => {
-    const r = filtere(alle, { reiter: 'alle', q: '', zeitraum: oktober, sortierung: nr, heute: HEUTE });
-    expect(r.zeilen.map((z) => z.id)).toEqual([3, 4, 2]);
-    expect(r.reiter).toEqual({ alle: 3, offen: 1, bezahlt: 1 });
+    const r = filtere(alle, { reiter: 'ausgestellt', q: '', zeitraum: oktober, sortierung: nr, heute: HEUTE });
+    expect(r.zeilen.map((z) => z.id)).toEqual([4, 2]);
+    expect(r.reiter).toEqual({ ausgestellt: 2, offen: 1, bezahlt: 1, entwuerfe: 1 });
+    const entwuerfe = filtere(alle, { reiter: 'entwuerfe', q: '', zeitraum: oktober, sortierung: nr, heute: HEUTE });
+    expect(entwuerfe.zeilen.map((z) => z.id)).toEqual([3]);
+    expect(entwuerfe.ohneZeitraum).toBe(true);
     expect(r.ueberfaellig).toBe(1);
     expect(r.ohneZeitraum).toBe(false);
     const offen = filtere(alle, { reiter: 'offen', q: '', zeitraum: oktober, sortierung: nr, heute: HEUTE });
     expect(offen.zeilen.map((z) => z.id)).toEqual([1]);
     expect(offen.ohneZeitraum).toBe(true);
-    const suche = filtere(alle, { reiter: 'alle', q: 'kaiser', zeitraum: oktober, sortierung: nr, heute: HEUTE });
+    const suche = filtere(alle, { reiter: 'bezahlt', q: 'kaiser', zeitraum: oktober, sortierung: nr, heute: HEUTE });
     expect(suche.zeilen.map((z) => z.id)).toEqual([4, 1]);
-    const betrag = filtere(alle, { reiter: 'alle', q: '65,00', zeitraum: null, sortierung: nr, heute: HEUTE });
+    const betrag = filtere(alle, { reiter: 'ausgestellt', q: '65,00', zeitraum: null, sortierung: nr, heute: HEUTE });
     expect(betrag.zeilen.map((z) => z.id)).toEqual([2]);
-    const entwurf = filtere(alle, { reiter: 'alle', q: 'entwurf', zeitraum: null, sortierung: nr, heute: HEUTE });
+    const entwurf = filtere(alle, { reiter: 'ausgestellt', q: 'entwurf', zeitraum: null, sortierung: nr, heute: HEUTE });
     expect(entwurf.zeilen.map((z) => z.id)).toEqual([3]);
   });
 
   it('Sortierung nach Betrag und Kunde', () => {
-    const betrag = filtere(alle, { reiter: 'alle', q: '', zeitraum: null, sortierung: { feld: 'betrag', richtung: -1 }, heute: HEUTE });
-    expect(betrag.zeilen.map((z) => z.summe_cent)).toEqual([15_300, 15_300, 6_500, 0]);
-    const kunde = filtere(alle, { reiter: 'alle', q: '', zeitraum: null, sortierung: { feld: 'kunde', richtung: 1 }, heute: HEUTE });
-    expect(kunde.zeilen[0].id).toBe(3);
-    expect(kunde.zeilen[1].kunde_name).toBe('Anna Schmidt');
+    const betrag = filtere(alle, { reiter: 'ausgestellt', q: '', zeitraum: null, sortierung: { feld: 'betrag', richtung: -1 }, heute: HEUTE });
+    expect(betrag.zeilen.map((z) => z.summe_cent)).toEqual([15_300, 15_300, 6_500]);
+    const kunde = filtere(alle, { reiter: 'ausgestellt', q: '', zeitraum: null, sortierung: { feld: 'kunde', richtung: 1 }, heute: HEUTE });
+    expect(kunde.zeilen[0].kunde_name).toBe('Anna Schmidt');
   });
 
   it('Spalte „Fällig / Zahlung“ und Betrag', () => {

@@ -264,6 +264,34 @@ export const PLATZHALTER = [
 ] as const;
 
 export type PlatzhalterName = (typeof PLATZHALTER)[number][0];
+
+/** Kurzer, lesbarer Name eines Platzhalters (Marke in der Bausteinliste statt „{kunde}“). */
+export const PLATZHALTER_KURZ: Readonly<Record<PlatzhalterName, string>> = {
+  kunde: 'Kunde',
+  nr: 'Nummer',
+  art: 'Belegart',
+  datum: 'Datum',
+  leistungsdatum: 'Leistungsdatum',
+  faellig: 'Fällig am',
+  summe: 'Betrag',
+  betrag_worte: 'Betrag in Worten',
+  betreff: 'Betreff',
+  einleitung: 'Einleitung',
+  schlusstext: 'Schlusstext',
+  zahlungsziel: 'Zahlungsziel',
+  firma: 'Firma',
+  inhaber: 'Inhaber',
+  strasse: 'Straße',
+  plz: 'PLZ',
+  ort: 'Ort',
+  steuernummer: 'Steuernummer',
+  telefon: 'Telefon',
+  email: 'E-Mail',
+  web: 'Website',
+  bank: 'Bank',
+  iban: 'IBAN',
+  bic: 'BIC',
+};
 const NAMEN = new Set<string>(PLATZHALTER.map(([n]) => n));
 export const istPlatzhalter = (n: string): n is PlatzhalterName => NAMEN.has(n);
 

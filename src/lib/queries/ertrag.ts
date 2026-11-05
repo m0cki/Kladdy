@@ -13,6 +13,8 @@ import { ladeVorlagenFuerArt } from './vorlagen';
 export interface ErtragStamm extends Omit<ErtragKontext, 'heute'> {
   /** Einstellung „Beleg bei Einnahmen“ */
   belegArt: ErtragsArt;
+  /** Einstellung „Neue Einnahme“: Beleg gleich ausstellen oder nur buchen */
+  einnahmeWeg: 'beleg' | 'ohne';
   offene: BelegZeile[];
 }
 
@@ -39,6 +41,7 @@ export async function ladeErtragStamm(): Promise<ErtragStamm> {
     vorlagen: { quittung, rechnung },
     zahlungszielTage: einstellungen.zahlungsziel_tage,
     belegArt: einstellungen.beleg_art,
+    einnahmeWeg: einstellungen.einnahme_weg,
     offene,
   };
 }

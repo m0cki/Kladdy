@@ -100,6 +100,20 @@ describe('Start und Hinweise', () => {
     expect(ertragStart({ beleg: 'rechnung', belege: [{}] }, 'quittung').weg).toBe('beleg');
   });
 
+  it('Einstellung „Nur buchen“: neue Einnahme ohne Beleg aus Kladdy, Termin und Entwurf behalten ihren Beleg', () => {
+    expect(ertragStart({}, 'quittung', 'ohne')).toMatchObject({ weg: 'ohne', art: 'quittung' });
+    expect(ertragStart({ beleg: 'quittung' }, 'quittung', 'ohne').weg).toBe('beleg');
+    expect(ertragStart({ termin: 4 }, 'quittung', 'ohne').weg).toBe('beleg');
+    expect(ertragStart({ entwurf: 9 }, 'rechnung', 'ohne').weg).toBe('beleg');
+  });
+
+  it('Vorschau der nächsten Buchungsnummer wie der Belegnummern', () => {
+    const kreise = [{ id: 'buchung', muster: '{JJJJ}-{NNNN}', jahr: 2026, naechste: 240 }] as Parameters<typeof naechsteBelegNummer>[0];
+    expect(naechsteBelegNummer(kreise, 'buchung', '2026-11-05', '2026-11-05')).toBe('2026-0240');
+    expect(naechsteBelegNummer(kreise, 'buchung', '2027-01-02', '2027-01-02')).toBe('2027-0001');
+    expect(naechsteBelegNummer([], 'buchung', '2026-11-05', '2026-11-05')).toBeNull();
+  });
+
   it('Rechnung noch offen, § 35a nur bei barer Zahlung mit eigenem Beleg', () => {
     expect(rechnungOffen(ertrag({ art: 'rechnung', bezahlt: false }))).toBe(true);
     expect(rechnungOffen(ertrag({ art: 'rechnung', bezahlt: true }))).toBe(false);

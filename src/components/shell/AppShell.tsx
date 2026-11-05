@@ -105,11 +105,6 @@ export function AppShell() {
 
   return (
     <>
-      <div className="aurora" aria-hidden="true">
-        <span />
-        <span />
-        <span />
-      </div>
       <div className={`app ${collapsed ? 'sb-collapsed' : ''}`} id="app">
         <Sidebar />
         <div className="main">

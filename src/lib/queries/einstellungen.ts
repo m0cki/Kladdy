@@ -82,13 +82,16 @@ export const speichereUstModus = (m: UstModus): Promise<boolean> => einstellungS
 export interface BelegEinstellungen {
   /** „Beleg bei Einnahmen“: Vorauswahl in der Erfassen-Schublade und für vorbereitete Belege bei Terminen */
   beleg_art: 'quittung' | 'rechnung';
+  /** „Neue Einnahme“: gleich einen eigenen Beleg ausstellen ('beleg') oder nur buchen ('ohne': Papierquittung,
+   *  Datei oder Quittung später) – Vorauswahl in der Erfassen-Schublade */
+  einnahme_weg: 'beleg' | 'ohne';
   /** Zahlungsziel neuer Rechnungen in Tagen */
   zahlungsziel_tage: number;
   /** Gültigkeit neuer Angebote in Tagen */
   angebot_tage: number;
 }
 
-export const BELEG_EINSTELLUNGEN_STANDARD: BelegEinstellungen = { beleg_art: 'quittung', zahlungsziel_tage: 14, angebot_tage: 30 };
+export const BELEG_EINSTELLUNGEN_STANDARD: BelegEinstellungen = { beleg_art: 'quittung', einnahme_weg: 'ohne', zahlungsziel_tage: 14, angebot_tage: 30 };
 
 const tage = (v: unknown, standard: number): number =>
   typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 365 ? v : standard;
@@ -99,6 +102,7 @@ export function belegEinstellungenAusWert(v: unknown): BelegEinstellungen {
   if (!istObjekt(v)) return { ...s };
   return {
     beleg_art: v.beleg_art === 'rechnung' ? 'rechnung' : 'quittung',
+    einnahme_weg: v.einnahme_weg === 'beleg' ? 'beleg' : 'ohne',
     zahlungsziel_tage: tage(v.zahlungsziel_tage, s.zahlungsziel_tage),
     angebot_tage: tage(v.angebot_tage, s.angebot_tage),
   };

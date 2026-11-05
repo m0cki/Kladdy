@@ -4,23 +4,8 @@
  * Optik und Verhalten wie referenz/prototyp/js/pages/belege.js (renderListe); Logik in lib/rechnungen.ts. */
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import {
-  ArrowRight,
-  Blocks,
-  Check,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  FileText,
-  Handshake,
-  Info,
-  Paperclip,
-  Printer,
-  Receipt,
-  Search,
-  Stamp,
-  type LucideIcon,
-} from 'lucide-react';
+import { ArrowRight, Blocks, Check, ChevronDown, ChevronLeft, ChevronRight, FileText, Handshake, Info, Paperclip, Printer, Receipt, Search, Stamp, type LucideIcon } from 'lucide-react';
+import { speichereQuelle } from '../lib/vorlagen/vorschau';
 import { pdfOeffnenFuer } from '../lib/belegaktionen';
 import { anzahlText } from '../lib/buchungen';
 import { erfassen } from '../lib/erfassen';
@@ -31,6 +16,7 @@ import {
   ART_NAME,
   LISTEN_ZEITRAEUME,
   REITER,
+  reiterAusAdresse,
   SORT_START,
   faelligText,
   filtere,
@@ -66,7 +52,7 @@ const zahl = (n: number) => new Intl.NumberFormat('de-DE').format(n);
 /* Reiter, Zeitraum und Sortierung überleben den Seitenwechsel (Modulvariablen wie im Prototyp); der Zeitraum beginnt
  * bei jedem Start mit dem aktuellen Monat */
 let gemerkt: { reiter: Reiter; sortierung: Sortierung; modus: ListenZeitraumModus; anker: string } = {
-  reiter: 'alle',
+  reiter: 'ausgestellt',
   sortierung: { feld: 'nr', richtung: -1 },
   modus: 'monat',
   anker: heuteIso(),
@@ -158,6 +144,17 @@ function NeuMenue({ naechste }: { naechste: Partial<Record<Belegart, string>> })
     else navigate(`/belege/neu?art=${art}`);
   };
 
+  // Blanko-Quittung: Vorlagen-Seite mit der Vorschau „Blanko“ (dort Drucken / PDF)
+  const blankoDrucken = () => {
+    setOffen(false);
+    try {
+      speichereQuelle(localStorage, 'quittung', 'blanko');
+    } catch {
+      /* ohne Speicher zeigt die Seite das Beispiel; „Blanko“ ist dort ein Klick */
+    }
+    navigate('/belege/vorlagen?art=quittung');
+  };
+
   const tasten = (e: KeyboardEvent<HTMLDivElement>) => {
     const liste = [...(box.current?.querySelectorAll<HTMLButtonElement>('.bl-mi') ?? [])];
     const i = liste.indexOf(document.activeElement as HTMLButtonElement);
@@ -172,7 +169,7 @@ function NeuMenue({ naechste }: { naechste: Partial<Record<Belegart, string>> })
       <button
         ref={knopf}
         type="button"
-        className="btn ghost bl-neu-btn"
+        className="btn-primary bl-neu-btn"
         aria-haspopup="menu"
         aria-expanded={offen}
         title="Neuer Beleg mit der nächsten laufenden Nummer"
@@ -199,9 +196,19 @@ function NeuMenue({ naechste }: { naechste: Partial<Record<Belegart, string>> })
             </div>
           );
         })}
+        <div className="bl-menu-sep" role="separator" />
+        <div className="bl-menu-head">Zum Ausdrucken</div>
+        <button type="button" className="bl-mi" role="menuitem" tabIndex={-1} onClick={blankoDrucken}>
+          <Printer />
+          <span>
+            <b>Blanko-Quittung</b>
+            <small>Von Hand ausfüllen, ohne Nummer – zuordnen über die Buchungsnummer</small>
+          </span>
+          <span />
+        </button>
         <p className="bl-menu-foot">
           <Info />
-          <span>Einnahmen ohne eigenen Beleg erfasst du über „+ Erfassen“ bei Ein- &amp; Ausgänge (⌘N).</span>
+          <span>Einnahmen ohne Beleg aus Kladdy erfasst du über „+ Erfassen“ › „Nur buchen“ (⌘N); eine Quittung lässt sich dort später nachholen.</span>
         </p>
       </div>
     </div>
@@ -276,8 +283,8 @@ function Liste({ zeilen, naechste }: { zeilen: BelegZeile[]; naechste: Partial<R
 
   // Adresse ?reiter=offen (Sprung aus der Auswertung bzw. der Seitenleiste) – übernehmen und wieder leeren
   useEffect(() => {
-    const r = params.get('reiter');
-    if (r === 'alle' || r === 'offen' || r === 'bezahlt') {
+    const r = reiterAusAdresse(params.get('reiter'));
+    if (r) {
       waehleReiter(r);
       setParams({}, { replace: true });
     }
@@ -296,7 +303,7 @@ function Liste({ zeilen, naechste }: { zeilen: BelegZeile[]; naechste: Partial<R
     modus,
     label: zr?.label ?? 'Gesamt',
     aus: r.ohneZeitraum,
-    hinweis: q.trim() ? 'Suche über alle Zeiträume' : 'alle offenen, unabhängig vom Zeitraum',
+    hinweis: q.trim() ? 'Suche über alle Belege und Zeiträume' : reiter === 'entwuerfe' ? 'alle Entwürfe, unabhängig vom Zeitraum' : 'alle offenen, unabhängig vom Zeitraum',
     zurueck: !!zr && zr.von > erster,
     vor: !!zr && modus !== 'gesamt' && verschiebe(modus, anker, 1) <= letzter,
     setModus: (m) => {
@@ -316,7 +323,13 @@ function Liste({ zeilen, naechste }: { zeilen: BelegZeile[]; naechste: Partial<R
     if (reiter === 'offen')
       return (
         <EmptyState icon={Check} title="Nichts offen">
-          Alle Rechnungen bezahlt, nichts für Termine vorbereitet.
+          Alle Rechnungen sind bezahlt.
+        </EmptyState>
+      );
+    if (reiter === 'entwuerfe')
+      return (
+        <EmptyState icon={Check} title="Keine Entwürfe">
+          Für Termine vorbereitete Belege erscheinen hier, bis sie ausgestellt sind.
         </EmptyState>
       );
     if (zr)
@@ -340,7 +353,9 @@ function Liste({ zeilen, naechste }: { zeilen: BelegZeile[]; naechste: Partial<R
     ? `${zahl(nOffen)} ${nOffen === 1 ? 'Treffer' : 'Treffer'} · alle Zeiträume`
     : reiter === 'offen'
       ? `${anzahlText(nOffen, 'offener Beleg', 'offene Belege')}${r.ueberfaellig ? ` · ${zahl(r.ueberfaellig)} überfällig` : ''} · unabhängig vom Zeitraum`
-      : `${anzahlText(nOffen, 'Beleg', 'Belege')} · ${zr ? zr.label : 'alle Zeiträume'}`;
+      : reiter === 'entwuerfe'
+        ? `${anzahlText(nOffen, 'Entwurf', 'Entwürfe')} · unabhängig vom Zeitraum`
+        : `${anzahlText(nOffen, 'Beleg', 'Belege')} · ${zr ? zr.label : 'alle Zeiträume'}`;
 
   return (
     <div className="page bl-list">
@@ -355,6 +370,7 @@ function Liste({ zeilen, naechste }: { zeilen: BelegZeile[]; naechste: Partial<R
               onChange={waehleReiter}
               options={REITER.map((t) => ({
                 value: t.value,
+                title: t.titel,
                 label: (
                   <>
                     {t.label}
@@ -477,8 +493,8 @@ function Zeile({ z, heute, oeffnen, aktion }: { z: BelegZeile; heute: string; oe
       onKeyDown={onKey}
     >
       <td className="l bl-nr">
-        <Link to={`/belege/${z.id}`} className={z.nummer ? '' : 'bl-draftnr'}>
-          {z.nummer ?? (z.termin_id != null ? 'Vorbereitet' : 'Entwurf')}
+        <Link to={`/belege/${z.id}`} className={z.nummer ? '' : 'bl-draftnr'} title={z.nummer ? undefined : 'Die Nummer wird beim Ausstellen vergeben'}>
+          {z.nummer ?? 'ohne Nr.'}
         </Link>
         {z.scan_beleg_id != null ? (
           <span className="bl-clip" title="Unterschriebenes Exemplar angehängt">

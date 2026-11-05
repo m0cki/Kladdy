@@ -1,5 +1,7 @@
-/* Schublade von rechts (§9.4): gleitet herein (.45 s), Hintergrund abgedunkelt + leicht unscharf, Esc schließt. */
-import { useEffect, useState, type ReactNode } from 'react';
+/* Dialog in der Mitte (früher Schublade von rechts, §9.4): blendet kurz ein, Hintergrund abgedunkelt + leicht unscharf,
+ * Esc schließt. Beim Öffnen bekommt der Dialog den Fokus, beim Schließen geht er an das vorher fokussierte Element zurück
+ * (ROADMAP I-50). Der Name `Drawer` bleibt, damit alle Aufrufer unverändert bleiben. */
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { X, type LucideIcon } from 'lucide-react';
 
 interface Props {
@@ -15,19 +17,28 @@ interface Props {
   className?: string;
 }
 
-const CLOSE_MS = 450;
+const CLOSE_MS = 240;
 
 export function Drawer({ open, onClose, title, sub, icon: Icon, width = 440, children, foot, className }: Props) {
   const [mounted, setMounted] = useState(open);
   const [shown, setShown] = useState(false);
+  const box = useRef<HTMLElement>(null);
+  const vorher = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (open) {
       setMounted(true);
-      const raf = requestAnimationFrame(() => requestAnimationFrame(() => setShown(true)));
+      vorher.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      const raf = requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          setShown(true);
+          if (box.current && !box.current.contains(document.activeElement)) box.current.focus({ preventScroll: true });
+        }),
+      );
       return () => cancelAnimationFrame(raf);
     }
     setShown(false);
+    if (vorher.current?.isConnected) vorher.current.focus({ preventScroll: true });
     const t = setTimeout(() => setMounted(false), CLOSE_MS);
     return () => clearTimeout(t);
   }, [open]);
@@ -45,7 +56,15 @@ export function Drawer({ open, onClose, title, sub, icon: Icon, width = 440, chi
   return (
     <div className={`overlay ${shown ? 'open' : ''}`}>
       <div className="drawer-backdrop" onClick={onClose} />
-      <aside className={className ? `drawer ${className}` : 'drawer'} role="dialog" aria-modal="true" aria-label={title} style={{ ['--drawer-w' as string]: `${width}px` }}>
+      <aside
+        ref={box}
+        tabIndex={-1}
+        className={className ? `drawer ${className}` : 'drawer'}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        style={{ ['--drawer-w' as string]: `${width}px` }}
+      >
         <header className="drawer-head">
           <h2>
             <Icon />

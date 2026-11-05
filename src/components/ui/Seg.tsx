@@ -1,9 +1,12 @@
-/* Segment-Umschalter mit gleitender Markierung (§9.4). Position der Markierung wird gemessen. */
+/* Segment-Umschalter mit gleitender Markierung (§9.4). Position der Markierung wird gemessen.
+ * Barrierefrei als Auswahlgruppe (role="radiogroup", ROADMAP I-51): eine Wahl aus mehreren, Pfeiltasten wechseln. */
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 
 export interface SegOption<T extends string> {
   value: T;
   label: ReactNode;
+  /** Tooltip (z. B. was der Reiter zeigt) */
+  title?: string;
 }
 
 interface Props<T extends string> {
@@ -39,7 +42,21 @@ export function Seg<T extends string>({ options, value, onChange, className = ''
   }, [value]);
 
   return (
-    <div ref={ref} className={`seg ${ready ? 'ready' : ''} ${className}`} role="tablist" aria-label={ariaLabel}>
+    <div
+      ref={ref}
+      className={`seg ${ready ? 'ready' : ''} ${className}`}
+      role="radiogroup"
+      aria-label={ariaLabel}
+      onKeyDown={(e) => {
+        if (!['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(e.key)) return;
+        const i = options.findIndex((o) => o.value === value);
+        if (i < 0) return;
+        e.preventDefault();
+        const n = options[(i + (e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : options.length - 1)) % options.length];
+        onChange(n.value);
+        requestAnimationFrame(() => ref.current?.querySelector<HTMLButtonElement>('button.active')?.focus());
+      }}
+    >
       <span
         className="seg-ind"
         style={
@@ -52,8 +69,10 @@ export function Seg<T extends string>({ options, value, onChange, className = ''
         <button
           key={o.value}
           type="button"
-          role="tab"
-          aria-selected={o.value === value}
+          role="radio"
+          aria-checked={o.value === value}
+          tabIndex={o.value === value ? 0 : -1}
+          title={o.title}
           className={o.value === value ? 'active' : ''}
           onClick={() => onChange(o.value)}
         >

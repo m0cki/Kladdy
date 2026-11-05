@@ -369,7 +369,7 @@ function Zeile({ t, q, h, gewaehlt, suchFeld }: { t: KundenTreffer; q: string; h
               <Hl text={k.email ?? ''} q={q} />
             </>
           ) : adresse ? (
-            <Hl text={adresse} q={q} />
+            <Hl text={adresse.replace(', ', '\n')} q={q} />
           ) : (
             <span className="muted">–</span>
           )}
@@ -377,7 +377,7 @@ function Zeile({ t, q, h, gewaehlt, suchFeld }: { t: KundenTreffer; q: string; h
       </td>
       <td className="c num ku-c-bes">{x.besuche || <span className="muted">–</span>}</td>
       <td className="l ku-c-last">
-        {x.zuletzt ? <span className="ku-z num">{datumKurz(x.zuletzt)}</span> : <span className="ku-z muted">–</span>}
+        {x.zuletzt ? <span className="ku-z num">{datumKurz(x.zuletzt)}</span> : n || nt ? null : <span className="ku-z muted">noch nie</span>}
         {n ? (
           <small className="ku-z ku-next" title={`Nächster Termin: ${terminLang(n.z, h)} · ${n.titel}`}>
             <CalendarDays />

@@ -120,8 +120,9 @@ import { waehlbar, wahlFinden, wahlName } from '../lib/vorlagen/eigene';
 import { standardVorlage } from '../lib/vorlagen/standard';
 import { heute as heuteIso } from '../lib/zeitraum';
 import { useUi } from '../store/ui';
+import { akzentPapier } from '../lib/settings';
 import { BlattVorschau } from '../components/belege/Blatt';
-import { StatusBadge, StatusKnopf, statusAktionAusfuehren } from '../components/belege/BelegStatus';
+import { StatusKnopf, statusAktionAusfuehren } from '../components/belege/BelegStatus';
 import { belegDialog } from '../components/belege/BelegDialog';
 import { PositionenEditor, type PositionsVorschlag } from '../components/belege/PositionenEditor';
 import { KategorieIcon, ZAHLUNGSWEG_ICON } from '../components/buchungen/Symbole';
@@ -305,7 +306,7 @@ const datumMitTag = (iso: string | null) => (iso ? DF_WOCHE.format(new Date(Numb
 function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schluessel: string }) {
   const navigate = useNavigate();
   const { stamm, beleg, ausgestellt } = g;
-  const akzent = useUi((s) => s.settings.accent);
+  const akzent = useUi((s) => akzentPapier(s.settings));
   const [form, setForm] = useState<BelegFormular>(g.form);
   const [start, setStart] = useState(() => (arbeit?.schluessel === schluessel ? arbeit.start : formularSchluessel(g.form)));
   const [fehler, setFehler] = useState<FormularFehler>({});
@@ -702,10 +703,10 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
             </div>
           ) : null}
           {beleg && !editierbar ? <SperrHinweis beleg={beleg} /> : null}
-          {beleg && !editierbar && beleg.art !== 'storno' ? <ScanKarte beleg={beleg} onDatei={(p) => void scanAnhaengen(p)} /> : null}
           <fieldset className="bl-fs" disabled={!editierbar}>
             {karten[art]}
           </fieldset>
+          {beleg && !editierbar && beleg.art !== 'storno' ? <ScanKarte beleg={beleg} onDatei={(p) => void scanAnhaengen(p)} /> : null}
           <div className="bl-actions">
             {editierbar ? (
               <>
@@ -746,7 +747,7 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
                     onClick={() => void ausstellen()}
                   >
                     {art === 'eigenbeleg' ? <Stamp /> : <Lock />}
-                    {art === 'quittung' || (art === 'rechnung' && form.bezahltAm) ? 'Finalisieren & buchen' : art === 'eigenbeleg' ? 'Buchen' : 'Finalisieren'}
+                    {form.buchungId != null && art !== 'angebot' ? 'Ausstellen & verknüpfen' : art === 'quittung' || (art === 'rechnung' && form.bezahltAm) ? 'Finalisieren & buchen' : art === 'eigenbeleg' ? 'Buchen' : 'Finalisieren'}
                   </button>
                 )}
               </>
@@ -791,10 +792,12 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
                 </Link>
               ) : null}
             </div>
-            <button type="button" className="btn ghost" title="Nur das Blatt drucken – in der Vorschau „Drucken“ oder „Als PDF sichern“ (⌘P)" onClick={() => void drucken()}>
-              <Printer />
-              Drucken / PDF
-            </button>
+            {editierbar ? (
+              <button type="button" className="btn ghost" title="Nur das Blatt drucken – in der Vorschau „Drucken“ oder „Als PDF sichern“ (⌘P)" onClick={() => void drucken()}>
+                <Printer />
+                Drucken / PDF
+              </button>
+            ) : null}
           </div>
           <BlattVorschau doc={doc} bausteine={gedruckt} maxScale={1.2} />
           <div className="bl-pcap">{ARTEN[art].format === 'a4' ? 'A4 hoch' : 'A5 quer'} · gedruckt 1:1, ohne Skalierung</div>
@@ -866,19 +869,20 @@ function KundeKarte({ m, i }: { m: MaskeKontext; i: number }) {
   return (
     <Karte k="kunde" titel="Kunde" icon={Users} i={i}>
       <div className="bl-stack">
-        <label className="bl-search">
-          <Search />
-          <input
-            className={`input ${m.fehler.kunde ? 'invalid' : ''}`}
-            list="bl-kunden"
-            value={form.kunde}
-            placeholder="Name eingeben – vorhandene Kunden werden vorgeschlagen"
-            autoComplete="off"
-            aria-label="Kunde"
-            readOnly={!editierbar}
-            onChange={(e) => set('kunde', e.target.value)}
-          />
-        </label>
+        {editierbar ? (
+          <label className="bl-search">
+            <Search />
+            <input
+              className={`input ${m.fehler.kunde ? 'invalid' : ''}`}
+              list="bl-kunden"
+              value={form.kunde}
+              placeholder="Name eingeben – vorhandene Kunden werden vorgeschlagen"
+              autoComplete="off"
+              aria-label="Kunde"
+              onChange={(e) => set('kunde', e.target.value)}
+            />
+          </label>
+        ) : null}
         <KundeInfo m={m} mitAnschrift />
         <Fehler text={m.fehler.kunde} />
       </div>
@@ -1362,21 +1366,25 @@ function QuittungAngabenKarte({ m, i }: { m: MaskeKontext; i: number }) {
       <div className="bl-stack">
         <div className="field">
           <label className="field-label" htmlFor="bl-von">
-            Erhalten von <span className="muted">(Kunde · optional bis {formatBetrag(m.kleinbetrag)})</span>
+            Erhalten von
           </label>
-          <div className="bl-search">
-            <Search />
-            <input
-              id="bl-von"
-              className={`input ${m.fehler.kunde ? 'invalid' : ''}`}
-              list="bl-kunden"
-              value={form.kunde}
-              placeholder="Barverkauf – oder Name, Kunden werden vorgeschlagen"
-              autoComplete="off"
-              readOnly={!editierbar}
-              onChange={(e) => set('kunde', e.target.value)}
-            />
-          </div>
+          {editierbar ? (
+            <>
+              <div className="bl-search">
+                <Search />
+                <input
+                  id="bl-von"
+                  className={`input ${m.fehler.kunde ? 'invalid' : ''}`}
+                  list="bl-kunden"
+                  value={form.kunde}
+                  placeholder="Barverkauf – oder Name, Kunden werden vorgeschlagen"
+                  autoComplete="off"
+                  onChange={(e) => set('kunde', e.target.value)}
+                />
+              </div>
+              <small className="muted">Bis {formatBetrag(m.kleinbetrag)} darf der Name fehlen (Kleinbetragsrechnung).</small>
+            </>
+          ) : null}
           {form.kunde.trim() || !editierbar ? <KundeInfo m={m} mitAnschrift={false} /> : null}
           <Fehler text={m.fehler.kunde} />
         </div>
@@ -1568,7 +1576,7 @@ function SperrHinweis({ beleg }: { beleg: BelegVoll }) {
             ? 'Hebt das Original auf. Endgültig und unverändert archiviert.'
             : storniert
               ? `Storniert${beleg.storno_nummer ? ` durch ${beleg.storno_nummer}` : ''} – bleibt unverändert archiviert.`
-              : 'Nummer, Datum und Beträge sind festgeschrieben. Für Korrekturen stornieren und neu erstellen – oder duplizieren.'}
+              : 'Nummer, Datum und Beträge sind festgeschrieben. Korrigieren heißt: stornieren und neu ausstellen. „Duplizieren“ legt nur einen neuen Entwurf mit denselben Angaben an.'}
         </span>
         {beleg.angebot_nummer ? <span>Aus Angebot {beleg.angebot_nummer}.</span> : null}
       </div>
@@ -1636,7 +1644,6 @@ function ScanKarte({ beleg, onDatei }: { beleg: BelegVoll; onDatei: (pfad: strin
 
 function AusgestelltAktionen({ beleg, zeile, mailen }: { beleg: BelegVoll; zeile: BelegZeile; mailen: () => void }) {
   const navigate = useNavigate();
-  const h = heuteIso();
   const status = (() => {
     if (beleg.art === 'storno') return `Stornobeleg vom ${datumText(beleg.datum)}`;
     if (beleg.status === 'storniert') return `Storniert${beleg.storniert_am ? ` am ${datumText(beleg.storniert_am)}` : ''}`;
@@ -1650,10 +1657,7 @@ function AusgestelltAktionen({ beleg, zeile, mailen }: { beleg: BelegVoll; zeile
   })();
   return (
     <>
-      <span className="bl-status">
-        <StatusBadge z={zeile} heute={h} />
-        {status}
-      </span>
+      <span className="bl-status">{status}</span>
       <span className="spacer" />
       {beleg.pdf_beleg_id != null ? (
         <>

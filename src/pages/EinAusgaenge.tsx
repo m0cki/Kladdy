@@ -5,7 +5,7 @@
  * Büroklammer öffnet den Beleg (mehrere: Menü), „Beleg anhängen …“ im Zeilenmenü (nicht bei Gegenbuchungen).
  * Optik und Verhalten wie referenz/prototyp/js/pages/buchungen.js; Logik in lib/buchungen.ts, Daten in lib/queries/buchungen.ts. */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeftRight,
   Ban,
@@ -16,6 +16,7 @@ import {
   Lock,
   Pencil,
   Plus,
+  ReceiptText,
   RotateCcw,
   Search,
   TriangleAlert,
@@ -35,6 +36,8 @@ import {
   kannStornieren,
   listenVorgabe,
   markiere,
+  quittungNachholbar,
+  quittungZuBuchungPfad,
   sperre,
   zahlungswegName,
   type BuchungZeile,
@@ -384,7 +387,7 @@ function Liste({ zeilen, kategorien, zeitraumLabel }: { zeilen: BuchungZeile[]; 
             <thead>
               <tr>
                 <th className="l bu-c-dat">Datum</th>
-                <th className="l bu-c-bnr">Beleg-Nr.</th>
+                <th className="l bu-c-bnr" title="Buchungsnummer, darunter der Beleg (Quittung oder Rechnung aus Kladdy, Nummer eines fremden Belegs oder Datei)">Nr. · Beleg</th>
                 <th className="l">Beschreibung</th>
                 <th className="l bu-c-kat">Kategorie</th>
                 <th className="l bu-c-zw">Zahlungsweg</th>
@@ -434,6 +437,7 @@ function Liste({ zeilen, kategorien, zeitraumLabel }: { zeilen: BuchungZeile[]; 
 function Zeile({ b, q }: { b: BuchungZeile; q: string }) {
   const s = sperre(b);
   const storniert = s === 'storniert';
+  const navigate = useNavigate();
   const wer = gegenueber(b);
   const nr = b.belegnummer || b.rechnung_nummer || '';
   const za = b.zahlungsart;
@@ -463,7 +467,10 @@ function Zeile({ b, q }: { b: BuchungZeile; q: string }) {
       <td className="l bu-dat" title={`${datumLang(b.zahlungsdatum)} · Nr. ${b.nummer}`}>
         {datumTagMonat(b.zahlungsdatum)}
       </td>
-      <td className="l">
+      <td className="l bu-nrzelle">
+        <span className="bu-bunr" title={`Buchungsnummer ${b.nummer} – auf Papierbelege schreiben, dann findest du beides wieder`}>
+          <Hl text={b.nummer} q={q} />
+        </span>
         <span className="bu-bnr">
           {nr ? (
             b.rechnung_id != null && b.rechnung_nummer ? (
@@ -483,10 +490,10 @@ function Zeile({ b, q }: { b: BuchungZeile; q: string }) {
               className="badge warn bu-missing"
               title={`Für diesen Eintrag fehlt noch der Beleg. ${b.typ === 'einnahme' ? 'Datei anhängen oder Quittung bzw. Rechnung erstellen.' : 'Datei anhängen oder Eigenbeleg erstellen.'}`}
             >
-              fehlt
+              {nr ? 'Datei fehlt' : 'Beleg fehlt'}
             </span>
           ) : null}
-          {!nr && !b.belege_anzahl && !fehltBeleg(b) ? <span className="bu-dash">–</span> : null}
+          {!nr && !b.belege_anzahl && !fehltBeleg(b) ? <span className="bu-dash">ohne Beleg</span> : null}
         </span>
       </td>
       <td className="l">
@@ -541,6 +548,17 @@ function Zeile({ b, q }: { b: BuchungZeile; q: string }) {
                   onClick={() => void belegAnhaengenDialog({ id: b.id, nummer: b.nummer, typ: b.typ })}
                 >
                   <FileUp />
+                </button>
+              ) : null}
+              {quittungNachholbar(b) ? (
+                <button
+                  type="button"
+                  className="icon-btn sm"
+                  title={`Quittung aus Kladdy zu ${b.nummer} ausstellen (verknüpft diese Einnahme, bucht nichts doppelt)`}
+                  aria-label="Quittung ausstellen"
+                  onClick={() => navigate(quittungZuBuchungPfad(b))}
+                >
+                  <ReceiptText />
                 </button>
               ) : null}
               {kannStornieren(b) ? (

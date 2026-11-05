@@ -6,7 +6,7 @@
  * - Offene Rechnung zuordnen: Liste der offenen Rechnungen; die Wahl übernimmt Betrag, Text und Kunde.
  * - Ohne eigenen Beleg: die Dateifläche darunter (zeichnet die Schublade selbst).
  * Logik in lib/ertrag.ts, gespeichert wird in ErfassenSchublade (beleg_ausstellen bzw. beleg_bezahlt). */
-import { Clock, FileText, Info, Paperclip, Receipt, TriangleAlert, Upload, User } from 'lucide-react';
+import { Clock, FileText, Info, NotebookPen, Paperclip, Receipt, TriangleAlert, User } from 'lucide-react';
 import type { Formular } from '../../lib/buchungen';
 import type { VorgemerkterBeleg } from '../../lib/belege';
 import {
@@ -56,7 +56,7 @@ export function BelegZumErtrag({ form, ertrag, setErtrag, stamm, ladeFehler, bel
   const wege: { weg: Ertragsweg; icon: typeof Clock; label: string; sub: string }[] = [
     { weg: 'beleg', icon: ArtIcon, label: 'Beleg erstellen', sub: naechste ?? (art === 'rechnung' ? 'Rechnung' : 'Quittung') },
     { weg: 'offen', icon: Clock, label: 'Offene Rechnung zuordnen', sub: offene.length ? `${offene.length} offen` : 'keine offen' },
-    { weg: 'ohne', icon: Upload, label: 'Ohne eigenen Beleg', sub: 'Datei anhängen' },
+    { weg: 'ohne', icon: NotebookPen, label: 'Nur buchen', sub: 'Papier oder Datei' },
   ];
 
   return (
@@ -86,14 +86,32 @@ export function BelegZumErtrag({ form, ertrag, setErtrag, stamm, ladeFehler, bel
       {ladeFehler ? (
         <p className="hint warn">
           <TriangleAlert />
-          Belege konnten nicht geladen werden: {ladeFehler} – „Ohne eigenen Beleg“ geht trotzdem.
+          Belege konnten nicht geladen werden: {ladeFehler} – „Nur buchen“ geht trotzdem.
         </p>
       ) : null}
       {stamm && ertrag.weg === 'beleg' ? (
         <BelegKasten form={form} ertrag={ertrag} setErtrag={setErtrag} stamm={stamm} naechste={naechste} belege={belege} nimmtBelege={nimmtBelege} fehler={fehler} />
       ) : null}
       {stamm && ertrag.weg === 'offen' ? <OffeneListe offene={offene} ertrag={ertrag} heute={h} fehler={fehler} onOffen={onOffen} /> : null}
+      {ertrag.weg === 'ohne' ? <NurBuchen buchung={stamm ? naechsteBelegNummer(stamm.kreise, 'buchung', h, h) : null} /> : null}
     </>
+  );
+}
+
+/* ---------- Nur buchen ---------- */
+
+/** Papier-Weg: buchen ohne Beleg aus Kladdy; die Buchungsnummer verbindet Papierquittung und Buchung. */
+function NurBuchen({ buchung }: { buchung: string | null }) {
+  return (
+    <div className="bu-nur">
+      <p>
+        <b>Gebucht wird ohne Beleg aus Kladdy.</b> Schreib die Buchungsnummer{' '}
+        {buchung ? <span className="mono bu-nur-nr">{buchung}</span> : null} auf deine Papierquittung, dann findest du
+        beides wieder. Eine Quittung aus Kladdy kannst du später jederzeit nachholen (Ein- & Ausgänge › Buchung ›
+        „Quittung ausstellen“).
+      </p>
+      <p className="muted">Blanko-Quittungen zum Ausfüllen von Hand druckst du unter Rechnungen & Quittungen › Neu.</p>
+    </div>
   );
 }
 

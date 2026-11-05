@@ -11,6 +11,7 @@
  *   Rückgängig/Wiederholen (⌘Z/⌘⇧Z und Menü „Widerrufen“). Diese Tasten gehen nicht an die Seite weiter, ⌘K/⌘N schon.
  * Stile: styles/vorlagen.css (.fe-*) */
 import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ClipboardEvent, type FormEvent, type HTMLAttributes, type KeyboardEvent, type Ref, type RefObject } from 'react';
+import { PLATZHALTER_KURZ } from '../../lib/vorlagen/dokument';
 import { createPortal } from 'react-dom';
 import { domStelle, istKanonisch, lesen, type Knoten } from '../../lib/vorlagen/editordom';
 import {
@@ -84,7 +85,8 @@ function knotenAus(laeufe: readonly Lauf[]): Node[] {
       chip.className = 'fe-chip';
       chip.contentEditable = 'false';
       chip.setAttribute('data-ph', l.name);
-      chip.textContent = `{${l.name}}`;
+      chip.textContent = PLATZHALTER_KURZ[l.name];
+      chip.title = 'Wird im Beleg durch den echten Wert ersetzt';
       inhalt.push(chip);
     } else {
       l.text.split('\n').forEach((teil, j) => {

@@ -16,7 +16,7 @@
   transition: background .2s, opacity .2s, box-shadow .2s;
 }
 .vl-blk:hover { background: var(--hover); }
-.vl-blk.on { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); }
+.vl-blk.on { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
 .vl-blk.aus .vl-meta, .vl-blk.aus .vl-ic { opacity: .45; }
 .vl-blk.aus .vl-meta b { text-decoration: line-through; }
 .vl-blk.dragging { opacity: .35; }
@@ -26,7 +26,7 @@
 .vl-blk:hover .vl-grip, .vl-grip:focus-visible { opacity: 1; }
 .vl-grip:hover { color: var(--text); }
 .vl-grip .ic { width: 16px; height: 16px; }
-.vl-ic { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; flex: none; background: var(--surface-2); border: 1px solid var(--border); color: var(--accent); }
+.vl-ic { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; flex: none; background: var(--surface-2); border: 1px solid var(--border); color: var(--accent-text); }
 .vl-ic .ic { width: 16px; height: 16px; }
 .vl-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; text-align: left; border-radius: 6px; }
 .vl-meta b { font-size: .86rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -61,7 +61,7 @@
 .vl-pal-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; max-height: 360px; overflow-y: auto; }
 .vl-pal-item { display: flex; align-items: flex-start; gap: 9px; padding: 9px; border-radius: 11px; text-align: left; transition: background .15s; }
 .vl-pal-item:hover, .vl-pal-item:focus-visible { background: var(--accent-soft); }
-.vl-pal-item > .ic { color: var(--accent); margin-top: 1px; }
+.vl-pal-item > .ic { color: var(--accent-text); margin-top: 1px; }
 .vl-pal-item span { display: flex; flex-direction: column; min-width: 0; }
 .vl-pal-item b { font-size: .8rem; font-weight: 650; }
 .vl-pal-item small { font-size: .7rem; color: var(--muted); line-height: 1.35; }
@@ -70,7 +70,7 @@
 .vl-move { gap: 2px; flex: none; }
 .vl-ph { display: flex; flex-wrap: wrap; gap: 4px; }
 .vl-ph .chip { font-family: var(--mono); font-size: .68rem; padding: 2px 7px; cursor: pointer; }
-.vl-ph .chip:hover { border-color: var(--accent-line); color: var(--accent); }
+.vl-ph .chip:hover { border-color: var(--accent-line); color: var(--accent-text); }
 
 /* ---------- Pflichtangaben ---------- */
 .vl-check-titel.bad .ic { color: var(--neg); }
@@ -84,12 +84,13 @@
 .vl-check-fuss { margin-top: 12px; }
 
 /* ---------- Vorschau ---------- */
-.vl-right { position: sticky; top: calc(var(--topbar-h) + 14px); display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.vl-right { position: sticky; top: calc(var(--topbar-h) + 14px); display: flex; flex-direction: column; gap: 12px; min-width: 0; max-height: calc(100vh - var(--topbar-h) - 28px); }
 .vl-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .vl-doc { display: inline-flex; align-items: center; gap: 6px; font-size: .8rem; color: var(--muted); }
 .vl-doc .ic { width: 16px; height: 16px; }
 /* Blatt höher als das Fenster (A4): in der Bühne blättern, statt unten abgeschnitten zu kleben */
-.vl-right .vl-desk { max-height: calc(100vh - var(--topbar-h) - 90px); overflow-y: auto; }
+.vl-right .vl-desk { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.vl-right > .vl-toolbar, .vl-right > .vl-blanko-hint, .vl-right > .vl-latex-link { flex: none; }
 .vl-pdf-hinweis { margin: -4px 0 0; }
 .vl-blanko-hinweis { margin: 8px 0 0; }
 .vl-pdf-fehler > span { flex: 1; min-width: 0; }
@@ -102,17 +103,17 @@
   background: var(--surface-2); border: 1px solid var(--border); font: 12px/1.6 var(--mono); color: var(--text-2); white-space: pre; tab-size: 2;
 }
 .vl-code .tx-c { color: var(--muted); font-style: italic; }
-.vl-code .tx-k { color: var(--accent); font-weight: 600; }
+.vl-code .tx-k { color: var(--accent-text); font-weight: 600; }
 .vl-code .tx-b { color: var(--series-2); }
 
 /* ---------- Leiste: Designs und eigene Vorlagen der Art ---------- */
 .vl-designs { display: flex; align-items: center; gap: 10px 16px; flex-wrap: wrap; margin-bottom: var(--gap); }
-.vl-designs .seg button .ic { color: var(--accent); }
+.vl-designs .seg button .ic { color: var(--accent-text); }
 .vl-design-tag { font-size: .66rem; font-weight: 600; color: var(--muted); padding: 1px 6px; border-radius: 99px; border: 1px solid var(--border-strong); }
 .vl-design-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: .8rem; }
 .vl-design-desc { color: var(--muted); }
 .vl-design-aktiv { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; color: var(--text-2); }
-.vl-design-aktiv > .ic { width: 15px; height: 15px; color: var(--accent); }
+.vl-design-aktiv > .ic { width: 15px; height: 15px; color: var(--accent-text); }
 .vl-design-btn { padding: 4px 10px; font-size: .78rem; }
 .vl-design-btn .ic { width: 14px; height: 14px; }
 .vl-design-tools { display: inline-flex; align-items: center; gap: 4px; }
@@ -123,12 +124,12 @@
 /* Hinweis auf die Firmendaten unter den Einstellungen eines Bausteins */
 .vl-firma { display: flex; align-items: flex-start; gap: 6px; margin-top: 12px; }
 .vl-firma > .ic { width: 14px; height: 14px; flex: none; margin-top: 2px; }
-.vl-firma a { color: var(--accent); }
+.vl-firma a { color: var(--accent-text); }
 .vl-firma code { font-family: var(--mono); font-size: .7rem; }
 
 @media (max-width: 1100px) {
   .vl-layout { grid-template-columns: minmax(0, 1fr); }
-  .vl-right { position: static; }
+  .vl-right { position: static; max-height: none; }
   .vl-right .vl-desk { max-height: none; overflow: hidden; }
 }
 
@@ -140,7 +141,7 @@
 .fe-eingabe:empty::before { content: attr(data-leer); color: var(--muted); pointer-events: none; }
 .fe-chip {
   display: inline-block; padding: 0 .4em; margin: 0 .05em; border-radius: 5px; border: 1px solid var(--accent-line);
-  background: var(--accent-soft); color: var(--accent); font: 500 .82em/1.35 var(--mono); font-style: normal;
+  background: var(--accent-soft); color: var(--accent-text); font: 500 .82em/1.35 var(--mono); font-style: normal;
   white-space: nowrap; vertical-align: baseline; user-select: all; -webkit-user-select: all; cursor: default;
 }
 .fe-feld { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
@@ -149,7 +150,43 @@
 .fe-leiste.schwebend { position: fixed; z-index: 60; box-shadow: var(--shadow); animation: fade .15s var(--ease) both; }
 .fe-btn { min-width: 28px; height: 26px; padding: 0 6px; border-radius: 6px; font: inherit; font-size: .84rem; color: var(--text-2); transition: background .15s, color .15s; }
 .fe-btn:hover { background: var(--hover); color: var(--text); }
-.fe-btn.on { background: var(--accent-soft); color: var(--accent); }
+.fe-btn.on { background: var(--accent-soft); color: var(--accent-text); }
 .fe-btn.fe-f { font-weight: 800; }
 .fe-btn.fe-k { font-style: italic; }
 .fe-btn.fe-u { text-decoration: underline; text-underline-offset: 2px; }
+
+/* Einstellungen direkt unter dem gewählten Baustein (statt einer zweiten Karte unter der Liste) */
+.vl-inline { list-style: none; margin: 0 0 6px; padding: 12px 14px 14px 16px; border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  background: color-mix(in oklab, var(--accent-soft) 55%, var(--surface)); box-shadow: inset 2px 0 0 var(--accent); }
+.vl-karte { display: grid; gap: 12px; }
+.vl-karte-kopf { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.vl-karte-text { margin: 0; display: flex; gap: 8px; align-items: flex-start; font-size: .82rem; color: var(--text-2); line-height: 1.45; }
+.vl-karte-text .ic { width: 15px; height: 15px; flex: none; margin-top: 2px; color: var(--accent-text); }
+.vl-karte .form { gap: 10px; }
+.vl-karte .vl-firma { margin: 0; }
+
+/* Platzhalter als lesbare Marke (statt „{kunde}“) */
+.vl-ph-mini { display: inline-block; padding: 0 5px; margin: 0 1px; border-radius: 4px; font-size: .92em; line-height: 1.35;
+  background: var(--accent-soft); color: var(--accent-text); font-weight: 600; }
+
+/* Werkzeugleiste über dem Blatt */
+.vl-quelle { display: flex; align-items: center; gap: 8px; }
+.vl-quelle-l { font-size: .8rem; color: var(--text-2); font-weight: 600; }
+.vl-blanko-hint { display: flex; gap: 10px; align-items: flex-start; margin: 0 0 10px; padding: 10px 12px; border-radius: var(--radius-sm);
+  background: var(--surface); border: 1px solid var(--border); font-size: .82rem; line-height: 1.45; color: var(--text-2); }
+.vl-blanko-hint .ic { width: 16px; height: 16px; flex: none; margin-top: 1px; color: var(--accent-text); }
+.vl-blanko-hint b { color: var(--text); }
+.vl-latex-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; font-size: .78rem; color: var(--muted); }
+.vl-latex-link .ic { width: 14px; height: 14px; }
+
+.vl-ph-wrap > summary { cursor: pointer; font-size: .78rem; color: var(--accent-text); font-weight: 600; margin-top: 6px; list-style: none; }
+.vl-ph-wrap > summary::-webkit-details-marker { display: none; }
+.vl-ph-wrap > summary::before { content: '+ '; }
+.vl-ph-wrap[open] > summary::before { content: '− '; }
+.vl-ph-wrap .vl-ph { margin-top: 6px; }
+
+/* Feste Formatleiste (F/K/U) sitzt rechts oben im Feld statt in einer eigenen Zeile – spart Höhe im Baukasten */
+.fe-feld:has(> .fe-leiste.fest) { position: relative; }
+.fe-feld > .fe-leiste.fest { position: absolute; top: 6px; right: 6px; z-index: 1; padding: 1px; border-color: transparent; background: transparent; }
+.fe-feld:has(> .fe-leiste.fest) > .fe-eingabe { padding-right: 104px; }
+.fe-feld > .fe-leiste.fest .fe-btn { height: 26px; min-width: 26px; }
