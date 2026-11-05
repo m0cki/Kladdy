@@ -39,12 +39,12 @@
 .sb-item > a { display: flex; align-items: center; gap: 10px; padding: 7px 8px; min-width: 0; }
 .sb-item:hover { background: var(--hover); }
 .sb-item.active { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); }
-.sb-nav > a { padding: 8px 10px; }
+.sb-nav > a { padding: 8px 8px 8px 10px; gap: 9px; }
 .sb-nav .ic { color: var(--text-2); transition: color .2s, transform .3s var(--spring); }
 .sb-nav:hover .ic { transform: scale(1.08); }
 .sb-nav.active .ic { color: var(--accent-text); }
-.sb-nav .sb-label { flex: 1; font-size: .9rem; font-weight: 550; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sb-nav .sb-badge { font-size: .68rem; font-weight: 700; padding: 1px 7px; border-radius: 99px; background: var(--surface-3); color: var(--text-2); }
+.sb-nav .sb-label { flex: 1; font-size: .88rem; font-weight: 550; letter-spacing: -.005em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sb-nav .sb-badge { font-size: .72rem; font-weight: 700; padding: 1px 7px; border-radius: 99px; background: var(--surface-3); color: var(--text-2); }
 .sb-nav .sb-badge.alarm { background: color-mix(in oklab, var(--neg) 18%, transparent); color: var(--neg); }
 .sb-nav .sb-badge.phase { font-weight: 600; color: var(--muted); background: transparent; box-shadow: inset 0 0 0 1px var(--border-strong); }
 .sb-title { padding: 0 10px 6px; font-size: .7rem; color: var(--text-2); font-weight: 650; white-space: nowrap; overflow: hidden; transition: opacity .25s; }
@@ -161,14 +161,14 @@
 .card-title .muted { font-weight: 500; font-size: .85rem; }
 .card-sub { font-size: .8rem; color: var(--muted); margin-top: 2px; }
 .card-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); font-size: .82rem; }
-.badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; font-size: .7rem; font-weight: 600; border-radius: 99px; background: var(--surface-3); color: var(--text-2); white-space: nowrap; }
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; font-size: .74rem; font-weight: 600; border-radius: 99px; background: var(--surface-3); color: var(--text-2); white-space: nowrap; }
 .badge .ic { width: 12px; height: 12px; }
-.badge.accent, .badge.offen { background: var(--accent-soft); color: var(--text); box-shadow: inset 0 0 0 1px var(--accent-line); }
+.badge.accent, .badge.offen { background: var(--accent-soft); color: var(--accent-text); box-shadow: none; }
 .badge.pos, .badge.bezahlt { background: color-mix(in oklab, var(--pos) 16%, transparent); color: var(--pos); }
 :root[data-mode="dark"] .badge.pos, :root[data-mode="dark"] .badge.bezahlt { background: color-mix(in oklab, var(--pos) 13%, transparent); color: color-mix(in oklab, var(--pos) 70%, white); }
 .badge.neg, .badge.ueberfaellig { background: color-mix(in oklab, var(--neg) 16%, transparent); color: var(--neg); }
 .badge.warn { background: color-mix(in oklab, var(--warn) 18%, transparent); color: var(--warn); }
-.badge.entwurf { background: transparent; color: var(--muted); box-shadow: inset 0 0 0 1px var(--border-strong); }
+.badge.entwurf { background: var(--surface-3); color: var(--text-2); box-shadow: none; }
 .badge.storniert { background: transparent; color: var(--muted); text-decoration: line-through; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { display: inline-flex; align-items: center; gap: 6px; font-size: .75rem; padding: 3px 10px; border-radius: 99px; border: 1px solid var(--border); color: var(--text-2); background: var(--surface-2); white-space: nowrap; transition: background .15s, border-color .15s, color .15s; }
@@ -176,7 +176,7 @@ button.chip:hover { border-color: var(--border-strong); color: var(--text); }
 .chip.on { border-color: var(--accent-line); background: var(--accent-soft); color: var(--text); }
 .chip.strong { font-family: var(--mono); color: var(--text); font-weight: 600; border-color: var(--accent-line); background: var(--accent-soft); }
 .chip .dot, .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; display: inline-block; }
-.pill { font-size: .62rem; font-weight: 700; letter-spacing: .05em; padding: 1px 6px; border-radius: 6px; background: var(--surface-3); color: var(--text-2); }
+.pill { font-size: .72rem; font-weight: 700; letter-spacing: .05em; padding: 1px 6px; border-radius: 6px; background: var(--surface-3); color: var(--text-2); }
 .link { color: var(--accent-text); font-weight: 600; font-size: .85rem; display: inline-flex; align-items: center; gap: 4px; }
 .link:hover { text-decoration: underline; }
 .link .ic { width: 15px; height: 15px; }
@@ -213,13 +213,13 @@ button.chip:hover { border-color: var(--border-strong); color: var(--text); }
   box-shadow: inset 0 1px 0 rgb(255 255 255 / .25), 0 6px 16px -8px var(--b); text-shadow: 0 1px 2px rgb(0 0 0 / .25);
 }
 .mono-logo.sm { width: 32px; height: 32px; border-radius: 10px; font-size: .75rem; }
-.mono-logo.xs { width: 26px; height: 26px; border-radius: 8px; font-size: .64rem; }
+.mono-logo.xs { width: 26px; height: 26px; border-radius: 8px; font-size: .72rem; }
 .mono-logo.lg { width: 64px; height: 64px; border-radius: 18px; font-size: 1.35rem; }
 
 /* (?)-Infobutton + globaler Tooltip */
 .q {
   width: 17px; height: 17px; border-radius: 50%; display: inline-grid; place-items: center; flex: none;
-  font-size: .66rem; font-weight: 700; line-height: 1; color: var(--muted); border: 1px solid var(--border-strong);
+  font-size: .72rem; font-weight: 700; line-height: 1; color: var(--muted); border: 1px solid var(--border-strong);
   cursor: help; transition: color .15s, border-color .15s, background .15s, transform .2s var(--spring); vertical-align: middle; margin-left: 4px;
 }
 .q:hover, .q:focus-visible { color: var(--on-accent); background: var(--accent); border-color: var(--accent); transform: scale(1.12); }
@@ -240,7 +240,7 @@ button.chip:hover { border-color: var(--border-strong); color: var(--text); }
 .seg button .ic { width: 15px; height: 15px; }
 .seg button:hover { color: var(--text); }
 .seg button.active { color: var(--text); }
-.seg button .cnt { font-size: .68rem; color: var(--muted); font-weight: 600; }
+.seg button .cnt { font-size: .72rem; color: var(--muted); font-weight: 600; }
 .seg-ind { position: absolute; left: 0; top: 0; border-radius: 9px; background: var(--surface); box-shadow: 0 1px 3px rgb(0 0 0 / .18), 0 0 0 1px var(--border-strong); }
 .seg.ready .seg-ind { transition: transform .35s var(--ease), width .35s var(--ease); }
 .seg.tabs { background: transparent; border: 0; padding: 0; gap: 4px; }
@@ -362,7 +362,7 @@ input[type="date"].input { font-variant-numeric: tabular-nums; }
 .money-input + .suffix { font-size: 1.2rem; font-weight: 600; }
 /* Vorschlag aus der Belegerkennung */
 .suggested { border-color: var(--accent-line) !important; background-color: var(--accent-soft) !important; }
-.sugg-tag { display: inline-flex; align-items: center; gap: 4px; font-size: .66rem; font-weight: 700; letter-spacing: .02em; color: var(--accent-text); }
+.sugg-tag { display: inline-flex; align-items: center; gap: 4px; font-size: .72rem; font-weight: 700; letter-spacing: .02em; color: var(--accent-text); }
 .sugg-tag .ic { width: 12px; height: 12px; }
 .hint { font-size: .76rem; color: var(--muted); line-height: 1.45; }
 .hint.warn { color: var(--warn); } .hint.neg { color: var(--neg); }
@@ -617,3 +617,12 @@ input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 7px; }
 .euer-table .euer-zeile { display: block; width: 76px; margin-left: auto; }
 .euer-table .hint { margin: 4px 0 0; }
 .sb-nav .sb-badge.warn { background: color-mix(in oklab, var(--warn) 20%, transparent); color: var(--warn); }
+.sb-nav .sb-badge { display: inline-flex; align-items: center; gap: 2px; padding: 1px 5px 1px 4px; flex: none; }
+.sb-nav .sb-badge .ic { width: 10px; height: 10px; }
+
+/* Hinweis unter dem Menüpunkt in Worten (statt Zähler ohne Erklärung) */
+.sb-nav .sb-label { display: flex; flex-direction: column; min-width: 0; }
+.sb-nav .sb-hint { font-size: .72rem; font-weight: 600; line-height: 1.2; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sb-nav .sb-hint.warn { color: var(--warn); }
+.sb-nav .sb-hint.alarm { color: var(--neg); }
+.sb-collapsed .sb-hint { display: none; }

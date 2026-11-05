@@ -43,11 +43,13 @@ interface Props {
   fehler?: string;
   onWeg: (weg: Ertragsweg) => void;
   onOffen: (z: BelegZeile) => void;
+  /** „Nur buchen“: Nummer der Papierquittung (Formularfeld belegnummer) */
+  onNummer: (nummer: string) => void;
 }
 
 const ART_ICON = { quittung: Receipt, rechnung: FileText } as const;
 
-export function BelegZumErtrag({ form, ertrag, setErtrag, stamm, ladeFehler, belege, nimmtBelege, fehler, onWeg, onOffen }: Props) {
+export function BelegZumErtrag({ form, ertrag, setErtrag, stamm, ladeFehler, belege, nimmtBelege, fehler, onWeg, onOffen, onNummer }: Props) {
   const h = heute();
   const art = ertrag.art;
   const ArtIcon = ART_ICON[art];
@@ -94,7 +96,16 @@ export function BelegZumErtrag({ form, ertrag, setErtrag, stamm, ladeFehler, bel
       ) : null}
       {stamm && ertrag.weg === 'offen' ? <OffeneListe offene={offene} ertrag={ertrag} heute={h} fehler={fehler} onOffen={onOffen} /> : null}
       {ertrag.weg === 'ohne' ? (
-        <NurBuchen buchung={stamm ? naechsteBelegNummer(stamm.kreise, 'buchung', h, h) : null} papier={ertrag.papier} onPapier={(papier) => setErtrag({ papier })} />
+        <NurBuchen
+          buchung={stamm ? naechsteBelegNummer(stamm.kreise, 'buchung', h, h) : null}
+          papier={ertrag.papier}
+          nummer={form.belegnummer}
+          onPapier={(papier) => {
+            setErtrag({ papier });
+            if (!papier) onNummer('');
+          }}
+          onNummer={onNummer}
+        />
       ) : null}
     </>
   );
@@ -102,21 +113,50 @@ export function BelegZumErtrag({ form, ertrag, setErtrag, stamm, ladeFehler, bel
 
 /* ---------- Nur buchen ---------- */
 
-/** Papier-Weg: buchen ohne Beleg aus Kladdy; die Buchungsnummer verbindet Papierquittung und Buchung. */
-function NurBuchen({ buchung, papier, onPapier }: { buchung: string | null; papier: boolean; onPapier: (papier: boolean) => void }) {
+/** Papier-Weg: buchen ohne Beleg aus Kladdy. Gibt es eine Papierquittung, trägt sie entweder ihre eigene Nummer (hier
+ *  eintragen) oder die Buchungsnummer (Feld leer lassen) – so findet man Zettel und Buchung wieder. */
+function NurBuchen({
+  buchung,
+  papier,
+  nummer,
+  onPapier,
+  onNummer,
+}: {
+  buchung: string | null;
+  papier: boolean;
+  nummer: string;
+  onPapier: (papier: boolean) => void;
+  onNummer: (nummer: string) => void;
+}) {
   return (
-    <div className="bu-nur">
-      <label className="bu-nur-check">
-        <input type="checkbox" checked={papier} onChange={(e) => onPapier(e.target.checked)} />
+    <div className="bu-nur" role="radiogroup" aria-label="Papierquittung">
+      <label className="bu-nur-opt">
+        <input type="radio" name="bu-papier" checked={!papier} onChange={() => onPapier(false)} />
         <span>
-          <b>Papierquittung liegt im Ordner</b>
-          <small>Ohne eingetragene Nummer gilt die Buchung dann als „Papier“ belegt.</small>
+          <b>Kein Papierbeleg</b>
         </span>
       </label>
-      <p>
-        Schreib die Buchungsnummer {buchung ? <span className="mono bu-nur-nr">{buchung}</span> : null} auf den Zettel – oder trag
-        links die Nummer aus deinem Quittungsblock ein. Eine Quittung aus Kladdy lässt sich später nachholen.
-      </p>
+      <label className="bu-nur-opt">
+        <input type="radio" name="bu-papier" checked={papier} onChange={() => onPapier(true)} />
+        <span>
+          <b>Papierquittung im Ordner</b>
+          <small>
+            Nummer der Quittung eintragen – oder leer lassen und {buchung ? <span className="mono bu-nur-nr">{buchung}</span> : 'die Buchungsnummer'} auf den
+            Zettel schreiben.
+          </small>
+        </span>
+      </label>
+      {papier ? (
+        <input
+          className="input bu-nr-in bu-nur-in"
+          aria-label="Nummer der Papierquittung"
+          placeholder="Nr. der Papierquittung (optional)"
+          autoComplete="off"
+          spellCheck={false}
+          value={nummer}
+          onChange={(e) => onNummer(e.target.value)}
+        />
+      ) : null}
     </div>
   );
 }

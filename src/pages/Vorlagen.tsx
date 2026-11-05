@@ -136,6 +136,7 @@ import {
 } from '../lib/vorlagen/vorschau';
 import { heute } from '../lib/zeitraum';
 import { useUi } from '../store/ui';
+import { BlattGross } from '../components/belege/BlattGross';
 import { akzentPapier } from '../lib/settings';
 import { Ladeansicht } from './einstellungen/Laden';
 
@@ -179,9 +180,9 @@ const TX_KLASSE: Readonly<Record<TexTeilArt, string>> = { kommentar: 'tx-c', bef
 /** Hinweis unter dem Blanko-Formular: von Hand ausgefüllt heißt nicht gebucht */
 const BLANKO_HINWEIS: Readonly<Record<Belegart, string>> = {
   quittung:
-    'Ohne Nummer, es wird nichts gespeichert. Die Einnahme buchst du über „+ Erfassen“ › „Nur buchen“ und schreibst die Buchungsnummer ins Feld „Nr.“ – oder du nummerierst selbst und trägst die Nummer beim Buchen ein. So gehören Zettel und Buchung zusammen.',
+    'Ohne Nummer, nichts wird gespeichert. Buchen über „+ Erfassen“ › „Nur buchen“, dann die Buchungsnummer ins Feld „Nr.“ schreiben.',
   eigenbeleg:
-    'Ohne Nummer, es wird nichts gespeichert. Die Ausgabe buchst du über „+ Erfassen“ und schreibst die Buchungsnummer ins Feld „Nr.“.',
+    'Ohne Nummer, nichts wird gespeichert. Die Ausgabe über „+ Erfassen“ buchen, dann die Buchungsnummer ins Feld „Nr.“ schreiben.',
   rechnung: '',
   angebot: '',
 };
@@ -566,7 +567,7 @@ function VorlagenLeiste({ art, liste, wahl, aktiv, vergeben, waehlen, verwenden,
           onClick={() => oeffnen('neu')}
         >
           <Plus />
-          Weitere Vorlage
+          Neue Vorlage …
         </button>
         {eigen && (
           <>
@@ -1051,7 +1052,7 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
                 ) : geaendert && !mitDb ? (
                   `${wahl.name} · geändert, nur auf dieser Seite`
                 ) : (
-                  `${wahl.name} (mitgeliefert) – deine Änderungen speichert Kladdy automatisch als eigene Vorlage`
+                  `${wahl.name} (mitgeliefert) – änderst du etwas, entsteht automatisch „Meine ${ARTEN[art].label}“`
                 )}
               </div>
             </div>
@@ -1245,6 +1246,11 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
         ) : (
           <LatexAnsicht art={art} bausteine={bausteine} accent={accent} blanko={blanko} />
         )}
+        {ansicht === 'vorschau' && !laedt ? (
+          <div className="vl-unter-blatt">
+            <BlattGross doc={doc} bausteine={bausteine} titel={blanko ? 'Blanko in Lesegröße' : 'Vorlage in Lesegröße'} />
+          </div>
+        ) : null}
         {ansicht === 'latex' ? (
           <button type="button" className="link vl-latex-link" onClick={() => setAnsicht('vorschau')}>
             Zurück zur Vorschau
@@ -1380,7 +1386,11 @@ function BausteinKarte({ b, index, anzahl, setze, schieben }: KarteProps) {
 
 function PflichtKarte({ art, liste, eigeneFirma, quelle }: { art: Belegart; liste: readonly Pflichtangabe[]; eigeneFirma: boolean; quelle: Vorschauquelle }) {
   const fehlt = liste.filter((p) => !p.ok).length;
-  const stand = fehlt ? `${fehlt} ${fehlt === 1 ? 'Angabe fehlt' : 'Angaben fehlen'}` : 'alles drin';
+  const stand = fehlt
+    ? `${fehlt} ${fehlt === 1 ? 'Angabe fehlt' : 'Angaben fehlen'}`
+    : quelle === 'blanko'
+      ? 'alle Felder vorgesehen'
+      : 'alles drin';
   return (
     <details className="card reveal vl-check-karte" style={reveal(3)} open={fehlt > 0}>
       <summary className="card-head">

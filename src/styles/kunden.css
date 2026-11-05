@@ -6,6 +6,7 @@
 
 /* ============ Monogramm: nur der Farbton kommt aus dem Namen (--h, Monogramm.tsx) ============ */
 .ku-mono { --b: color-mix(in oklab, var(--accent) 78%, var(--text-2)); } /* einheitlich ruhig statt Zufallsfarben je Name */
+:root[data-mode="dark"] .ku-mono { --b: color-mix(in oklab, var(--accent) 45%, #0c1416); }
 
 /* ============ Schublade: Fuß gehört dem Inhalt (Portal), Platzhalter ohne eigene Box ============ */
 .ku-fuss { display: contents; }
@@ -43,7 +44,7 @@ button.ku-weg, button.ku-nr { cursor: pointer; text-align: left; }
 small.ku-z { font-size: .72rem; color: var(--muted); margin-top: 1px; }
 .ku-lz { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .ku-tx { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.ku-lz .badge { flex: none; padding: 2px 7px; font-size: .66rem; }
+.ku-lz .badge { flex: none; padding: 2px 7px; font-size: .72rem; }
 .ku-adr, .ku-c-leist .ku-tx { color: var(--text-2); }
 small.ku-next { color: var(--accent-text); font-weight: 600; }
 small.ku-z.warn-t { color: var(--warn); font-weight: 600; }
@@ -134,7 +135,7 @@ a.ku-hw:hover { filter: brightness(1.06); }
 .ku-ev-ntz { font-style: italic; }
 .ku-ev.s-abgesagt { opacity: .65; }
 .ku-ev.s-abgesagt .ku-ev-m > b, .ku-ev.s-abgesagt .ku-ev-r b { text-decoration: line-through; }
-.ku-heute { position: relative; display: flex; align-items: center; gap: 10px; margin: 4px 0; padding-left: 26px; font-size: .68rem; font-weight: 700;
+.ku-heute { position: relative; display: flex; align-items: center; gap: 10px; margin: 4px 0; padding-left: 26px; font-size: .72rem; font-weight: 700;
   color: var(--accent-text); }
 .ku-heute::before { content: ""; position: absolute; left: 1px; top: 50%; width: 10px; height: 10px; margin-top: -5px; border-radius: 50%; background: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft); }
@@ -185,3 +186,7 @@ a.ku-hw:hover { filter: brightness(1.06); }
 .ku-table .ku-c-bes { width: 70px; }
 .ku-table .ku-c-ntz { width: 62px; }
 .ku-table .ku-c-last { width: 176px; }
+
+.ku-table .ku-c-adr { width: 16%; }
+.ku-table .ku-c-leist { width: 21%; }
+.ku-table td .cell-main .t b { overflow-wrap: normal; word-break: normal; hyphens: auto; }

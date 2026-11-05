@@ -210,3 +210,12 @@
 .sheet .fe-eingabe:empty::before { color: var(--leer); font-style: italic; }
 .sheet .fe-chip { color: var(--akz); }
 .sheet .fe-chip { text-transform: none; letter-spacing: 0; }
+
+/* Gewählter Abstand bzw. Trennlinie: Markierung innen als Fläche statt Rahmen, der die Nachbarzeilen überdeckt */
+.sheet .blk-abstand.blk-sel, .sheet .blk-trennlinie.blk-sel { outline: 0; background: color-mix(in oklab, var(--accent) 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 55%, transparent); }
+.sheet.editable .blk-abstand:hover, .sheet.editable .blk-trennlinie:hover { outline: 0; background: color-mix(in oklab, var(--accent) 8%, transparent); }
+
+/* Vorlagen: direkt bearbeitbare Texte im Blatt sind leise unterstrichen (Klick bearbeitet sie) */
+.sheet.editable .blk-tx { text-decoration: underline dotted color-mix(in oklab, var(--accent) 50%, transparent); text-underline-offset: 2px; text-decoration-thickness: 1px; cursor: text; }
+.sheet.editable .blk-tx:hover { background: color-mix(in oklab, var(--accent) 8%, transparent); }

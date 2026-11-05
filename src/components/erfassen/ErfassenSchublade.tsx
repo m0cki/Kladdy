@@ -60,6 +60,7 @@ import {
   type KategorieWahl,
   type KundeKurz,
   type Sperre,
+  type Zahlungsart,
 } from '../../lib/buchungen';
 import { anhaengen, vorgemerkteAnhaengen } from '../../lib/belegablage';
 import { pdfNachholen } from '../../lib/belegaktionen';
@@ -190,9 +191,12 @@ function leeresFormular(stamm: Stamm, v: Vorbelegung): Formular {
     wer: typ === 'einnahme' ? (kunde ? kundenLabel(kunde) : '') : (v.lieferant ?? ''),
     kundeBewusstNeu: null,
     privat: '',
-    zahlungsart: v.zahlungsart ?? 'bank',
+    zahlungsart: v.zahlungsart ?? standardZahlungsweg(typ),
   };
 }
+
+/** Vorgabe beim Erfassen: Einnahmen meist bar vor Ort, Ausgaben meist per Überweisung oder Karte. */
+const standardZahlungsweg = (typ: BuchungTyp): Zahlungsart => (typ === 'einnahme' ? 'bar' : 'bank');
 
 function formularAus(b: BuchungZeile): Formular {
   return {
@@ -736,6 +740,7 @@ export function ErfassenSchublade() {
                   fehler={ertragFehler}
                   onWeg={onWeg}
                   onOffen={onOffen}
+                  onNummer={(nr) => set('belegnummer', nr)}
                 />
               ) : null
             }
@@ -751,7 +756,9 @@ export function ErfassenSchublade() {
                 const kat = stamm.kategorien.find((k) => k.id === f.kategorieId);
                 // Ausgabe: das Geschäft ist Freitext – Kundennummer aus dem Feld nehmen
                 const wer = t === 'ausgabe' ? kundeAufloesen(f.wer, stamm.kunden).art === 'kunde' ? f.wer.replace(/\s*·\s*K-\d{3,}\s*$/i, '') : f.wer : f.wer;
-                return { ...f, typ: t, wer, kategorieId: kat?.typ === t ? f.kategorieId : standardKategorie(stamm.kategorien, t) };
+                // Zahlungsweg nur mitwechseln, solange er noch der Vorgabe der bisherigen Art entspricht
+                const zahlungsart = f.zahlungsart === standardZahlungsweg(f.typ) ? standardZahlungsweg(t) : f.zahlungsart;
+                return { ...f, typ: t, wer, zahlungsart, kategorieId: kat?.typ === t ? f.kategorieId : standardKategorie(stamm.kategorien, t) };
               });
               setKatVorschlag(false);
               setFehler({});
@@ -828,8 +835,8 @@ function FormularInhalt(props: InhaltProps) {
   const ausgabe = typ === 'ausgabe';
   // „Offene Rechnung zuordnen“: Betrag, Text und Kunde kommen aus der Rechnung
   const zuordnen = weg === 'offen';
-  // Beleg-Nr. nur ohne eigenen Beleg (sonst vergibt der Beleg die Nummer)
-  const mitNr = weg === 'ohne';
+  // Beleg-Nr. nur ohne eigenen Beleg (sonst vergibt der Beleg die Nummer); bei neuen Einnahmen steht sie bei „Nur buchen“
+  const mitNr = weg === 'ohne' && !(typ === 'einnahme' && ertragBereich != null);
   const kats = stamm.kategorien.filter((k) => k.typ === typ);
   const kat = stamm.kategorien.find((k) => k.id === form.kategorieId);
   const cent = parseBetrag(form.betrag);
@@ -1185,6 +1192,8 @@ function FormularInhalt(props: InhaltProps) {
         {nimmtBelege && weg !== 'beleg' ? (
           hatDateien ? (
             <BelegDropzone kompakt titel="Weiteren Beleg hierher ziehen oder klicken" text="" />
+          ) : !ausgabe && ertragBereich != null ? (
+            <BelegDropzone kompakt titel="Scan oder Abrechnung anhängen (optional) – hierher ziehen oder klicken" text="" />
           ) : (
             <BelegDropzone
               titel={ausgabe ? 'Beleg hierher ziehen' : 'Abrechnung oder Zahlungsnachweis hierher ziehen'}

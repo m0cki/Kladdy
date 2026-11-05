@@ -42,7 +42,9 @@ export const istBelegart = (v: unknown): v is Belegart => typeof v === 'string' 
 export const formatVon = (art: Belegart): Blattformat => ARTEN[art].format;
 
 export const HINWEIS_19 = 'Umsatzsteuerfrei aufgrund der Kleinunternehmerregelung gemäß § 19 UStG.';
-export const HINWEIS_14B = 'Hinweis für Privatkunden: Bitte bewahren Sie diesen Beleg zwei Jahre auf (§ 14b UStG).';
+/** Aufbewahrungshinweis (§ 14 Abs. 4 Satz 1 Nr. 9, § 14b UStG): Pflicht bei Leistungen im Zusammenhang mit einem Grundstück
+ *  an Privatkunden – der Text nennt den Anwendungsbereich, damit er auf anderen Belegen nicht falsch verstanden wird. */
+export const HINWEIS_14B = 'Hinweis für Privatkunden bei Arbeiten an Haus oder Grundstück: Bitte bewahren Sie diesen Beleg zwei Jahre auf (§ 14b UStG).';
 
 /** Standardtexte der Maske je Art (Prototyp TEXTE). */
 export const STANDARD_TEXTE: Readonly<Record<Belegart, { einleitung: string; schlusstext: string }>> = {

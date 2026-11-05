@@ -122,6 +122,7 @@ import { waehlbar, wahlFinden, wahlName } from '../lib/vorlagen/eigene';
 import { standardVorlage } from '../lib/vorlagen/standard';
 import { heute as heuteIso } from '../lib/zeitraum';
 import { useUi } from '../store/ui';
+import { BlattGross } from '../components/belege/BlattGross';
 import { akzentPapier } from '../lib/settings';
 import { BlattVorschau } from '../components/belege/Blatt';
 import { StatusKnopf, statusAktionAusfuehren } from '../components/belege/BelegStatus';
@@ -800,6 +801,7 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
                 </Link>
               ) : null}
             </div>
+            <BlattGross doc={doc} bausteine={gedruckt} titel={`${beleg?.nummer ?? 'Entwurf'} in Lesegröße`} />
             {editierbar ? (
               <button type="button" className="btn ghost" title="Nur das Blatt drucken – in der Vorschau „Drucken“ oder „Als PDF sichern“ (⌘P)" onClick={() => void drucken()}>
                 <Printer />

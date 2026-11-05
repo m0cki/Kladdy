@@ -36,7 +36,7 @@ export default function Darstellung() {
 
   return (
     <>
-      <SetCard title="Darstellung" i={1}>
+      <SetCard title="Farbe und Modus" i={1}>
         <SetRow id="modus" label="Modus">
           {seg(
             'mode',
@@ -51,7 +51,6 @@ export default function Darstellung() {
         <div className="set-row" data-setting="farbschema">
           <div className="set-label">
             <span>Farbschema</span>
-            <span className="muted">{schema.name}</span>
           </div>
           <div className="schemata" role="radiogroup" aria-label="Farbschema">
             {FARBSCHEMATA.map((th) => {

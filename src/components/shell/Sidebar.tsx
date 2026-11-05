@@ -67,19 +67,18 @@ function Hauptmenue({ pathname }: { pathname: string }) {
               <li key={to} className={`sb-item sb-nav ${active ? 'active' : ''}`}>
                 <Link to={to} title={label} aria-current={active ? 'page' : undefined}>
                   <Icon />
-                  <span className="sb-label">{label}</span>
-                  {to === '/termine' && termine.offen > 0 ? (
-                    <span className="sb-badge warn" title={`${termine.offen} Termin${termine.offen === 1 ? '' : 'e'} nachtragen`} aria-label={`${termine.offen} nachtragen`}>
-                      {termine.offen}
-                    </span>
-                  ) : to === '/termine' && termine.heute > 0 ? (
+                  <span className="sb-label">
+                    {label}
+                    {to === '/termine' && termine.offen > 0 ? (
+                      <small className="sb-hint warn">{termine.offen === 1 ? '1 Termin nachtragen' : `${termine.offen} Termine nachtragen`}</small>
+                    ) : null}
+                    {to === '/belege' && ueberfaellig > 0 ? (
+                      <small className="sb-hint alarm">{ueberfaellig === 1 ? '1 Rechnung überfällig' : `${ueberfaellig} Rechnungen überfällig`}</small>
+                    ) : null}
+                  </span>
+                  {to === '/termine' && termine.offen === 0 && termine.heute > 0 ? (
                     <span className="sb-badge" title={`${termine.heute} heute`}>
                       {termine.heute}
-                    </span>
-                  ) : null}
-                  {to === '/belege' && ueberfaellig > 0 ? (
-                    <span className="sb-badge alarm" title={`${ueberfaellig} Rechnung${ueberfaellig === 1 ? '' : 'en'} überfällig`} aria-label={`${ueberfaellig} überfällig`}>
-                      {ueberfaellig}
                     </span>
                   ) : null}
                 </Link>
@@ -117,7 +116,7 @@ function EinstellungsMenue({ pathname }: { pathname: string }) {
                 <Link to={to} title={phase ? `${label} – noch nicht fertig, kommt mit einem der nächsten Updates` : label} aria-current={active ? 'page' : undefined}>
                   <Icon />
                   <span className="sb-label">{label}</span>
-                  {phase ? <span className="sb-badge phase">geplant</span> : null}
+                  {phase ? <span className="sb-badge phase">kommt bald</span> : null}
                 </Link>
               </li>
             );

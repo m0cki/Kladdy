@@ -119,25 +119,28 @@ export const anzahlUeberfaellig = (zeilen: readonly BelegZeile[], heute: string)
 
 /* ================= Filter, Zeitraum, Suche, Sortierung ================= */
 
-export type Reiter = 'ausgestellt' | 'offen' | 'bezahlt' | 'entwuerfe';
+export type Reiter = 'alle' | 'offen' | 'bezahlt' | 'angebote' | 'entwuerfe';
 export const REITER: readonly { value: Reiter; label: string; titel: string }[] = [
-  { value: 'ausgestellt', label: 'Alle', titel: 'Alle ausgestellten Belege (mit Nummer) im gewählten Zeitraum – Offen und Bezahlt sind ein Teil davon' },
+  { value: 'alle', label: 'Alle', titel: 'Alle ausgestellten Belege (mit Nummer) im gewählten Zeitraum – Offen, Bezahlt und Angebote sind Teile davon' },
   { value: 'offen', label: 'Offen', titel: 'Offene Rechnungen im gewählten Zeitraum' },
   { value: 'bezahlt', label: 'Bezahlt', titel: 'Bezahlte Rechnungen, Quittungen und gebuchte Eigenbelege im gewählten Zeitraum' },
+  { value: 'angebote', label: 'Angebote', titel: 'Angebote im gewählten Zeitraum (noch keine Einnahme)' },
   { value: 'entwuerfe', label: 'Entwürfe', titel: 'Entwürfe und für Termine vorbereitete Belege (noch ohne Nummer) im gewählten Zeitraum' },
 ];
 
-/** Reiter aus der Adresse (?reiter=…); alte Werte: „alle“ ⇒ Ausgestellt. */
+/** Reiter aus der Adresse (?reiter=…); alter Wert „ausgestellt“ ⇒ Alle. */
 export function reiterAusAdresse(r: string | null): Reiter | null {
-  if (r === 'alle') return 'ausgestellt';
+  if (r === 'ausgestellt') return 'alle';
   return REITER.some((t) => t.value === r) ? (r as Reiter) : null;
 }
 
-/** Ausgestellt = alles mit Nummer (auch Angebote und Stornos); Offen = offene Rechnungen; Bezahlt = bezahlte
- * Rechnungen, Quittungen und gebuchte Eigenbelege; Entwürfe = noch ohne Nummer (Entwürfe und für Termine vorbereitete). */
+/** Belegregister: Alle = ausgestellte Belege (mit Nummer); Offen = offene Rechnungen; Bezahlt = bezahlte Rechnungen,
+ * Quittungen und gebuchte Eigenbelege; Angebote = ausgestellte Angebote – zusammen „Alle“ (bis auf Stornos).
+ * Entwürfe (noch ohne Nummer, auch für Termine vorbereitete) gehören nicht ins Register und stehen getrennt. */
 export function passtReiter(z: BelegZeile, r: Reiter): boolean {
   if (r === 'offen') return z.art === 'rechnung' && z.status === 'offen' && !!z.nummer;
   if (r === 'bezahlt') return z.status === 'bezahlt' && z.art !== 'angebot' && z.art !== 'storno';
+  if (r === 'angebote') return z.art === 'angebot' && !!z.nummer;
   if (r === 'entwuerfe') return !z.nummer;
   return !!z.nummer;
 }
@@ -180,13 +183,13 @@ export const faelligSchluessel = (z: BelegZeile): string =>
 
 const text = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
-/** Wie im Prototyp: Entwürfe oben, dann nach Datum und Nummer; andere Spalten nach ihrem Wert. */
+/** Belegregister: ausgestellte Belege nach Nummer bzw. Datum, Entwürfe (ohne Nummer) dahinter; andere Spalten nach ihrem Wert. */
 export function vergleiche(a: BelegZeile, b: BelegZeile, s: Sortierung): number {
   const r = s.richtung;
   if (s.feld === 'betrag') return r * (a.summe_cent - b.summe_cent) || b.id - a.id;
   if (s.feld === 'kunde') return r * (a.kunde_name ?? '').localeCompare(b.kunde_name ?? '', 'de') || b.id - a.id;
   if (s.feld === 'faellig') return r * text(faelligSchluessel(a), faelligSchluessel(b)) || text(a.nummer ?? '', b.nummer ?? '');
-  if (!a.nummer !== !b.nummer) return a.nummer ? 1 : -1;
+  if (!a.nummer !== !b.nummer) return a.nummer ? -1 : 1;
   if (s.feld === 'datum' || (a.datum !== b.datum && a.art !== b.art)) return r * text(a.datum ?? '', b.datum ?? '') || r * (a.id - b.id);
   return r * text(a.nummer ?? a.datum ?? '', b.nummer ?? b.datum ?? '') || r * (a.id - b.id);
 }
@@ -210,9 +213,10 @@ export function filtere(
   const imZeitraum = (z: BelegZeile) => !o.zeitraum || (!!z.datum && z.datum >= o.zeitraum.von && z.datum <= o.zeitraum.bis);
   const imZr = alle.filter(imZeitraum);
   const reiter: Record<Reiter, number> = {
-    ausgestellt: imZr.filter((z) => passtReiter(z, 'ausgestellt')).length,
+    alle: imZr.filter((z) => passtReiter(z, 'alle')).length,
     offen: imZr.filter((z) => passtReiter(z, 'offen')).length,
     bezahlt: imZr.filter((z) => passtReiter(z, 'bezahlt')).length,
+    angebote: imZr.filter((z) => passtReiter(z, 'angebote')).length,
     entwuerfe: imZr.filter((z) => passtReiter(z, 'entwuerfe')).length,
   };
   const offenFrueher = o.zeitraum ? alle.filter((z) => passtReiter(z, 'offen') && !!z.datum && z.datum < (o.zeitraum?.von ?? '')).length : 0;

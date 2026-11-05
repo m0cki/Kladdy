@@ -47,7 +47,7 @@ export const FARBSCHEMATA: readonly Farbschema[] = [
     name: 'Petrol',
     beschreibung: 'Schiefergrau mit Petrol, sachlich',
     hell: { akzent: '#0b6a77', tintH: 195, tintS: 16 },
-    dunkel: { akzent: '#3cc3cf', tintH: 195, tintS: 20 },
+    dunkel: { akzent: '#2fb0bc', tintH: 195, tintS: 20 },
   },
   {
     id: 'kladde',

@@ -209,7 +209,7 @@ function Liste({ index, h, o, setO, tbodyRef, suchFeld, sucheLeeren }: ListeProp
               {kopf('besuche', 'Besuche', 'c ku-c-bes')}
               {kopf('zuletzt', 'Zuletzt / nächster', 'l ku-c-last')}
               <th className="l ku-c-leist">Leistung</th>
-              <th className="ku-c-ums">Umsatz</th>
+              <th className="ku-c-ums" title="Summe der Einnahmen und ausgestellten Quittungen und Rechnungen – auch noch offene Rechnungen">Belegsumme</th>
               <th className="c ku-c-ntz" title="Notiz vorhanden">
                 Notiz
               </th>
@@ -279,7 +279,7 @@ function LeistungZelle({ t, q }: { t: KundenTreffer; q: string }) {
   const x = t.info;
   // nur Vergangenes (der nächste Termin steht in der Spalte davor); Suchtreffer zeigen den gefundenen Eintrag
   const e = t.eintrag ?? x.letzterBesuch ?? null;
-  if (!e) return <span className="ku-z muted">noch kein Besuch</span>;
+  if (!e) return <span className="ku-z muted">–</span>;
   // Badge: Status des Eintrags, bei bezahlten der Hinweis auf offene/überfällige Rechnungen des Kunden
   const b =
     e.status !== 'bezahlt'
@@ -378,7 +378,7 @@ function Zeile({ t, q, h, gewaehlt, suchFeld }: { t: KundenTreffer; q: string; h
       </td>
       <td className="c num ku-c-bes">{x.besuche || <span className="muted">–</span>}</td>
       <td className="l ku-c-last">
-        {x.zuletzt ? <span className="ku-z num">{datumKurz(x.zuletzt)}</span> : n || nt ? null : <span className="ku-z muted">noch nie</span>}
+        {x.zuletzt ? <span className="ku-z num">{datumKurz(x.zuletzt)}</span> : n || nt ? null : <span className="ku-z muted">noch kein Besuch</span>}
         {n ? (
           <small className="ku-z ku-next" title={`Nächster Termin: ${terminLang(n.z, h)} · ${n.titel}`}>
             <CalendarDays />

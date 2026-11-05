@@ -87,8 +87,8 @@
 .bl-erfassen-hint .ic { width: 14px; height: 14px; }
 
 /* Status-Badge als Knopf + Menü (fixed am body) */
-.badge.vorbereitet { background: transparent; color: var(--accent-text); box-shadow: inset 0 0 0 1px var(--accent-line); }
-.badge.abgelehnt { background: transparent; color: var(--muted); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--neg) 35%, transparent); }
+.badge.vorbereitet { background: var(--surface-3); color: var(--text-2); box-shadow: none; }
+.badge.abgelehnt { background: var(--surface-3); color: var(--text-2); box-shadow: none; }
 .bl-stbtn { display: inline-flex; align-items: center; gap: 2px; padding: 2px 3px 2px 2px; border-radius: 99px; transition: background .15s, box-shadow .15s; }
 .bl-stbtn > .ic { width: 12px; height: 12px; color: var(--muted); opacity: 0; transition: opacity .15s, transform .2s var(--ease); }
 .bl-stbtn:hover, .bl-stbtn:focus-visible, .bl-stbtn.open { background: var(--hover); box-shadow: inset 0 0 0 1px var(--border-strong); outline: none; }
@@ -223,7 +223,7 @@
 .bl-pos { position: relative; display: grid; grid-template-columns: 22px minmax(0, 1fr) 30px; gap: 7px 8px; align-items: center; padding: 9px 8px 9px 5px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); transition: border-color .15s, box-shadow .15s, opacity .15s; }
 .bl-pos:focus-within { border-color: var(--border-strong); }
 .bl-pos-grip { grid-row: 1 / span 2; align-self: stretch; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border-radius: 7px; color: var(--muted); cursor: grab; touch-action: none; }
-.bl-pos-grip span { font-size: .68rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-2); }
+.bl-pos-grip span { font-size: .72rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-2); }
 .bl-pos-grip .ic { width: 14px; height: 14px; }
 .bl-pos-grip:hover { background: var(--hover); color: var(--text); }
 .bl-pos-grip:active { cursor: grabbing; }
@@ -292,3 +292,26 @@
 .bl-list .page-actions .bl-filter { width: 230px; flex: none; }
 .bl-list .page-actions .bl-filter .input { height: 42px; }
 .bl-list .page-actions .bl-filter .ic { top: 13px; }
+/* festgeschrieben: Umschalter (z. B. Zahlungsweg) zeigen nur die gewählte Option als Text */
+.bl-fs:disabled .seg { background: transparent; border-color: transparent; box-shadow: none; padding: 0; }
+.bl-fs:disabled .seg .seg-ind { display: none; }
+.bl-fs:disabled .seg button:not(.active) { display: none; }
+.bl-fs:disabled .seg button.active { padding-left: 0; color: var(--text); background: transparent; box-shadow: none; opacity: 1; }
+/* Zahlungsziel festgeschrieben: „14 Tage“ linksbündig wie die übrigen Werte */
+.bl-fs:disabled .input-wrap:has(#bl-ziel) { display: inline-flex; align-items: baseline; gap: 4px; }
+.bl-fs:disabled #bl-ziel { field-sizing: content; width: auto; min-width: 2ch; appearance: textfield; padding-left: 0; font-variant-numeric: tabular-nums; text-align: left; padding-right: 0; }
+.bl-fs:disabled .input-wrap:has(#bl-ziel) .suffix { position: static; transform: none; }
+
+/* „Groß ansehen“: Blatt in Lesegröße im Dialog */
+.blatt-gross .drawer-body { padding: 18px; background: var(--surface-2); }
+.blatt-gross-desk { display: grid; place-items: start center; }
+.bl-fs:disabled .seg { display: flex; justify-content: flex-start; width: auto; }
+.bl-fs:disabled .seg button.active { flex: none; justify-content: flex-start; }
+
+/* Entwürfe stehen neben dem Register, nicht darin */
+.bl-entwuerfe { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; font-size: .84rem; font-weight: 600;
+  color: var(--text-2); border: 1px dashed var(--border-strong); background: transparent; }
+.bl-entwuerfe .cnt { font-size: .74rem; color: var(--muted); }
+.bl-entwuerfe:hover { color: var(--text); border-color: var(--accent-line); }
+.bl-entwuerfe.on { color: var(--accent-text); border-style: solid; border-color: var(--accent); background: var(--accent-soft); }
+.bl-fs:disabled #bl-ziel::-webkit-inner-spin-button, .bl-fs:disabled #bl-ziel::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }

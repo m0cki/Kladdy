@@ -109,7 +109,9 @@ export function StatusKnopf({ z, heute, hier = false, onAktion }: Props) {
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
   const btn = useRef<HTMLButtonElement>(null);
   const pop = useRef<HTMLDivElement>(null);
-  const nurBadge = z.status === 'entwurf' && !istVorbereitet(z);
+  // Nur Badge: freie Entwürfe; in der Beleg-Maske auch ausgestellte Quittungen und Eigenbelege – ihr Status ist fest
+  // (Stornieren und Duplizieren stehen dort als eigene Knöpfe)
+  const nurBadge = (z.status === 'entwurf' && !istVorbereitet(z)) || (hier && !!z.nummer && (z.art === 'quittung' || z.art === 'eigenbeleg'));
 
   const zu = (fokus = false) => {
     setOffen(false);

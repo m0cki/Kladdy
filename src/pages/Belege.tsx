@@ -52,7 +52,7 @@ const zahl = (n: number) => new Intl.NumberFormat('de-DE').format(n);
 /* Reiter, Zeitraum und Sortierung überleben den Seitenwechsel (Modulvariablen wie im Prototyp); der Zeitraum beginnt
  * bei jedem Start mit dem aktuellen Jahr – die Nummernkreise zählen je Jahr (QU-2026-…), so steht die Liste lückenlos */
 let gemerkt: { reiter: Reiter; sortierung: Sortierung; modus: ListenZeitraumModus; anker: string } = {
-  reiter: 'ausgestellt',
+  reiter: 'alle',
   sortierung: { feld: 'nr', richtung: -1 },
   modus: 'jahr',
   anker: heuteIso(),
@@ -373,7 +373,7 @@ function Liste({ zeilen, naechste }: { zeilen: BelegZeile[]; naechste: Partial<R
               className="input sm"
               type="search"
               value={q}
-              placeholder="Nr., Kunde, Betreff, Betrag …"
+              placeholder="Belege durchsuchen …"
               aria-label="Belege filtern"
               autoComplete="off"
               spellCheck={false}
@@ -397,7 +397,7 @@ function Liste({ zeilen, naechste }: { zeilen: BelegZeile[]; naechste: Partial<R
               ariaLabel="Belege filtern"
               value={reiter}
               onChange={waehleReiter}
-              options={REITER.map((t) => ({
+              options={REITER.filter((t) => t.value !== 'entwuerfe' && (t.value !== 'angebote' || r.reiter.angebote > 0 || reiter === 'angebote')).map((t) => ({
                 value: t.value,
                 title: t.titel,
                 label: (
@@ -408,6 +408,15 @@ function Liste({ zeilen, naechste }: { zeilen: BelegZeile[]; naechste: Partial<R
                 ),
               }))}
             />
+            <button
+              type="button"
+              className={`bl-entwuerfe ${reiter === 'entwuerfe' ? 'on' : ''}`}
+              aria-pressed={reiter === 'entwuerfe'}
+              title="Entwürfe und für Termine vorbereitete Belege – noch ohne Nummer, nicht im Belegregister"
+              onClick={() => waehleReiter(reiter === 'entwuerfe' ? 'alle' : 'entwuerfe')}
+            >
+              Entwürfe <span className="cnt">{zahl(r.reiter.entwuerfe)}</span>
+            </button>
             <ZeitraumLeiste zeitraum={zeitraum} />
             {r.ohneZeitraum ? (
               <span className="bl-zrhint">
