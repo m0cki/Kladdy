@@ -70,7 +70,8 @@
 .sheet .blk-fk-name + .blk-fk-z { margin-top: 1mm; }
 .sheet.sh-a5q .blk-fk .blk-logo, .sheet.sh-a5q .blk-fk .blk-logo-slot { height: 12mm; }
 /* Absenderzeile & Anschrift */
-.sheet .blk-absender { font-size: 7.5pt; color: var(--grau); }
+/* frei stehende Absenderzeile (Quittung, Eigenbeleg): lesbar – wer den Betrag erhalten hat, gehört dazu */
+.sheet .blk-absender { font-size: 8.5pt; color: inherit; }
 .sheet .blk-absender.linie { display: inline-block; max-width: 85mm; font-size: 7pt; padding-bottom: .8mm; border-bottom: .2mm solid var(--haar); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sheet .blk-absenderzeile + .blk-anschrift_meta { margin-top: 2.5mm; }
 .sheet .blk-anschrift_meta { display: flex; justify-content: space-between; align-items: flex-start; gap: 8mm; }

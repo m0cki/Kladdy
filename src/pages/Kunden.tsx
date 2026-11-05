@@ -208,7 +208,7 @@ function Liste({ index, h, o, setO, tbodyRef, suchFeld, sucheLeeren }: ListeProp
               {kopf('name', 'Kunde', 'l')}
               <th className="l ku-c-adr">Adresse</th>
               {kopf('besuche', 'Besuche', 'c ku-c-bes')}
-              {kopf('zuletzt', 'Zuletzt / nächster', 'l ku-c-last')}
+              {kopf('zuletzt', 'Nächster Termin · zuletzt', 'l ku-c-last')}
               <th className="l ku-c-leist">Leistung</th>
               <th className="ku-c-ums" title="Summe der Einnahmen und ausgestellten Quittungen und Rechnungen – auch noch offene Rechnungen">Belegsumme</th>
               <th className="c ku-c-ntz" title="Notiz vorhanden">

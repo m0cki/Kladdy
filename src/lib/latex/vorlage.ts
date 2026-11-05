@@ -294,7 +294,7 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => Schnipsel>>
   },
   absenderzeile(b, x) {
     const t = textTex(b.text('text'), true, x.blanko);
-    if (!b.an('linie')) return { tex: L`{${fs(7.5)}\color{grau}${t.tex}\par}`, leer: t.leer };
+    if (!b.an('linie')) return { tex: L`{${fs(8.5)}${t.tex}\par}`, leer: t.leer };
     // Unterstrichen wie im Fensterumschlag; zu lang ⇒ auf 85 mm verkleinert (Vorschau: abgeschnitten mit …)
     return {
       tex: zeilen(
