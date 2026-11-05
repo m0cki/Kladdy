@@ -260,7 +260,7 @@ function ZeitraumLeiste({ zeitraum }: { zeitraum: ZeitraumSteuerung }) {
 /* ---------- Liste ---------- */
 
 const SPALTEN: readonly { feld: SortFeld | null; label: string; klasse: string }[] = [
-  { feld: 'nr', label: 'Nr.', klasse: 'l' },
+  { feld: 'nr', label: 'Beleg-Nr. · Buchung', klasse: 'l' },
   { feld: null, label: 'Art', klasse: 'l' },
   { feld: 'kunde', label: 'Kunde', klasse: 'l' },
   { feld: null, label: 'Betreff', klasse: 'l bl-c-betreff' },
@@ -551,7 +551,10 @@ function Zeile({ z, heute, oeffnen, aktion }: { z: BelegZeile; heute: string; oe
           {z.nummer ?? 'ohne Nr.'}
         </Link>
         {z.buchung_nummer ? (
-          <small className="bl-buchnr" title={`Gebucht als ${z.buchung_nummer} (Ein- & Ausgänge)`}>
+          <small
+            className="bl-buchnr"
+            title={`Belegnummer ${z.nummer ?? ''} bekommt der Kunde. Unter der Buchungsnummer ${z.buchung_nummer} steht die Einnahme in Ein- & Ausgänge.`}
+          >
             Buchung {z.buchung_nummer}
           </small>
         ) : null}

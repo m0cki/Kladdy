@@ -456,7 +456,7 @@ export default function Vorlagen() {
         title="Vorlagen"
         sub="So sehen deine Belege aus. Baustein wählen und einstellen – oder direkt ins Blatt klicken und Texte ändern."
         back={{ to: '/belege', label: 'Rechnungen & Quittungen' }}
-        actions={<Seg options={ART_OPTIONEN} value={art} onChange={artWaehlen} ariaLabel="Belegart der Vorlage" />}
+        actions={<Seg className="tabs" options={ART_OPTIONEN} value={art} onChange={artWaehlen} ariaLabel="Belegart der Vorlage" />}
       />
       {!basis || !bereit || !letzte ? (
         <Skelett />

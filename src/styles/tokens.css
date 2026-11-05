@@ -59,7 +59,7 @@
   --border-strong: hsl(var(--tint-h) var(--tint-s) 83%);
   --text: hsl(var(--tint-h) 25% 10%);
   --text-2: hsl(var(--tint-h) 12% 28%);
-  --muted: hsl(var(--tint-h) 8% 41%);
+  --muted: hsl(var(--tint-h) 9% 36%);
   --grid: hsl(var(--tint-h) calc(var(--tint-s) + 4%) 92%);
   --axis: hsl(var(--tint-h) var(--tint-s) 78%);
   --hover: hsl(var(--tint-h) 30% 30% / .05);

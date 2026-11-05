@@ -212,8 +212,7 @@
 .sheet .fe-chip { text-transform: none; letter-spacing: 0; }
 
 /* Gewählter Abstand bzw. Trennlinie: Markierung innen als Fläche statt Rahmen, der die Nachbarzeilen überdeckt */
-.sheet .blk-abstand.blk-sel, .sheet .blk-trennlinie.blk-sel { outline: 0; background: color-mix(in oklab, var(--accent) 9%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 45%, transparent); }
+.sheet .blk-abstand.blk-sel, .sheet .blk-trennlinie.blk-sel { outline: 1.5px dashed var(--accent); outline-offset: -2px; background: transparent; box-shadow: none; }
 .sheet.editable .blk-abstand:hover, .sheet.editable .blk-trennlinie:hover { outline: 0; background: color-mix(in oklab, var(--accent) 8%, transparent); }
 
 /* Vorlagen: direkt bearbeitbare Texte im Blatt sind leise unterstrichen (Klick bearbeitet sie) */
