@@ -3,7 +3,7 @@
  * Notiz-Symbol. Suche über Name, Straße, Ort, Telefon, Notiz und Leistung; Umschalter Alle · Stammkunden · mit Notiz.
  * Keine KPI-Kacheln, keine Summen (Statistik nur in der Auswertung). Klick öffnet die Kunden-Schublade.
  * Optik und Verhalten wie referenz/prototyp/js/pages/kunden.js; Logik in lib/kunden.ts, Daten in lib/queries/kunden.ts. */
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
 import { CalendarDays, Mail, Phone, Plus, Search, StickyNote, Users } from 'lucide-react';
 import { datumKurz, markiere } from '../lib/buchungen';
 import {
@@ -220,7 +220,22 @@ function Liste({ index, h, o, setO, tbodyRef, suchFeld, sucheLeeren }: ListeProp
           </thead>
           <tbody ref={tbodyRef}>
             {zeilen.length ? (
-              zeilen.map((t) => <Zeile key={t.info.k.id} t={t} q={qt} h={h} gewaehlt={gewaehlt === t.info.k.id} suchFeld={suchFeld} />)
+              zeilen.map((t, i) => {
+                // Standardsortierung ohne Suche: Gruppen „mit Termin“ / „ohne Termin“, damit die Reihenfolge lesbar ist
+                const gruppiert = o.sort === 'zuletzt' && o.richtung < 0 && !qt;
+                const gruppe = mitTermin(t) ? 'termin' : 'rest';
+                const neu = gruppiert && (i === 0 || mitTermin(zeilen[i - 1]) !== mitTermin(t));
+                return (
+                  <Fragment key={t.info.k.id}>
+                    {neu ? (
+                      <tr className="ku-gruppe">
+                        <td colSpan={7}>{gruppe === 'termin' ? 'Mit Termin – nachtragen und nächster zuerst' : 'Ohne Termin – zuletzt da zuerst'}</td>
+                      </tr>
+                    ) : null}
+                    <Zeile t={t} q={qt} h={h} gewaehlt={gewaehlt === t.info.k.id} suchFeld={suchFeld} />
+                  </Fragment>
+                );
+              })
             ) : (
               <tr className="ku-leer">
                 <td colSpan={7}>
@@ -277,6 +292,9 @@ function Leer({ gesamt, q, filter, alleZeigen, sucheLeeren }: { gesamt: number; 
 }
 
 /* ---------- eine Zeile ---------- */
+
+/** Hat der Kunde einen offenen Termin (nachzutragen oder kommend)? Bestimmt die Gruppe in der Liste. */
+const mitTermin = (t: KundenTreffer): boolean => t.info.nachtragen.length > 0 || !!t.info.naechster;
 
 /** Vergangener Tag wie die Termine: im laufenden Jahr „Fr 06.11.“, sonst „22.04.2025“ (das „vor …“ steht darunter). */
 function tagKurz(datum: string, heute: string): string {

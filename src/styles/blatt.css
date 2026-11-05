@@ -12,7 +12,7 @@
 
 /* ---------- Blatt ---------- */
 .sheet {
-  --akz: color-mix(in oklab, var(--accent) 86%, #000);
+  --akz: color-mix(in oklab, var(--accent-papier, var(--accent)) 86%, #000);
   --ink: #16181d; --grau: #6b7280; --haar: #d5d8de; --papier: #fff;
   --leer: #9ca3af; --marke: #a3a8b1; --strich: #c4c8cf; --slot: #c7cad1; --slot-text: #a0a5ae; --kasten: #f3f4f6;
   --qr: #111111; /* GiroCode-Module, wie girocode.png im PDF (lib/girocode/png.ts) */
@@ -223,7 +223,8 @@
 /* ohne Logo: der Platzhalter erscheint erst, wenn man auf den Kopf zeigt oder ihn wählt */
 .sheet.editable .blk-logo-slot { opacity: 0; transition: opacity .15s; }
 .sheet.editable .blk:hover .blk-logo-slot, .sheet.editable .blk.blk-sel .blk-logo-slot { opacity: 1; }
-.sheet .blk-buchnr { margin: 1mm 0 2mm; }
+.sheet .blk-buchnr { margin: 1.5mm 0 2.5mm; font-size: 10pt; font-weight: 600; }
+.sheet .blk-buchnr span { font-size: 7.5pt; font-weight: 400; color: var(--grau); margin-right: 1.5mm; }
 .sheet .blk-abstand.blk-sel, .sheet .blk-trennlinie.blk-sel { position: relative; }
 .sheet .blk-abstand.blk-sel::after, .sheet .blk-trennlinie.blk-sel::after { content: 'Abstand'; position: absolute; inset: 0; display: grid; place-items: center;
   font: 600 8pt var(--font); color: var(--accent); letter-spacing: .02em; pointer-events: none; }

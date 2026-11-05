@@ -226,6 +226,8 @@ export function applySettings(s: Settings, root: HTMLElement, systemDark: boolea
   d.posneg = s.posneg;
   d.glass = s.glass ? 'on' : 'off';
   root.style.setProperty('--accent', p.akzent);
+  // Belege werden gedruckt: im Blatt immer die Papierfarbe (wie im PDF), auch im Dunkelmodus
+  root.style.setProperty('--accent-papier', akzentPapier(s));
   root.style.setProperty('--on-accent', onAccent(p.akzent));
   root.style.setProperty('--accent-text', textAkzent(p.akzent, modus));
   root.style.setProperty('--tint-h', String(p.tintH));

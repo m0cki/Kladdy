@@ -91,7 +91,7 @@ export default function Darstellung() {
             })}
           </div>
         </div>
-        <SetRow id="akzentfarbe" label="Eigene Akzentfarbe" value={eigen ? (s.akzent ?? '').toUpperCase() : 'aus'}>
+        <SetRow id="akzentfarbe" label="Eigene Akzentfarbe" value={eigen ? (s.akzent ?? '').toUpperCase() : undefined}>
           <div className="toggle-row">
             <span>Statt der Farbe des Schemas eine eigene verwenden (z. B. deine Firmenfarbe)</span>
             <Switch

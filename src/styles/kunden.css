@@ -194,3 +194,5 @@ a.ku-hw:hover { filter: brightness(1.06); }
 .ku-z.ku-top { display: inline-flex; align-items: center; gap: 5px; font-size: .86rem; font-weight: 600; }
 .ku-z.ku-top .ic { width: 14px; height: 14px; }
 .ku-z.ku-war { font-weight: 500; }
+.ku-table tr.ku-gruppe td { padding: 10px 14px 6px; font-size: .78rem; font-weight: 650; color: var(--text-2); background: var(--surface-2); text-align: left; }
+.ku-z.ku-war { font-weight: 400; color: var(--text-2); } /* vergangener Besuch: leiser als ein kommender Termin */
