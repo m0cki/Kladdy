@@ -38,7 +38,7 @@
 .tm-ping { animation: tmPing 1.4s var(--ease); }
 @keyframes tmPing { 0%, 35% { background: var(--accent-soft); } }
 /* Je Tag ein Raster; die Zeilen sind Subgrids → Zeit, Betrag, Beleg-Chip und Aktionen stehen untereinander */
-.tm-items { list-style: none; margin: 0; padding: 0 8px; display: grid; grid-template-columns: 62px 32px minmax(0, 1fr) auto auto auto; column-gap: 14px; }
+.tm-items { list-style: none; margin: 0; padding: 0 8px; display: grid; grid-template-columns: 62px 32px minmax(0, 1fr) 76px 172px 176px; /* feste Spalten: Betrag, Chip und Aktionen stehen in allen Tagesgruppen untereinander */ column-gap: 14px; }
 .tm-frei { grid-column: 1 / -1; padding: 6px 12px 10px 24px; font-size: .84rem; color: var(--muted); }
 .tm-trenner { display: flex; align-items: center; gap: 12px; margin: 18px 20px 0; font-size: .8rem; font-weight: 650; color: var(--text-2); }
 .tm-trenner::before, .tm-trenner::after { content: ""; flex: 1; border-top: 1px dashed var(--border-strong); }
@@ -240,3 +240,4 @@ a.ku-hw.tm-hw:hover { border-color: var(--accent-line); }
 .tm-legende i.nach { background: var(--warn); border-color: var(--warn); border-radius: 1px; transform: rotate(45deg) scale(.9); }
 
 .tm-frage { color: var(--text-2) !important; font-weight: 600; }
+.tm-nach .tm-items { grid-template-columns: 62px 32px minmax(0, 1fr) 76px 172px auto; } /* Nachtragen: Frage und zwei Knöpfe brauchen mehr Platz */

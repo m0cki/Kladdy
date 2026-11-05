@@ -111,7 +111,7 @@ import {
   zusammenfassung,
 } from '../lib/vorlagen/baukasten';
 import { BEISPIEL_FIRMA, beispielbeleg, blankobeleg, firmaOderBeispiel, hatBlanko } from '../lib/vorlagen/beispiel';
-import { ARTEN, BELEGARTEN, PLATZHALTER, PLATZHALTER_KURZ, istBelegart, zerlegen, type BelegDokument, type Belegart, type PlatzhalterName } from '../lib/vorlagen/dokument';
+import { ARTEN, BELEGARTEN, PLATZHALTER, PLATZHALTER_KURZ, istBelegart, zerlegen, type BelegDokument, type Belegart, type PlatzhalterName, type Textteil } from '../lib/vorlagen/dokument';
 import { pflichtCheck, type Pflichtangabe } from '../lib/vorlagen/pflicht';
 import {
   NAME_MAX,
@@ -1129,7 +1129,7 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
                         ) : null}
                       </b>
                       <small>
-                        {zerlegen(zusammenfassung(b)).map((t, k) =>
+                        {nurPlatzhalter(zerlegen(zusammenfassung(b))).map((t, k) =>
                           t.art === 'text' ? t.text : (
                             <span key={k} className="vl-ph-txt" title="Setzt Kladdy beim Ausstellen ein">
                               {PLATZHALTER_KURZ[t.name]}
@@ -1292,6 +1292,14 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
 }
 
 /* ================= Einstellungen des gewählten Bausteins ================= */
+
+/** Liste: enthält die Zusammenfassung Platzhalter, nur diese zeigen („Firma · Inhaber · Straße …“) – feste Beschriftungen
+ *  wie „Inh.“ oder „Steuernr.“ dazwischen machten die Zeile unlesbar. Reiner Text bleibt, wie er ist. */
+function nurPlatzhalter(teile: Textteil[]): Textteil[] {
+  const ph = teile.filter((t) => t.art === 'platzhalter');
+  if (!ph.length) return teile;
+  return ph.flatMap((t, i) => (i ? [{ art: 'text' as const, text: ' · ' }, t] : [t]));
+}
 
 interface KarteProps {
   b: Baustein | undefined;

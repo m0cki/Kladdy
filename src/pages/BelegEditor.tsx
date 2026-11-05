@@ -11,39 +11,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { open as dateiDialog } from '@tauri-apps/plugin-dialog';
-import {
-  Ban,
-  Banknote,
-  Blocks,
-  CalendarDays,
-  Check,
-  ChevronLeft,
-  CircleCheck,
-  Clock,
-  Copy,
-  FileText,
-  FolderSearch,
-  Info,
-  Landmark,
-  List,
-  Lock,
-  Mail,
-  Paperclip,
-  Pencil,
-  Plus,
-  Printer,
-  QrCode,
-  Receipt,
-  Search,
-  Stamp,
-  Store,
-  Trash2,
-  TriangleAlert,
-  Upload,
-  Users,
-  X,
-  type LucideIcon,
-} from 'lucide-react';
+import { Ban, Banknote, Blocks, CalendarDays, Check, ChevronLeft, ChevronRight, CircleCheck, Clock, Copy, FileText, FolderSearch, Info, Landmark, List, Lock, Mail, Paperclip, Pencil, Plus, Printer, QrCode, Receipt, Search, Stamp, Store, Trash2, TriangleAlert, type LucideIcon, Upload, Users, X } from 'lucide-react';
 import { pdfNachholen, pdfOeffnenFuer } from '../lib/belegaktionen';
 import { setzeDropZiel } from '../lib/belegablage';
 import { ausgestellterBeleg, entwurfOeffnen, mailText, type Schnappschuss } from '../lib/belegpdf';
@@ -694,7 +662,7 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
         </div>
       </div>
 
-      <div className="bl-grid">
+      <div className={`bl-grid${editierbar ? '' : ' fest'}`}>
         <div className="bl-form" ref={formRef}>
           {editierbar && beleg?.termin_id != null ? (
             <div className="bl-termin reveal" style={reveal(1)}>
@@ -712,9 +680,20 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
             </div>
           ) : null}
           {beleg && !editierbar ? <SperrHinweis beleg={beleg} /> : null}
-          <fieldset className="bl-fs" disabled={!editierbar}>
-            {karten[art]}
-          </fieldset>
+          {editierbar ? (
+            <fieldset className="bl-fs">{karten[art]}</fieldset>
+          ) : (
+            // festgeschrieben: alles steht auf dem Blatt rechts – die Felder nur auf Wunsch
+            <details className="bl-angaben">
+              <summary>
+                <ChevronRight />
+                Alle Angaben als Liste
+              </summary>
+              <fieldset className="bl-fs" disabled>
+                {karten[art]}
+              </fieldset>
+            </details>
+          )}
           {beleg && !editierbar && beleg.art !== 'storno' ? <ScanKarte beleg={beleg} onDatei={(p) => void scanAnhaengen(p)} /> : null}
           <div className="bl-actions">
             {editierbar ? (
@@ -1679,7 +1658,11 @@ function AusgestelltAktionen({ beleg, zeile, mailen }: { beleg: BelegVoll; zeile
           </button>
         </>
       ) : null}
-      <button type="button" className="btn ghost" onClick={() => void pdfOeffnenFuer(beleg.id)}>
+      <button
+        type="button"
+        className={(beleg.art === 'rechnung' && beleg.status === 'offen') || (beleg.art === 'angebot' && beleg.status !== 'angenommen') ? 'btn ghost' : 'btn-primary sm'}
+        onClick={() => void pdfOeffnenFuer(beleg.id)}
+      >
         <Printer />
         {beleg.pdf_beleg_id != null ? 'PDF öffnen' : 'PDF erzeugen'}
       </button>

@@ -268,9 +268,11 @@ function Agenda({
           }}
           options={FILTER.map((f) => ({
             value: f.value,
+            // heute Erledigte stehen in beiden Reitern – „Alle“ ohne Zahl, damit niemand nachrechnet
+            title: f.value === 'anstehend' ? 'Nachtragen, heute und kommend – heute erledigte bleiben bis Tagesende stehen' : undefined,
             label: (
               <>
-                {f.label} <span className="cnt">{zaehler[f.value]}</span>
+                {f.label} {f.value === 'alle' ? null : <span className="cnt">{zaehler[f.value]}</span>}
               </>
             ),
           }))}
