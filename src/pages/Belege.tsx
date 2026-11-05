@@ -50,11 +50,11 @@ export const ART_SYMBOL: Readonly<Record<ListenArt, LucideIcon>> = {
 const zahl = (n: number) => new Intl.NumberFormat('de-DE').format(n);
 
 /* Reiter, Zeitraum und Sortierung überleben den Seitenwechsel (Modulvariablen wie im Prototyp); der Zeitraum beginnt
- * bei jedem Start mit dem aktuellen Monat */
+ * bei jedem Start mit dem aktuellen Jahr – die Nummernkreise zählen je Jahr (QU-2026-…), so steht die Liste lückenlos */
 let gemerkt: { reiter: Reiter; sortierung: Sortierung; modus: ListenZeitraumModus; anker: string } = {
   reiter: 'ausgestellt',
   sortierung: { feld: 'nr', richtung: -1 },
-  modus: 'monat',
+  modus: 'jahr',
   anker: heuteIso(),
 };
 
@@ -104,8 +104,8 @@ interface ZeitraumSteuerung {
 }
 
 const NEU: readonly { art: Belegart; sub: string }[] = [
-  { art: 'quittung', sub: 'Einnahme mit Quittung erfassen' },
-  { art: 'rechnung', sub: 'Einnahme erfassen – bezahlt oder offen' },
+  { art: 'quittung', sub: 'Ausstellen und die Einnahme gleich buchen' },
+  { art: 'rechnung', sub: 'Bezahlt oder offen' },
   { art: 'angebot', sub: 'Für einen Kunden – noch keine Einnahme' },
   { art: 'eigenbeleg', sub: 'Originalbeleg einer Ausgabe fehlt' },
 ];
@@ -208,7 +208,7 @@ function NeuMenue({ naechste }: { naechste: Partial<Record<Belegart, string>> })
         </button>
         <p className="bl-menu-foot">
           <Info />
-          <span>Einnahmen ohne Beleg aus Kladdy erfasst du über „+ Erfassen“ › „Nur buchen“ (⌘N); eine Quittung lässt sich dort später nachholen.</span>
+          <span>Nur buchen, ohne Beleg aus Kladdy: „+ Erfassen“ (⌘N).</span>
         </p>
       </div>
     </div>
@@ -429,8 +429,8 @@ function Liste({ zeilen, naechste }: { zeilen: BelegZeile[]; naechste: Partial<R
               }}
             >
               {r.ueberfaellig ? <TriangleAlert /> : <Clock />}
-              {r.offenFrueher === 1 ? '1 offene Rechnung' : `${zahl(r.offenFrueher)} offene Rechnungen`} aus früheren Monaten
-              {r.ueberfaellig ? ` · ${zahl(r.ueberfaellig)} überfällig` : ''} – alle offenen zeigen
+              Außerdem offen aus früheren Zeiträumen: {r.offenFrueher === 1 ? '1 Rechnung' : `${zahl(r.offenFrueher)} Rechnungen`}
+              {r.ueberfaellig ? ` (${zahl(r.ueberfaellig)} überfällig)` : ''} · anzeigen
             </button>
           </div>
         ) : null}

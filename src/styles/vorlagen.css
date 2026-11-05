@@ -198,3 +198,9 @@
 .vl-check-karte > summary::-webkit-details-marker { display: none; }
 .vl-check-karte[open] > summary { margin-bottom: 12px; }
 .vl-check-karte > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 6px; }
+
+/* Abstand und Trennlinie: schmale, leise Zeilen – sie gliedern, sind aber keine Inhalte */
+.vl-blk.leise { padding-top: 1px; padding-bottom: 1px; }
+.vl-blk.leise .vl-ic { width: 22px; height: 18px; background: transparent; border-color: transparent; color: var(--muted); }
+.vl-blk.leise .vl-meta b { font-weight: 500; font-size: .78rem; color: var(--text-2); }
+.vl-blk.leise .vl-meta small { font-size: .7rem; }

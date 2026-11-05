@@ -1578,13 +1578,13 @@ function SperrHinweis({ beleg }: { beleg: BelegVoll }) {
     <div className="bl-lock reveal" style={reveal(1)}>
       <Lock />
       <div>
-        <b>{beleg.art === 'storno' ? `Stornobeleg zu ${beleg.storno_von_nummer ?? '—'}` : 'Ausgestellt – Änderungen nur per Storno (GoBD)'}</b>
+        <b>{beleg.art === 'storno' ? `Stornobeleg zu ${beleg.storno_von_nummer ?? '—'}` : storniert ? 'Storniert' : 'Ausgestellt und festgeschrieben (GoBD)'}</b>
         <span>
           {beleg.art === 'storno'
             ? 'Hebt das Original auf. Endgültig und unverändert archiviert.'
             : storniert
               ? `Storniert${beleg.storno_nummer ? ` durch ${beleg.storno_nummer}` : ''} – bleibt unverändert archiviert.`
-              : 'Nummer, Datum und Beträge sind festgeschrieben. Korrigieren heißt: stornieren und neu ausstellen. „Duplizieren“ legt nur einen neuen Entwurf mit denselben Angaben an.'}
+              : 'Ändern geht nur über „Stornieren …“ und neu ausstellen.'}
         </span>
         {beleg.angebot_nummer ? <span>Aus Angebot {beleg.angebot_nummer}.</span> : null}
       </div>
@@ -1659,7 +1659,7 @@ function AusgestelltAktionen({ beleg, zeile, mailen }: { beleg: BelegVoll; zeile
     if (beleg.art === 'angebot') return beleg.status === 'angenommen' ? 'In Rechnung umgewandelt' : beleg.status === 'abgelehnt' ? 'Vom Kunden abgelehnt' : `gültig bis ${datumText(beleg.faellig_am)}`;
     if (beleg.status === 'bezahlt') {
       const was = beleg.art === 'eigenbeleg' ? 'Ausgabe gebucht' : beleg.art === 'quittung' ? 'Bezahlt' : 'Bezahlt';
-      return `${was} am ${datumText(beleg.bezahlt_am ?? beleg.datum)}${beleg.buchung_nummer ? ` · ${beleg.buchung_nummer}` : ''}`;
+      return `${was} am ${datumText(beleg.bezahlt_am ?? beleg.datum)}${beleg.buchung_nummer ? ` · gebucht als ${beleg.buchung_nummer}` : ''}`;
     }
     return '';
   })();

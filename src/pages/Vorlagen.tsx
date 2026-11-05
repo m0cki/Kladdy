@@ -36,7 +36,6 @@ import {
   Check,
   CircleCheck,
   Clock,
-  Code,
   Eye,
   EyeOff,
   FileText,
@@ -567,7 +566,7 @@ function VorlagenLeiste({ art, liste, wahl, aktiv, vergeben, waehlen, verwenden,
           onClick={() => oeffnen('neu')}
         >
           <Plus />
-          Eigene Vorlage anlegen
+          Weitere Vorlage
         </button>
         {eigen && (
           <>
@@ -755,7 +754,9 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
   /** gewählter Baustein; -1 = keiner (Start: Übersicht aller Bausteine, Klick klappt die Einstellungen auf) */
   const [sel, setSel] = useState(-1);
   const [palette, setPalette] = useState(false);
-  const [ansicht, setAnsicht] = useState<Ansicht>('vorschau');
+  // Erzeugten LaTeX-Code nur auf Wunsch (Fachleute, Fehlersuche): Adresse …/belege/vorlagen?ansicht=latex
+  const [suchParams] = useSearchParams();
+  const [ansicht, setAnsicht] = useState<Ansicht>(suchParams.get('ansicht') === 'latex' ? 'latex' : 'vorschau');
   /** Ziehen am Griff: Baustein `von` an die Einfügestelle `stelle` */
   const [zug, setZug] = useState<{ von: number; stelle: number } | null>(null);
   const [gespeichert, setGespeichert] = useState(0);
@@ -1050,7 +1051,7 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
                 ) : geaendert && !mitDb ? (
                   `${wahl.name} · geändert, nur auf dieser Seite`
                 ) : (
-                  `${wahl.name} (mitgeliefert) – sobald du etwas änderst, speichert Kladdy es als eigene Vorlage`
+                  `${wahl.name} (mitgeliefert) – deine Änderungen speichert Kladdy automatisch als eigene Vorlage`
                 )}
               </div>
             </div>
@@ -1069,6 +1070,7 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
                 const Icon = ICON[b.typ];
                 const klasse = [
                   'vl-blk',
+                  (b.typ === 'abstand' || b.typ === 'trennlinie') && 'leise',
                   i === sel && 'on',
                   b.aus && 'aus',
                   zug?.von === i && 'dragging',
@@ -1195,16 +1197,6 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
             </div>
           )}
           <span className="spacer" />
-          <button
-            type="button"
-            className={`icon-btn sm ${ansicht === 'latex' ? 'on' : ''}`}
-            title="Erzeugten Satz-Code (LaTeX) ansehen – nur zum Nachschauen"
-            aria-label="Satz-Code ansehen"
-            aria-pressed={ansicht === 'latex'}
-            onClick={() => setAnsicht((a) => (a === 'latex' ? 'vorschau' : 'latex'))}
-          >
-            <Code />
-          </button>
           {blanko ? null : mitBeleg ? (
             <span className="vl-doc" title="Gezeigt als Entwurf ohne Nummer in den aktuellen Bausteinen – der Beleg selbst bleibt unverändert">
               {laedt ? <LoaderCircle className="ic spin" /> : <FileText />}

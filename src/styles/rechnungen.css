@@ -18,7 +18,7 @@
   transition: opacity .16s var(--ease), transform .22s var(--ease), visibility 0s linear .22s;
 }
 .bl-neu.open .bl-menu { opacity: 1; transform: none; pointer-events: auto; visibility: visible; transition-delay: 0s; }
-.bl-menu-head { padding: 6px 10px 4px; font-size: .8rem; color: var(--text-2); font-weight: 650; text-align: right; }
+.bl-menu-head { padding: 6px 10px 4px; font-size: .8rem; color: var(--text-2); font-weight: 650; text-align: left; }
 .bl-mi { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: center; gap: 11px; width: 100%; padding: 9px 10px; border-radius: 11px; text-align: left; color: var(--text); transition: background .15s; }
 .bl-mi > .ic { width: 18px; height: 18px; color: var(--accent-text); }
 .bl-mi span { display: flex; flex-direction: column; min-width: 0; }
@@ -202,12 +202,16 @@
 /* Hinweisleisten: vorbereitet (Termin), gesperrt (ausgestellt) */
 .bl-termin, .bl-lock { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; font-size: .8rem; color: var(--text-2); line-height: 1.45; }
 .bl-termin { border: 1px solid var(--accent-line); background: color-mix(in oklab, var(--accent) 8%, var(--surface)); }
-.bl-lock { align-items: flex-start; border: 1px solid var(--border-strong); background: var(--surface-2); }
+.bl-lock { align-items: center; padding: 9px 12px; border: 1px solid var(--border); background: var(--surface-2); }
 .bl-termin > .ic, .bl-lock > .ic { color: var(--accent-text); width: 20px; height: 20px; flex: none; }
 .bl-termin > div, .bl-lock > div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .bl-termin b, .bl-lock b { color: var(--text); font-size: .86rem; }
 .bl-termin .link, .bl-lock .link { white-space: nowrap; font-size: .8rem; }
-.bl-fs:disabled .input, .bl-fs:disabled .select, .bl-fs:disabled .textarea { background: transparent; border-style: dashed; color: var(--text); -webkit-text-fill-color: var(--text); opacity: 1; cursor: default; resize: none; }
+.bl-fs:disabled .input, .bl-fs:disabled .select, .bl-fs:disabled .textarea { background: transparent; border-color: transparent; box-shadow: none; padding-left: 0; height: auto; min-height: 0;
+  color: var(--text); -webkit-text-fill-color: var(--text); opacity: 1; cursor: default; resize: none; appearance: none; }
+.bl-fs:disabled .select { background-image: none; }
+/* festgeschrieben: Werte lesen sich wie Text, nicht wie Eingabefelder */
+.bl-fs:disabled .field-label, .bl-fs:disabled label { color: var(--muted); }
 .bl-fs:disabled .bl-pos-grip, .bl-fs:disabled .bl-pos-del, .bl-fs:disabled .bl-pos-add, .bl-fs:disabled .bl-mini, .bl-fs:disabled .bl-zielrow .chips { display: none; }
 .bl-fs:disabled .bl-pos { grid-template-columns: 0 minmax(0, 1fr) 0; column-gap: 0; padding-left: 10px; }
 .bl-fs:disabled .seg button, .bl-fs:disabled .bl-kat { cursor: default; }
@@ -280,7 +284,7 @@
   color: var(--text-2); background: var(--surface-2); border: 1px solid var(--border); }
 .bl-frueher:hover { border-color: var(--border-strong); color: var(--text); }
 .bl-frueher .ic { width: 14px; height: 14px; }
-.bl-frueher.alarm { color: var(--neg); border-color: color-mix(in oklab, var(--neg) 40%, transparent); background: color-mix(in oklab, var(--neg) 8%, var(--surface)); }
+.bl-frueher.alarm .ic { color: var(--neg); }
 .bl-hinweiszeile { padding: 8px 14px; border-bottom: 1px solid var(--border); }
 .bl-hinweiszeile .bl-frueher { margin-left: 0; }
 .bl-tabsl .bl-zr { margin-left: 4px; }

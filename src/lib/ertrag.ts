@@ -71,7 +71,7 @@ export function ertragStart(
     adresse: '',
     leistung: '',
     offenId: null,
-    papier: standardWeg === 'ohne',
+    papier: false,
   };
 }
 

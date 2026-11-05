@@ -277,6 +277,11 @@ function Agenda({
       </div>
       {wocheZeigen(termine, filter, h) ? (
         <div className="tm-woche">
+          <p className="tm-legende" aria-hidden="true">
+            <span><i /> geplant</span>
+            <span><i className="erledigt" /> erledigt</span>
+            <span><i className="nach" /> nachtragen</span>
+          </p>
           {wochen.map((w) => (
             <div key={w.label} className="tm-wo">
               <div className="tm-wo-h">
@@ -497,7 +502,7 @@ function Zeile({
       <div className="tm-acts">
         {k.frage ? <span className="tm-frage">War der Termin?</span> : null}
         {k.haupt === 'abhaken' ? (
-          <button type="button" className="btn-primary sm tm-kass" title="Termin abhaken – den Beleg stellst du danach aus" onClick={() => onAktion('abhaken', t)}>
+          <button type="button" className="btn ghost sm tm-kass" title="Termin abhaken – den Beleg stellst du danach aus" onClick={() => onAktion('abhaken', t)}>
             <Check />
             Erledigt
           </button>

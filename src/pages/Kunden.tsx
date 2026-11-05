@@ -210,8 +210,8 @@ function Liste({ index, h, o, setO, tbodyRef, suchFeld, sucheLeeren }: ListeProp
               {kopf('zuletzt', 'Zuletzt / nächster', 'l ku-c-last')}
               <th className="l ku-c-leist">Leistung</th>
               <th className="ku-c-ums">Umsatz</th>
-              <th className="c ku-c-ntz">
-                <span className="sr-only">Notiz</span>
+              <th className="c ku-c-ntz" title="Notiz vorhanden">
+                Notiz
               </th>
             </tr>
           </thead>
@@ -277,7 +277,8 @@ function Leer({ gesamt, q, filter, alleZeigen, sucheLeeren }: { gesamt: number; 
 
 function LeistungZelle({ t, q }: { t: KundenTreffer; q: string }) {
   const x = t.info;
-  const e = t.eintrag ?? x.letzterBesuch ?? x.naechster ?? x.eintraege[0] ?? null;
+  // nur Vergangenes (der nächste Termin steht in der Spalte davor); Suchtreffer zeigen den gefundenen Eintrag
+  const e = t.eintrag ?? x.letzterBesuch ?? null;
   if (!e) return <span className="ku-z muted">noch kein Besuch</span>;
   // Badge: Status des Eintrags, bei bezahlten der Hinweis auf offene/überfällige Rechnungen des Kunden
   const b =

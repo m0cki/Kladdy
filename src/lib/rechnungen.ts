@@ -80,7 +80,9 @@ export type StatusSchluessel =
   | 'stornobeleg'
   | 'angenommen'
   | 'abgelehnt'
-  | 'abgelaufen';
+  | 'abgelaufen'
+  /** Angebot, auf dessen Antwort gewartet wird (nicht „offen“ wie eine unbezahlte Rechnung) */
+  | 'ausstehend';
 
 /** Status zur Anzeige: „überfällig“, „vorbereitet“ und die Sonderfälle je Art (Prototyp statusKey/statusBadge). */
 export function statusSchluessel(z: Pick<BelegZeile, 'art' | 'status' | 'termin_id' | 'faellig_am'>, heute: string): StatusSchluessel {
@@ -89,7 +91,7 @@ export function statusSchluessel(z: Pick<BelegZeile, 'art' | 'status' | 'termin_
   if (z.status === 'storniert') return 'storniert';
   if (z.art === 'angebot') {
     if (z.status === 'angenommen' || z.status === 'abgelehnt') return z.status;
-    return z.faellig_am && z.faellig_am < heute ? 'abgelaufen' : 'offen';
+    return z.faellig_am && z.faellig_am < heute ? 'abgelaufen' : 'ausstehend';
   }
   if (z.art === 'rechnung' && z.status === 'offen') return z.faellig_am && z.faellig_am < heute ? 'ueberfaellig' : 'offen';
   if (z.art === 'eigenbeleg' && z.status === 'bezahlt') return 'gebucht';
@@ -108,6 +110,7 @@ export const STATUS_BADGE: Readonly<Record<StatusSchluessel, { klasse: string; t
   angenommen: { klasse: 'bezahlt', text: 'Angenommen' },
   abgelehnt: { klasse: 'abgelehnt', text: 'Abgelehnt' },
   abgelaufen: { klasse: 'entwurf', text: 'Abgelaufen' },
+  ausstehend: { klasse: 'vorbereitet', text: 'Ausstehend' },
 };
 
 /** Zahl der überfälligen Rechnungen (Seitenleiste, roter Zähler). */
@@ -118,7 +121,7 @@ export const anzahlUeberfaellig = (zeilen: readonly BelegZeile[], heute: string)
 
 export type Reiter = 'ausgestellt' | 'offen' | 'bezahlt' | 'entwuerfe';
 export const REITER: readonly { value: Reiter; label: string; titel: string }[] = [
-  { value: 'ausgestellt', label: 'Ausgestellt', titel: 'Alle Belege mit Nummer im gewählten Zeitraum' },
+  { value: 'ausgestellt', label: 'Alle', titel: 'Alle ausgestellten Belege (mit Nummer) im gewählten Zeitraum – Offen und Bezahlt sind ein Teil davon' },
   { value: 'offen', label: 'Offen', titel: 'Offene Rechnungen im gewählten Zeitraum' },
   { value: 'bezahlt', label: 'Bezahlt', titel: 'Bezahlte Rechnungen, Quittungen und gebuchte Eigenbelege im gewählten Zeitraum' },
   { value: 'entwuerfe', label: 'Entwürfe', titel: 'Entwürfe und für Termine vorbereitete Belege (noch ohne Nummer) im gewählten Zeitraum' },
@@ -347,7 +350,7 @@ export function statusMenue(z: BelegZeile, heute: string, hier = false): StatusM
       p.push({ aktion: 'rechnung-oeffnen', label: 'Rechnung öffnen', sub: 'Der Entwurf aus diesem Angebot' });
       return { text: 'Angenommen und in eine Rechnung umgewandelt.', punkte: p };
     }
-    p.push({ aktion: 'angebot-offen', label: 'Offen', sub: 'Wartet auf Antwort des Kunden', art: z.status === 'offen' ? 'on' : undefined });
+    p.push({ aktion: 'angebot-offen', label: 'Ausstehend', sub: 'Wartet auf Antwort des Kunden', art: z.status === 'offen' ? 'on' : undefined });
     p.push({ aktion: 'umwandeln', label: 'Angenommen …', sub: 'In eine Rechnung umwandeln (Entwurf)' });
     p.push({ aktion: 'angebot-abgelehnt', label: 'Abgelehnt', sub: 'Kunde hat abgesagt', art: z.status === 'abgelehnt' ? 'on' : undefined });
     const text = z.status === 'abgelehnt' ? 'Der Kunde hat das Angebot abgelehnt.' : `Wartet auf Antwort${z.faellig_am ? ` – gültig bis ${datumText(z.faellig_am)}` : ''}.`;

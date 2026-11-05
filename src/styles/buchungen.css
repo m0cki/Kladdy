@@ -84,7 +84,15 @@
 .bu-table th.bu-c-zw { width: 132px; }
 .bu-table th.bu-c-amt { width: 196px; }
 /* schmal: Zahlungsweg nur als Symbol, Aktionen schweben links neben dem Betrag (Spalte braucht keinen Platz dafür) */
-@container bu-card (max-width: 980px) {
+/* mittlere Breite (Fenster ~1360 px): Zahlungsweg mit Text, schmalere Spalten statt Abschneiden */
+@container bu-card (max-width: 1100px) {
+  .bu-table th.bu-c-dat { width: 64px; }
+  .bu-table th.bu-c-bnr { width: 160px; }
+  .bu-table th.bu-c-kat { width: 164px; }
+  .bu-table th.bu-c-zw { width: 136px; }
+  .bu-table th.bu-c-amt { width: 120px; }
+}
+@container bu-card (max-width: 860px) {
   .bu-table { min-width: 640px; } /* ~1100 px Fensterbreite: Betrag bleibt sichtbar, erst darunter wird gescrollt */
   .bu-table th.bu-c-dat { width: 66px; }
   .bu-table th.bu-c-bnr { width: 168px; }

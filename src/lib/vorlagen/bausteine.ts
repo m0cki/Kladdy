@@ -123,7 +123,7 @@ export const BAUSTEINE: Readonly<Record<BausteinTyp, BausteinDef>> = {
   },
   titel: {
     name: 'Titel',
-    beschreibung: 'Große Überschrift, z. B. „Rechnung RE-2026-013“',
+    beschreibung: 'Große Überschrift mit Belegart und Nummer',
     arten: ALLE,
     felder: [
       { key: 'text', label: 'Text', typ: 'text', default: '{art} {nr}' },

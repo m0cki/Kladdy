@@ -1178,7 +1178,7 @@ function FormularInhalt(props: InhaltProps) {
       )}
 
       <section>
-        <h3>{ausgabe ? 'Beleg' : 'Beleg zum Ertrag'}</h3>
+        <h3>{ausgabe ? 'Beleg' : 'Beleg zur Einnahme'}</h3>
         {ausgabe ? null : ertragBereich}
         <VorhandeneBelege liste={abgelegt} />
         {nimmtBelege && weg !== 'beleg' ? <VorgemerkteBelege belege={belege} wann={wann} /> : null}

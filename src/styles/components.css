@@ -165,6 +165,7 @@
 .badge .ic { width: 12px; height: 12px; }
 .badge.accent, .badge.offen { background: var(--accent-soft); color: var(--text); box-shadow: inset 0 0 0 1px var(--accent-line); }
 .badge.pos, .badge.bezahlt { background: color-mix(in oklab, var(--pos) 16%, transparent); color: var(--pos); }
+:root[data-mode="dark"] .badge.pos, :root[data-mode="dark"] .badge.bezahlt { background: color-mix(in oklab, var(--pos) 13%, transparent); color: color-mix(in oklab, var(--pos) 70%, white); }
 .badge.neg, .badge.ueberfaellig { background: color-mix(in oklab, var(--neg) 16%, transparent); color: var(--neg); }
 .badge.warn { background: color-mix(in oklab, var(--warn) 18%, transparent); color: var(--warn); }
 .badge.entwurf { background: transparent; color: var(--muted); box-shadow: inset 0 0 0 1px var(--border-strong); }

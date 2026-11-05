@@ -61,7 +61,7 @@ export function BelegZumErtrag({ form, ertrag, setErtrag, stamm, ladeFehler, bel
 
   return (
     <>
-      <div className="bu-ew" role="radiogroup" aria-label="Beleg zum Ertrag">
+      <div className="bu-ew" role="radiogroup" aria-label="Beleg zur Einnahme">
         {wege.map(({ weg, icon: Icon, label, sub }) => {
           const an = ertrag.weg === weg;
           const gesperrt = !stamm && weg !== 'ohne';
@@ -114,11 +114,9 @@ function NurBuchen({ buchung, papier, onPapier }: { buchung: string | null; papi
         </span>
       </label>
       <p>
-        <b>Gebucht wird ohne Beleg aus Kladdy.</b> Damit Zettel und Buchung zusammenfinden, schreib die Buchungsnummer{' '}
-        {buchung ? <span className="mono bu-nur-nr">{buchung}</span> : null} auf deine Papierquittung – oder trag links die
-        Nummer aus deinem Quittungsblock ein. Eine Quittung aus Kladdy kannst du später jederzeit nachholen.
+        Schreib die Buchungsnummer {buchung ? <span className="mono bu-nur-nr">{buchung}</span> : null} auf den Zettel – oder trag
+        links die Nummer aus deinem Quittungsblock ein. Eine Quittung aus Kladdy lässt sich später nachholen.
       </p>
-      <p className="muted">Blanko-Quittungen zum Ausfüllen von Hand druckst du unter Rechnungen & Quittungen › Neu.</p>
     </div>
   );
 }

@@ -18,9 +18,9 @@
 .tm-d b { font-size: .95rem; font-weight: 650; line-height: 1.3; font-family: var(--num-font); font-variant-numeric: tabular-nums; }
 .tm-d.we b { color: var(--muted); }
 .tm-dots { display: flex; align-items: center; justify-content: center; gap: 3px; height: 6px; }
-.tm-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
-.tm-dots i.erledigt { background: var(--pos); }
-.tm-dots i.nach { background: var(--warn); }
+.tm-dots i { width: 7px; height: 7px; border-radius: 50%; background: transparent; border: 1.5px solid var(--accent); box-sizing: border-box; } /* geplant: Ring */
+.tm-dots i.erledigt { background: var(--pos); border-color: var(--pos); } /* erledigt: voll */
+.tm-dots i.nach { background: var(--warn); border-color: var(--warn); border-radius: 1px; transform: rotate(45deg) scale(.9); } /* nachtragen: Raute */
 .tm-dots em { font-style: normal; font-size: .58rem; font-weight: 700; line-height: 1; color: var(--muted); }
 .tm-d:not(.frei):hover { background: var(--hover); color: var(--text); }
 .tm-d.frei { cursor: default; }
@@ -231,3 +231,10 @@ a.ku-hw.tm-hw:hover { border-color: var(--accent-line); }
   .tm-tag-h { padding-inline: 14px; }
 }
 @media (max-width: 520px) { .tm-zeitrow { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .tm-zeitrow > .field:first-child { grid-column: 1 / -1; } }
+
+/* Legende zu den Punkten im Wochenstreifen (Form, nicht nur Farbe) */
+.tm-legende { grid-column: 1 / -1; display: flex; gap: 14px; margin: 0 6px 8px; font-size: .74rem; color: var(--text-2); }
+.tm-legende span { display: inline-flex; align-items: center; gap: 5px; }
+.tm-legende i { width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid var(--accent); box-sizing: border-box; }
+.tm-legende i.erledigt { background: var(--pos); border-color: var(--pos); }
+.tm-legende i.nach { background: var(--warn); border-color: var(--warn); border-radius: 1px; transform: rotate(45deg) scale(.9); }

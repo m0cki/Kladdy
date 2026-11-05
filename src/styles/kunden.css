@@ -183,3 +183,5 @@ a.ku-hw:hover { filter: brightness(1.06); }
   white-space: pre-line; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; line-height: 1.3;
 }
 .ku-table .ku-c-bes { width: 70px; }
+.ku-table .ku-c-ntz { width: 62px; }
+.ku-table .ku-c-last { width: 176px; }

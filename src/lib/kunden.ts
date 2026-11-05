@@ -89,19 +89,19 @@ export type EintragStatus =
 
 /** Badge-Klasse (components.css) und Text je Status. */
 export const STATUS_BADGE: Readonly<Record<EintragStatus, { klasse: string; text: string }>> = {
-  bezahlt: { klasse: 'bezahlt', text: 'bezahlt' },
-  offen: { klasse: 'offen', text: 'offen' },
-  ueberfaellig: { klasse: 'ueberfaellig', text: 'überfällig' },
+  bezahlt: { klasse: 'bezahlt', text: 'Bezahlt' },
+  offen: { klasse: 'offen', text: 'Offen' },
+  ueberfaellig: { klasse: 'ueberfaellig', text: 'Überfällig' },
   entwurf: { klasse: 'entwurf', text: 'Entwurf' },
-  vorbereitet: { klasse: 'entwurf', text: 'vorbereitet' },
-  storniert: { klasse: 'storniert', text: 'storniert' },
+  vorbereitet: { klasse: 'entwurf', text: 'Vorbereitet' },
+  storniert: { klasse: 'storniert', text: 'Storniert' },
   angebot: { klasse: 'accent', text: 'Angebot' },
-  angenommen: { klasse: 'pos', text: 'angenommen' },
-  abgelehnt: { klasse: 'entwurf', text: 'abgelehnt' },
-  geplant: { klasse: 'accent', text: 'geplant' },
-  nachtragen: { klasse: 'warn', text: 'nachtragen' },
-  erledigt: { klasse: 'bezahlt', text: 'erledigt' },
-  abgesagt: { klasse: 'entwurf', text: 'abgesagt' },
+  angenommen: { klasse: 'pos', text: 'Angenommen' },
+  abgelehnt: { klasse: 'entwurf', text: 'Abgelehnt' },
+  geplant: { klasse: 'accent', text: 'Geplant' },
+  nachtragen: { klasse: 'warn', text: 'Nachtragen' },
+  erledigt: { klasse: 'bezahlt', text: 'Erledigt' },
+  abgesagt: { klasse: 'entwurf', text: 'Abgesagt' },
 };
 
 export const ART_NAME: Readonly<Record<VerlaufArt, string>> = {
