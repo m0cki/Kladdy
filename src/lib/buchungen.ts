@@ -499,3 +499,22 @@ export function quittungZuBuchungPfad(b: BuchungZeile): string {
   p.set('kategorie', String(b.kategorie_id));
   return `/belege/neu?${p.toString()}`;
 }
+
+/* ---------- Summenzeile der Liste ---------- */
+
+/** Summen der gezeigten Zahlungen (ohne stornierte Buchungen und ihre Gegenbuchungen): Einnahmen, Ausgaben, Saldo in
+ *  Cent. Reine Zahlungssicht wie die Liste – die EÜR mit Privatanteilen, AfA usw. steht in der Auswertung. */
+export function listenSummen(zeilen: readonly Pick<BuchungZeile, 'typ' | 'betrag_cent' | 'storniert' | 'storno_von_id'>[]): {
+  einnahmen: number;
+  ausgaben: number;
+  saldo: number;
+} {
+  let einnahmen = 0;
+  let ausgaben = 0;
+  for (const b of zeilen) {
+    if (b.storniert || b.storno_von_id != null) continue;
+    if (b.typ === 'einnahme') einnahmen += b.betrag_cent;
+    else ausgaben += b.betrag_cent;
+  }
+  return { einnahmen, ausgaben, saldo: einnahmen - ausgaben };
+}

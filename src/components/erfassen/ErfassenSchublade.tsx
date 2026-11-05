@@ -75,6 +75,7 @@ import {
   maskenPfad,
   naechsteBelegNummer,
   PAPIER_BELEG,
+  papierGewaehlt,
   rechnungOffen,
   type Ertrag,
   type ErtragsArt,
@@ -533,7 +534,7 @@ export function ErfassenSchublade() {
       // neue Einnahme ohne eigenen Beleg zum Termin: schließt ihn „ohne Beleg“ ab (Rust, dieselbe Transaktion)
       const terminId = !zeile && r.daten.typ === 'einnahme' ? (bezug?.termin?.id ?? null) : null;
       // „Nur buchen“ mit Papierquittung ohne eigene Nummer: als „Papier“ belegt (Zettel trägt die Buchungsnummer)
-      const papier = !zeile && r.daten.typ === 'einnahme' && weg === 'ohne' && ertrag.papier && !r.daten.belegnummer && !belege.length;
+      const papier = !zeile && r.daten.typ === 'einnahme' && weg === 'ohne' && papierGewaehlt(ertrag, form.zahlungsart) && !r.daten.belegnummer && !belege.length;
       const basis = papier ? { ...r.daten, belegnummer: PAPIER_BELEG } : r.daten;
       const mitDateien = belege.length ? { ...basis, belege: belege.map((b) => b.pfad) } : basis;
       const daten = terminId != null ? { ...mitDateien, termin_id: terminId } : mitDateien;

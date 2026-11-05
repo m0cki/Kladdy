@@ -180,7 +180,7 @@ const TX_KLASSE: Readonly<Record<TexTeilArt, string>> = { kommentar: 'tx-c', bef
 /** Hinweis unter dem Blanko-Formular: von Hand ausgefüllt heißt nicht gebucht */
 const BLANKO_HINWEIS: Readonly<Record<Belegart, string>> = {
   quittung:
-    'Ohne Nummer gedruckt, nichts wird gespeichert. Trag deine eigene Quittungsnummer ins Feld „Nr.“ ein (z. B. 17) und gib sie beim Buchen unter „Nur buchen“ › „Papierquittung“ an.',
+    'Ohne Nummer gedruckt, nichts wird gespeichert. Nach dem Buchen („+ Erfassen“ › „Nur buchen“) die Buchungsnummer ins Feld „Buchungs-Nr.“ schreiben – so gehören Zettel und Buchung zusammen.',
   eigenbeleg:
     'Ohne Nummer gedruckt, nichts wird gespeichert. Trag eine eigene Nummer ins Feld „Nr.“ ein und gib sie beim Buchen der Ausgabe als Beleg-Nr. an.',
   rechnung: '',
@@ -626,7 +626,7 @@ function VorlagenLeiste({ art, liste, wahl, aktiv, vergeben, waehlen, verwenden,
         </form>
       )}
       <div className="vl-design-info">
-        <span className="vl-design-desc">{eigen ? `Eigene Vorlage auf Basis von „${designName(art, wahl.design)}“` : designFuer(art, wahl.design).beschreibung}</span>
+        <span className="vl-design-desc" hidden>{eigen ? `Eigene Vorlage auf Basis von „${designName(art, wahl.design)}“` : designFuer(art, wahl.design).beschreibung}</span>
         {wahl.aktiv ? (
           <span className="vl-design-aktiv">
             <CircleCheck />
@@ -1119,7 +1119,7 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
                       <b>
                         {def.name}
                         {pflichtBausteine.has(i) ? (
-                          <span className="vl-pflicht" title="Enthält eine Pflichtangabe – kann nicht ausgeblendet oder entfernt werden">
+                          <span className="vl-pflicht" title="Enthält eine Pflichtangabe – bleibt im Beleg (Texte sind trotzdem änderbar)">
                             <Lock />
                             Pflicht
                           </span>
@@ -1316,7 +1316,7 @@ function BausteinKarte({ b, index, anzahl, pflicht, setze, schieben, umschalten:
 
   return (
     <div className="vl-karte" aria-label={`Einstellungen: ${def.name}`} role="group">
-      <div className="vl-karte-kopf">
+      <div className="vl-karte-kopf" hidden={zusammenfassung(b) === def.beschreibung && !b.aus}>
         <p className="vl-karte-text">
           <Icon />
           {def.beschreibung}
@@ -1335,9 +1335,9 @@ function BausteinKarte({ b, index, anzahl, pflicht, setze, schieben, umschalten:
         </span>
         <span className="spacer" />
         {pflicht ? (
-          <span className="vl-pflicht-hinweis">
+          <span className="vl-pflicht-hinweis" title="Der Baustein bleibt im Beleg; seine Texte und Einstellungen darfst du ändern">
             <Lock />
-            Pflichtangabe – bleibt im Beleg
+            Pflicht – bleibt im Beleg, Texte änderbar
           </span>
         ) : (
           <>

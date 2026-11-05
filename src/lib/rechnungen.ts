@@ -56,6 +56,8 @@ export interface BelegZeile {
   storniert_am: string | null;
   pdf_beleg_id: number | null;
   scan_beleg_id: number | null;
+  /** Buchungsnummer der verknüpften Zahlung (Quittung, bezahlte Rechnung, Eigenbeleg) */
+  buchung_nummer?: string | null;
 }
 
 export const ART_NAME: Readonly<Record<ListenArt, string>> = {
@@ -231,6 +233,11 @@ export function filtere(
       return woerter.every((w) => h.includes(w));
     })
     .sort((a, b) => vergleiche(a, b, o.sortierung));
+  // Überfälliges zuerst, damit der Hinweis „überfällig“ zu einer sichtbaren Zeile führt (nur bei der Standard-Sortierung)
+  if (!suche && o.sortierung.feld === 'nr' && (o.reiter === 'alle' || o.reiter === 'offen')) {
+    const ueber = (z: BelegZeile) => statusSchluessel(z, o.heute) === 'ueberfaellig';
+    zeilen.sort((a, b) => Number(ueber(b)) - Number(ueber(a)));
+  }
   return { zeilen, reiter, ueberfaellig: anzahlUeberfaellig(alle, o.heute), ohneZeitraum, offenFrueher };
 }
 

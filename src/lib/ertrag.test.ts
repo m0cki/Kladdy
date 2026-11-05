@@ -11,6 +11,7 @@ import {
   karteiAnschrift,
   maskenPfad,
   naechsteBelegNummer,
+  papierGewaehlt,
   offeneRechnungen,
   offenFaellig,
   rechnungOffen,
@@ -105,8 +106,10 @@ describe('Start und Hinweise', () => {
     expect(ertragStart({ beleg: 'quittung' }, 'quittung', 'ohne').weg).toBe('beleg');
     expect(ertragStart({ termin: 4 }, 'quittung', 'ohne').weg).toBe('beleg');
     expect(ertragStart({ entwurf: 9 }, 'rechnung', 'ohne').weg).toBe('beleg');
-    expect(ertragStart({}, 'quittung', 'ohne').papier).toBe(false);
-    expect(ertragStart({}, 'quittung').papier).toBe(false);
+    expect(ertragStart({}, 'quittung', 'ohne').papier).toBeNull();
+    expect(papierGewaehlt({ papier: null }, 'bar')).toBe(true);
+    expect(papierGewaehlt({ papier: null }, 'bank')).toBe(false);
+    expect(papierGewaehlt({ papier: false }, 'bar')).toBe(false);
   });
 
   it('Vorschau der nächsten Buchungsnummer wie der Belegnummern', () => {

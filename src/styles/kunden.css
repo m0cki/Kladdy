@@ -15,7 +15,7 @@ button.ku-weg, button.ku-nr { cursor: pointer; text-align: left; }
 .ku-liste .seg .cnt { margin-left: 4px; font-variant-numeric: tabular-nums; }
 
 /* ============ Kopf ============ */
-.ku-search { position: relative; width: 340px; max-width: 100%; }
+.ku-search { position: relative; width: 230px; max-width: 100%; }
 .ku-search > .ic { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--muted); pointer-events: none; }
 .ku-search .input { padding-left: 36px; }
 

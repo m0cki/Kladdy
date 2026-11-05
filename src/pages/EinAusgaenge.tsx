@@ -35,6 +35,7 @@ import {
   filtere,
   gegenueber,
   kannStornieren,
+  listenSummen,
   listenVorgabe,
   markiere,
   quittungNachholbar,
@@ -51,6 +52,7 @@ import { bearbeiten, erfassen } from '../lib/erfassen';
 import { ladeBuchungen, ladeKategorienWahl } from '../lib/queries/buchungen';
 import { storniereMitNachfrage } from '../lib/storno';
 import { teile } from '../lib/suche';
+import { formatBetrag } from '../lib/money';
 import { zeitraum } from '../lib/zeitraum';
 import { useUi } from '../store/ui';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -449,7 +451,12 @@ function Liste({
             </tbody>
           </table>
         </div>
-        {r.zeilen.length ? <p className="bu-foot">{anzahlText(r.zeilen.length)}</p> : null}
+        {r.zeilen.length ? (
+          <p className="bu-foot">
+            <span>{anzahlText(r.zeilen.length)}</span>
+            <Summenzeile zeilen={r.zeilen} label={zeitraumLabel} />
+          </p>
+        ) : null}
       </div>
     </>
   );
@@ -613,5 +620,23 @@ function Zeile({ b, q }: { b: BuchungZeile; q: string }) {
         </div>
       </td>
     </tr>
+  );
+}
+
+/** Schlanke Summenzeile unter der Liste (nur Text, keine Kacheln): Zahlungen im gezeigten Ausschnitt. */
+function Summenzeile({ zeilen, label }: { zeilen: readonly BuchungZeile[]; label: string }) {
+  const s = listenSummen(zeilen);
+  return (
+    <span className="bu-summen" aria-label={`Summen ${label}`}>
+      <span>
+        Einnahmen <b className="ein">{formatBetrag(s.einnahmen, { vorzeichen: 'immer' })}</b>
+      </span>
+      <span>
+        Ausgaben <b className="aus">{formatBetrag(-s.ausgaben, { vorzeichen: 'immer' })}</b>
+      </span>
+      <span>
+        Saldo <b>{formatBetrag(s.saldo, { vorzeichen: 'immer' })}</b>
+      </span>
+    </span>
   );
 }

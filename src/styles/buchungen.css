@@ -376,3 +376,10 @@
 .bu-head-neu { flex: 0 0 auto; }
 .bu-bar-top .zr, .bu-bar-top .period { flex: none; }
 #bf-betrag::placeholder { color: var(--muted); opacity: .55; }
+
+/* Summenzeile im Tabellenfuß (nur Text) */
+.bu-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.bu-summen { display: inline-flex; gap: 18px; flex-wrap: wrap; color: var(--text-2); font-size: .84rem; }
+.bu-summen b { font-variant-numeric: tabular-nums; color: var(--text); margin-left: 4px; }
+.bu-summen b.ein { color: var(--pos); }
+.bu-summen b.aus { color: var(--neg); }

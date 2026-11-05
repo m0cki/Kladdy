@@ -5,7 +5,7 @@
  * Optik und Verhalten wie referenz/prototyp/js/pages/kunden.js; Logik in lib/kunden.ts, Daten in lib/queries/kunden.ts. */
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
 import { CalendarDays, Mail, Phone, Plus, Search, StickyNote, Users } from 'lucide-react';
-import { anzahlText, datumKurz, markiere } from '../lib/buchungen';
+import { datumKurz, markiere } from '../lib/buchungen';
 import {
   SORT_START,
   STATUS_BADGE,
@@ -94,7 +94,7 @@ export default function Kunden() {
                 type="search"
                 className="input"
                 value={q}
-                placeholder="Name, Straße, Ort, Telefon, Notiz, Leistung …"
+                placeholder="Kunden durchsuchen …"
                 aria-label="Kunden durchsuchen"
                 autoComplete="off"
                 spellCheck={false}
@@ -199,7 +199,7 @@ function Liste({ index, h, o, setO, tbodyRef, suchFeld, sucheLeeren }: ListeProp
             ),
           }))}
         />
-        <span className="ku-count">{zeilen.length === gesamt ? anzahlText(gesamt, 'Kunde', 'Kunden') : `${zeilen.length} von ${gesamt}`}</span>
+        {zeilen.length === gesamt ? null : <span className="ku-count">{`${zeilen.length} von ${gesamt}`}</span>}
       </div>
       <div className="table-wrap">
         <table className="fin-table ku-table">

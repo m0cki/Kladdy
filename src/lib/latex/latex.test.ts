@@ -549,6 +549,9 @@ describe('Blanko-Formular zum Ausfüllen von Hand', () => {
     // Formular: Nr. und Datum als Linie, Klassisch: „Nr. {nr}“ im Titel als kurze Lücke
     expect(mainTex('quittung', standardVorlage('quittung', 'formular'), '#6366f1', { blanko: true }).tex).toContain(String.raw`\KForm{Nr.}{\KSchreib}`);
     expect(mainTex('quittung', standardVorlage('quittung'), '#6366f1', { blanko: true }).tex).toContain(String.raw`Nr. \KLuecke{}`);
+    // Blanko: eigenes Feld für die Buchungsnummer (Zuordnung Zettel ↔ Buchung), in beiden Stilen
+    expect(mainTex('quittung', standardVorlage('quittung'), '#6366f1', { blanko: true }).tex).toContain('Buchungs-Nr.');
+    expect(mainTex('quittung', standardVorlage('quittung', 'formular'), '#6366f1', { blanko: true }).tex).toContain(String.raw`\KForm{Buchungs-Nr.}{\KSchreib}`);
   });
 
   it('Unterschrift: „Ort, Datum“ bleibt leer, die Linie bleibt', () => {

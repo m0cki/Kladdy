@@ -202,7 +202,7 @@ function NeuMenue({ naechste }: { naechste: Partial<Record<Belegart, string>> })
           <Printer />
           <span>
             <b>Blanko-Quittung</b>
-            <small>Von Hand ausfüllen – eigene Nummer eintragen und beim Buchen angeben</small>
+            <small>Von Hand ausfüllen – mit Feld für die Buchungsnummer</small>
           </span>
           <span />
         </button>
@@ -535,6 +535,11 @@ function Zeile({ z, heute, oeffnen, aktion }: { z: BelegZeile; heute: string; oe
         <Link to={`/belege/${z.id}`} className={z.nummer ? '' : 'bl-draftnr'} title={z.nummer ? undefined : 'Die Nummer wird beim Ausstellen vergeben'}>
           {z.nummer ?? 'ohne Nr.'}
         </Link>
+        {z.buchung_nummer ? (
+          <small className="bl-buchnr" title={`Gebucht als ${z.buchung_nummer} (Ein- & Ausgänge)`}>
+            Buchung {z.buchung_nummer}
+          </small>
+        ) : null}
         {z.scan_beleg_id != null ? (
           <span className="bl-clip" title="Unterschriebenes Exemplar angehängt">
             <Paperclip />

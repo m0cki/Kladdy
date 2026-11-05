@@ -17,6 +17,7 @@ import {
   kategorieAusText,
   kundeAufloesen,
   kundenLabel,
+  listenSummen,
   markiere,
   nameOhneNummer,
   privatProzent,
@@ -345,5 +346,18 @@ describe('Quittung nachträglich zu einer Buchung', () => {
     const ohne = new URL(quittungZuBuchungPfad(einnahme({ kunde_id: null, beschreibung: ' ' })), 'http://x').searchParams;
     expect(ohne.has('kunde')).toBe(false);
     expect(ohne.has('text')).toBe(false);
+  });
+});
+
+describe('Summenzeile', () => {
+  it('Einnahmen, Ausgaben und Saldo ohne Stornos', () => {
+    const z = [
+      zeile({ id: 1, typ: 'einnahme', betrag_cent: 10_000 }),
+      zeile({ id: 2, typ: 'ausgabe', betrag_cent: 2_500 }),
+      zeile({ id: 3, typ: 'ausgabe', betrag_cent: 999, storniert: 1 }),
+      zeile({ id: 4, typ: 'einnahme', betrag_cent: 999, storno_von_id: 3 }),
+    ];
+    expect(listenSummen(z)).toEqual({ einnahmen: 10_000, ausgaben: 2_500, saldo: 7_500 });
+    expect(listenSummen([])).toEqual({ einnahmen: 0, ausgaben: 0, saldo: 0 });
   });
 });

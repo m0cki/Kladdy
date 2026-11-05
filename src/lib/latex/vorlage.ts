@@ -229,6 +229,7 @@ function quittungBlanko(a: QuittungAngaben, von: string, fuer: string): string {
       L`{\color{haar}\hrule height .25mm}\vspace{3mm}`,
       a.kunde && L`\KForm{${von}}{\KSchreib}`,
       a.zweck && L`\KForm{${fuer}}{\KSchreib}`,
+      L`\KForm{Buchungs-Nr.}{\KSchreib}`,
       a.zahlungsart && L`\KForm{Zahlungsart}{\KKaestchen{0}\hspace{1.5mm}Bar\hspace{5mm}\KKaestchen{0}\hspace{1.5mm}Überweisung\hspace{5mm}\KKaestchen{0}\hspace{1.5mm}PayPal}`,
       a.betrag && L`\vspace{1mm}{${fs(13, 1.3)}\noindent\textbf{Gesamtbetrag:}\ \KSchreib[€]\par}\vspace{1mm}`,
       a.worte && L`{${fs(9)}\noindent\textcolor{grau}{in Worten:} \KSchreib\par}\vspace{1mm}`,
@@ -244,6 +245,7 @@ function quittungBlanko(a: QuittungAngaben, von: string, fuer: string): string {
     a.worte && L`\KFeld{Betrag in Worten}{\KSchreib}`,
     a.kunde && L`\KFeld{${von}}{\KSchreib}`,
     a.zweck && L`\KFeld{${fuer}}{\KSchreib}`,
+    L`\KFeld{Buchungs-Nr. (aus Kladdy)}{\KSchreib}`,
   );
 }
 

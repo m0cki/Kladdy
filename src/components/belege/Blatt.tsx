@@ -262,6 +262,9 @@ function quittungBlanko(b: Aufgeloest, x: Ctx): ReactNode {
             <Schreiben />
           </FormZeile>
         )}
+        <FormZeile label="Buchungs-Nr." schreib>
+          <Schreiben />
+        </FormZeile>
         {a.zahlungsart && (
           <FormZeile label="Zahlungsart">
             <Kreuze weg={null} />
@@ -319,6 +322,9 @@ function quittungBlanko(b: Aufgeloest, x: Ctx): ReactNode {
           <Schreiben />
         </Feld>
       )}
+      <Feld label="Buchungs-Nr. (aus Kladdy)">
+        <Schreiben />
+      </Feld>
     </>
   );
 }

@@ -48,9 +48,13 @@ export interface Ertrag {
   leistung: string;
   /** „Offene Rechnung zuordnen“: die gewählte Rechnung */
   offenId: number | null;
-  /** „Nur buchen“: eine Papierquittung liegt im Ordner (ohne eingetragene Nummer wird die Buchung als „Papier“ belegt) */
-  papier: boolean;
+  /** „Nur buchen“: eine Papierquittung liegt im Ordner (ohne eingetragene Nummer wird die Buchung als „Papier“ belegt);
+   *  null = noch nicht gewählt ⇒ folgt dem Zahlungsweg (bar ⇒ ja), siehe papierGewaehlt */
+  papier: boolean | null;
 }
+
+/** Papierquittung bei „Nur buchen“: gewählt oder – solange nicht gewählt – bei Barzahlung ja (dann gibt es meist einen Zettel). */
+export const papierGewaehlt = (e: Pick<Ertrag, 'papier'>, zahlungsart: Zahlungsart): boolean => e.papier ?? zahlungsart === 'bar';
 
 /** Belegnummer, die eine Buchung mit Papierquittung ohne eigene Nummer bekommt (gilt dann nicht als „ohne Beleg“). */
 export const PAPIER_BELEG = 'Papier';
@@ -71,7 +75,7 @@ export function ertragStart(
     adresse: '',
     leistung: '',
     offenId: null,
-    papier: false,
+    papier: null,
   };
 }
 

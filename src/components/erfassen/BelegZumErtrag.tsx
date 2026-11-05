@@ -16,6 +16,7 @@ import {
   karteiAnschrift,
   naechsteBelegNummer,
   offenFaellig,
+  papierGewaehlt,
   rechnungOffen,
   vorlageFuer,
   type Ertrag,
@@ -98,7 +99,7 @@ export function BelegZumErtrag({ form, ertrag, setErtrag, stamm, ladeFehler, bel
       {ertrag.weg === 'ohne' ? (
         <NurBuchen
           buchung={stamm ? naechsteBelegNummer(stamm.kreise, 'buchung', h, h) : null}
-          papier={ertrag.papier}
+          papier={papierGewaehlt(ertrag, form.zahlungsart)}
           nummer={form.belegnummer}
           onPapier={(papier) => {
             setErtrag({ papier });
@@ -141,8 +142,8 @@ function NurBuchen({
         <span>
           <b>Papierquittung im Ordner</b>
           <small>
-            Nummer der Quittung eintragen. Hat sie keine, schreib die Buchungsnummer{' '}
-            {buchung ? <span className="mono bu-nur-nr">{buchung}</span> : null} auf den Zettel.
+            Auf den Zettel ins Feld „Buchungs-Nr.“ kommt {buchung ? <span className="mono bu-nur-nr">{buchung}</span> : 'die Buchungsnummer'}. Hat die Quittung
+            eine eigene Nummer, trag sie hier ein.
           </small>
         </span>
       </label>

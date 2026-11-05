@@ -238,3 +238,5 @@ a.ku-hw.tm-hw:hover { border-color: var(--accent-line); }
 .tm-legende i { width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid var(--accent); box-sizing: border-box; }
 .tm-legende i.erledigt { background: var(--pos); border-color: var(--pos); }
 .tm-legende i.nach { background: var(--warn); border-color: var(--warn); border-radius: 1px; transform: rotate(45deg) scale(.9); }
+
+.tm-frage { color: var(--text-2) !important; font-weight: 600; }
