@@ -453,7 +453,7 @@ input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 7px; }
 .drawer-foot .spacer { flex: 1; }
 .set-row { display: flex; flex-direction: column; gap: 8px; }
 .set-label { display: flex; justify-content: space-between; align-items: center; font-size: .85rem; font-weight: 600; }
-.set-label output { font-family: var(--mono); font-size: .75rem; color: var(--muted); font-weight: 500; }
+.set-label output { font-family: var(--font); font-variant-numeric: tabular-nums; font-size: .8rem; color: var(--text-2); font-weight: 600; }
 .drawer .seg, .set-card .seg { align-self: flex-start; flex-wrap: wrap; }
 /* Hinweis-Kasten in den Einstellungen (Datensicherung, Über) */
 .set-note { display: flex; align-items: flex-start; gap: 10px; padding: 11px 13px; border-radius: var(--radius-sm); font-size: .8rem; line-height: 1.5;

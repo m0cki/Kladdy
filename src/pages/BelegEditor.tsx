@@ -680,7 +680,7 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
             </button>
           ) : null}
           {!editierbar && zeile && statusMenue(zeile, h).punkte.some((p) => p.aktion === 'stornieren') ? (
-            <button type="button" className="btn ghost bl-storno-btn" title="Beleg ungültig machen – die Nummer bleibt vergeben, eine Einnahme wird zurückgenommen (GoBD)" onClick={() => statusAktionAusfuehren('stornieren', zeile, navigate)}>
+            <button type="button" className="btn ghost bl-storno-btn danger-text" title="Beleg ungültig machen – die Nummer bleibt vergeben, eine Einnahme wird zurückgenommen (GoBD)" onClick={() => statusAktionAusfuehren('stornieren', zeile, navigate)}>
               <Ban />
               Stornieren …
             </button>

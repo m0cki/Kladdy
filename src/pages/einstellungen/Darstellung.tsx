@@ -116,10 +116,10 @@ export default function Darstellung() {
       </SetCard>
 
       <SetCard title="Feinabstimmung" i={2}>
-        <SetRow id="radius" label="Eckenrundung" value={`${s.radius}px`}>
+        <SetRow id="radius" label="Eckenrundung" value={s.radius === 0 ? "eckig" : `${s.radius} px`}>
           {range('radius', 0, 24, 'Eckenrundung')}
         </SetRow>
-        <SetRow id="schriftgroesse" label="Schriftgröße" value={`${s.fontScale}%`}>
+        <SetRow id="schriftgroesse" label="Schriftgröße" value={`${s.fontScale} %`}>
           {range('fontScale', 85, 120, 'Schriftgröße', 5)}
         </SetRow>
         <SetRow id="dichte" label="Dichte">

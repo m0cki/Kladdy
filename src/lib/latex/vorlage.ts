@@ -222,14 +222,13 @@ const KREUZE_LEER =
 function quittungBlanko(a: QuittungAngaben, von: string, fuer: string): string {
   if (a.formular) {
     const halb = L`\dimexpr(\linewidth-8mm)/2\relax`;
-    const nr = L`\begin{minipage}[t]{${halb}}\KForm{Nr.}{\KSchreib}\end{minipage}`;
+    const nr = L`\begin{minipage}[t]{${halb}}\KForm{Buchungs-Nr.}{\KSchreib}\end{minipage}`;
     const kopf = a.datum ? L`\noindent\begin{minipage}[t]{${halb}}\KForm{Datum}{\KSchreib}\end{minipage}\hfill` + nr + L`\par` : L`\noindent` + nr + L`\par`;
     return zeilen(
       kopf,
       L`{\color{haar}\hrule height .25mm}\vspace{3mm}`,
       a.kunde && L`\KForm{${von}}{\KSchreib}`,
       a.zweck && L`\KForm{${fuer}}{\KSchreib}`,
-      L`\KForm{Buchungs-Nr.}{\KSchreib}`,
       a.zahlungsart && L`\KForm{Zahlungsart}{\KKaestchen{0}\hspace{1.5mm}Bar\hspace{5mm}\KKaestchen{0}\hspace{1.5mm}Überweisung\hspace{5mm}\KKaestchen{0}\hspace{1.5mm}PayPal}`,
       a.betrag && L`\vspace{1mm}{${fs(13, 1.3)}\noindent\textbf{Gesamtbetrag:}\ \KSchreib[€]\par}\vspace{1mm}`,
       a.worte && L`{${fs(9)}\noindent\textcolor{grau}{in Worten:} \KSchreib\par}\vspace{1mm}`,
@@ -351,7 +350,8 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => Schnipsel>>
   },
   titel(b, x) {
     const t = textTex(b.text('text'), true, x.blanko);
-    const r = textTex(b.text('rechts'), true, x.blanko);
+    // Blanko: ohne Nummer gedruckt – die Nummernzeile im Titel entfällt (dafür hat das Formular „Buchungs-Nr.“)
+    const r = x.blanko && b.text('rechts').includes('{nr}') ? { tex: '', leer: [] as string[] } : textTex(b.text('rechts'), true, x.blanko);
     const farbe = b.text('stil') === 'akzent' ? L`\color{akzent}` : '';
     const rechts = r.leer && !r.leer.length ? '' : wennNichtLeer(r.leer, L`\hfill{${fs(10.5)}\bfseries ${r.tex}}`);
     return fest(

@@ -383,3 +383,4 @@
 .bu-summen b { font-variant-numeric: tabular-nums; color: var(--text); margin-left: 4px; }
 .bu-summen b.ein { color: var(--pos); }
 .bu-summen b.aus { color: var(--neg); }
+.bu-bunr { font-family: var(--font); font-weight: 650; }

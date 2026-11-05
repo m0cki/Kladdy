@@ -248,7 +248,7 @@ function quittungBlanko(b: Aufgeloest, x: Ctx): ReactNode {
               <Schreiben />
             </FormZeile>
           )}
-          <FormZeile label="Nr." schreib>
+          <FormZeile label="Buchungs-Nr." schreib>
             <Schreiben />
           </FormZeile>
         </div>
@@ -262,9 +262,6 @@ function quittungBlanko(b: Aufgeloest, x: Ctx): ReactNode {
             <Schreiben />
           </FormZeile>
         )}
-        <FormZeile label="Buchungs-Nr." schreib>
-          <Schreiben />
-        </FormZeile>
         {a.zahlungsart && (
           <FormZeile label="Zahlungsart">
             <Kreuze weg={null} />
@@ -405,7 +402,8 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
     );
   },
   titel(b, x) {
-    const rechts = feld(b, x, 'rechts');
+    // Blanko: ohne Nummer gedruckt – die Nummernzeile im Titel entfällt (dafür hat das Formular „Buchungs-Nr.“)
+    const rechts = x.doc.blanko && b.text('rechts').includes('{nr}') ? null : feld(b, x, 'rechts');
     return (
       <>
         <div className={`blk-titel-row${b.text('stil') === 'akzent' ? ' akzent' : ''}${b.an('versal') ? ' versal' : ''}`}>

@@ -1062,10 +1062,10 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
                 ) : (
                   <span className="vl-stand">
                     <span className="vl-stand-chip">
-                      <Lock />
-                      Mitgeliefert, unverändert
+                      <Pencil />
+                      Mitgeliefert – frei bearbeitbar
                     </span>
-                    <span>Deine erste Änderung wird als „Meine {ARTEN[art].label}“ gespeichert.</span>
+                    <span>Deine erste Änderung speichert Kladdy automatisch als „Meine {ARTEN[art].label}“.</span>
                   </span>
                 )}
               </div>

@@ -546,9 +546,10 @@ describe('Blanko-Formular zum Ausfüllen von Hand', () => {
       expect(makro(daten, 'Steuernummer')).toBe(BEISPIEL_FIRMA.steuernummer);
       expect(makro(daten, 'Nummer')).toBe('');
     }
-    // Formular: Nr. und Datum als Linie, Klassisch: „Nr. {nr}“ im Titel als kurze Lücke
-    expect(mainTex('quittung', standardVorlage('quittung', 'formular'), '#6366f1', { blanko: true }).tex).toContain(String.raw`\KForm{Nr.}{\KSchreib}`);
-    expect(mainTex('quittung', standardVorlage('quittung'), '#6366f1', { blanko: true }).tex).toContain(String.raw`Nr. \KLuecke{}`);
+    // Blanko (ohne Nummer gedruckt): Formular mit Linie „Buchungs-Nr.“, Klassisch ohne Nummernzeile im Titel
+    expect(mainTex('quittung', standardVorlage('quittung', 'formular'), '#6366f1', { blanko: true }).tex).toContain(String.raw`\KForm{Buchungs-Nr.}{\KSchreib}`);
+    // Blanko ohne Nummer: keine Nummernzeile im Titel
+    expect(mainTex('quittung', standardVorlage('quittung'), '#6366f1', { blanko: true }).tex).not.toContain(String.raw`Nr. \KLuecke{}`);
     // Blanko: eigenes Feld für die Buchungsnummer (Zuordnung Zettel ↔ Buchung), in beiden Stilen
     expect(mainTex('quittung', standardVorlage('quittung'), '#6366f1', { blanko: true }).tex).toContain('Buchungs-Nr.');
     expect(mainTex('quittung', standardVorlage('quittung', 'formular'), '#6366f1', { blanko: true }).tex).toContain(String.raw`\KForm{Buchungs-Nr.}{\KSchreib}`);
@@ -571,7 +572,7 @@ describe('Blanko-Formular zum Ausfüllen von Hand', () => {
     expect(klammernOk(f)).toBe(true);
     expect(f).not.toContain(String.raw`\KForm{Datum}`);
     expect(f).not.toContain('Gesamtbetrag:');
-    expect(f).toContain(String.raw`\KForm{Nr.}{\KSchreib}`);
+    expect(f).toContain(String.raw`\KForm{Buchungs-Nr.}{\KSchreib}`);
     expect(rumpf(mainTex('quittung', mit('klassisch', { betrag: false, datum: false, zahlungsart: false, worte: false, kunde: false, zweck: false }), '#6366f1', { blanko: true }).tex)).not.toContain(
       String.raw`\KFeld`,
     );

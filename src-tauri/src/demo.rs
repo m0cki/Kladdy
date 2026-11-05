@@ -34,6 +34,9 @@ use crate::datenbank::{self, MIGRATIONEN, MigrationsQuelle, db_fehler, url_zu};
 use crate::liquiditaet::{self, PlanpostenEingabe, WiederkehrendEingabe};
 use crate::nummern;
 
+/// Aufbewahrungshinweis wie im Frontend (lib/vorlagen/dokument.ts `HINWEIS_14B`) – Demo-Belege sehen aus wie neue.
+const HINWEIS_14B: &str = "Hinweis für Privatkunden bei Arbeiten an Haus oder Grundstück: Bitte bewahren Sie diesen Beleg zwei Jahre auf (§ 14b UStG).";
+
 /// Datei der Demo-Datenbank (im selben Ordner wie `DB_DATEI`).
 pub const DEMO_DB_DATEI: &str = "kladdy-dev-demo.db";
 /// Ablageordner für Belege im Demo-Modus (wie `belege::BELEGE_ORDNER`).
@@ -530,8 +533,9 @@ pub async fn fuellen(
             // Trigger festgeschrieben (Migration 0007), genau wie beim Ausstellen in rechnungen.rs.
             let id = sqlx::query(
                 "INSERT INTO rechnungen (art, nummer, status, kunde_id, kunde_name, kunde_adresse, kunde_nummer, datum,
-                   leistung_von, faellig_am, betreff, summe_cent, termin_id, bezahlt_am, erstellt_am, geaendert_am)
-                 VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                   leistung_von, faellig_am, betreff, schlusstext, summe_cent, termin_id, bezahlt_am, erstellt_am,
+                   geaendert_am)
+                 VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             )
             .bind(&r.art)
             .bind(&r.status)
@@ -544,6 +548,8 @@ pub async fn fuellen(
             .bind((r.art != "angebot").then_some(&r.datum))
             .bind(&r.faellig_am)
             .bind(&r.betreff)
+            // Schlusstext wie bei neuen Belegen (lib/vorlagen/dokument.ts HINWEIS_14B), Angebote und Eigenbelege ohne
+            .bind((r.art == "quittung" || r.art == "rechnung").then_some(HINWEIS_14B))
             .bind(summe(&r.positionen))
             .bind(r.termin.map(|t| termin_ids[t]))
             .bind(&r.bezahlt_am)

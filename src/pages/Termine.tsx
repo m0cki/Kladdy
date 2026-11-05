@@ -501,7 +501,7 @@ function Zeile({
         <BelegChip t={t} />
       </div>
       <div className="tm-acts">
-        {k.frage ? <span className="tm-frage">Hat er stattgefunden?</span> : null}
+        {k.frage ? <span className="tm-frage">Hat der Termin stattgefunden?</span> : null}
         {k.haupt === 'abhaken' ? (
           <button type="button" className="btn ghost sm tm-kass" title="Termin abhaken – den Beleg stellst du danach aus" onClick={() => onAktion('abhaken', t)}>
             <Check />

@@ -2,7 +2,7 @@
  * Zeitraum Monat · Jahr · Gesamt nach Belegdatum (Offen und Suche über alle Zeiträume), Status-Menü am Badge, „Vorlagen“
  * und kleinem „Neu“-Menü mit den nächsten Nummern. Keine KPI-Kacheln, unten nur die Anzahl.
  * Optik und Verhalten wie referenz/prototyp/js/pages/belege.js (renderListe); Logik in lib/rechnungen.ts. */
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowRight, Blocks, Check, ChevronDown, ChevronLeft, ChevronRight, Clock, FileText, Handshake, Info, Paperclip, Printer, Receipt, Search, Stamp, TriangleAlert, type LucideIcon } from 'lucide-react';
 import { speichereQuelle } from '../lib/vorlagen/vorschau';
@@ -223,7 +223,7 @@ function Kopf({ naechste, suche }: { naechste: Partial<Record<Belegart, string>>
           <FileText />
           Rechnungen &amp; Quittungen
         </h1>
-        <p className="page-sub">Quittungen, Rechnungen, Angebote und Eigenbelege mit laufender Nummer · es zählt das Belegdatum</p>
+        <p className="page-sub">Alle Belege mit Nummer, auch Angebote · es zählt das Belegdatum</p>
       </div>
       <div className="page-actions">
         {suche}
@@ -302,6 +302,9 @@ function Liste({ zeilen, naechste }: { zeilen: BelegZeile[]; naechste: Partial<R
 
   const zr = listenZeitraum(modus, anker);
   const r = useMemo(() => filtere(zeilen, { reiter, q, zeitraum: zr, sortierung, heute: h }), [zeilen, reiter, q, zr?.von, zr?.bis, sortierung, h]); // eslint-disable-line react-hooks/exhaustive-deps
+  // überfällige Rechnungen, die filtere() bei der Standard-Sortierung vorne einreiht (Gruppenzeilen erklären das)
+  const angeheftet =
+    !q.trim() && sortierung.feld === 'nr' && (reiter === 'alle' || reiter === 'offen') ? r.zeilen.filter((z) => statusSchluessel(z, h) === 'ueberfaellig').length : 0;
   const erster = zeilen.reduce((m, z) => (z.datum && z.datum < m ? z.datum : m), h);
   const letzter = zeilen.reduce((m, z) => (z.datum && z.datum > m ? z.datum : m), h);
   const zeitraum: ZeitraumSteuerung = {
@@ -421,7 +424,7 @@ function Liste({ zeilen, naechste }: { zeilen: BelegZeile[]; naechste: Partial<R
               title="Entwürfe und für Termine vorbereitete Belege – noch ohne Nummer, nicht im Belegregister"
               onClick={() => waehleReiter(reiter === 'entwuerfe' ? 'alle' : 'entwuerfe')}
             >
-              Entwürfe <span className="cnt">{zahl(r.reiter.entwuerfe)}</span>
+              <span className="bl-entwuerfe-l">ohne Nr.:</span> Entwürfe <span className="cnt">{zahl(r.reiter.entwuerfe)}</span>
             </button>
             <ZeitraumLeiste zeitraum={zeitraum} />
             {r.ohneZeitraum ? (
@@ -476,7 +479,18 @@ function Liste({ zeilen, naechste }: { zeilen: BelegZeile[]; naechste: Partial<R
             </thead>
             <tbody>
               {r.zeilen.length ? (
-                r.zeilen.map((z) => (
+                r.zeilen.map((z, i) => (
+                  <Fragment key={z.id}>
+                  {angeheftet > 0 && i === 0 ? (
+                    <tr className="bl-gruppe alarm">
+                      <td colSpan={9}>Überfällig – zuerst gezeigt</td>
+                    </tr>
+                  ) : null}
+                  {angeheftet > 0 && i === angeheftet ? (
+                    <tr className="bl-gruppe">
+                      <td colSpan={9}>Weitere Belege, nach Nummer</td>
+                    </tr>
+                  ) : null}
                   <Zeile
                     key={z.id}
                     z={z}
@@ -484,6 +498,7 @@ function Liste({ zeilen, naechste }: { zeilen: BelegZeile[]; naechste: Partial<R
                     oeffnen={() => navigate(`/belege/${z.id}`)}
                     aktion={(a) => statusAktionAusfuehren(a, z, navigate)}
                   />
+                  </Fragment>
                 ))
               ) : (
                 <tr>
