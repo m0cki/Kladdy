@@ -481,7 +481,7 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => Schnipsel>>
           a.zahlungsart && L`\KForm{Zahlungsart}{${kreuze}}`,
           a.betrag && L`\vspace{1mm}{${fs(13, 1.3)}\noindent\textbf{Gesamtbetrag:}\ \textbf{\Gesamt}\par}\vspace{1mm}`,
           a.worte && L`{${fs(9)}\noindent\textcolor{grau}{in Worten:} \BetragInWorten\par}\vspace{1mm}`,
-          L`\ifdefempty{\BuchungsNr}{}{{${fs(8)}\color{grau}Buchungs-Nr. \BuchungsNr\par}}`,
+          a.buchungsnr && L`\ifdefempty{\BuchungsNr}{}{{${fs(8)}\color{grau}Buchungs-Nr. \BuchungsNr\par}}`,
         ),
       );
     }
@@ -496,7 +496,7 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => Schnipsel>>
         a.worte && L`\KFeld{Betrag in Worten}{\BetragInWorten}`,
         a.kunde && L`\KFeld{${von}}{${kunde}}`,
         a.zweck && L`\KFeld{${fuer}}{${fuerWert}}`,
-        L`\ifdefempty{\BuchungsNr}{}{{${fs(8)}\color{grau}Buchungs-Nr. \BuchungsNr\par}}`,
+        a.buchungsnr && L`\ifdefempty{\BuchungsNr}{}{{${fs(8)}\color{grau}Buchungs-Nr. \BuchungsNr\par}}`,
       ),
     );
   },

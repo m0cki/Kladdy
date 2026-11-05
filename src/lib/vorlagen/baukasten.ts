@@ -46,6 +46,7 @@ export function zusammenfassung(b: Baustein): string {
       [a.worte, 'in Worten'],
       [a.kunde, label('von', 'Erhalten von')],
       [a.zweck, label('fuer', 'Für')],
+      [a.buchungsnr, 'Buchungs-Nr.'],
     ];
     return teile.flatMap(([an, t]) => (an ? [t] : [])).join(' · ');
   }

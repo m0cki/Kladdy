@@ -497,7 +497,7 @@ function Liste({ zeilen, naechste }: { zeilen: BelegZeile[]; naechste: Partial<R
                   ) : null}
                   {angeheftet > 0 && i === angeheftet ? (
                     <tr className="bl-gruppe">
-                      <td colSpan={9}>Weitere Belege, nach Nummer</td>
+                      <td colSpan={9}>Weitere Belege, neueste zuerst</td>
                     </tr>
                   ) : null}
                   <Zeile

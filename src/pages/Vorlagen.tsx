@@ -808,6 +808,12 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
     [echtDoc, blanko, art, basis, logo],
   );
   const pflicht = useMemo(() => pflichtCheck(doc, bausteine), [doc, bausteine]);
+  const pflichtFehlt = pflicht.filter((p) => !p.ok).length;
+  /** Baustein, in dem die Steuernummer steht (Rechnung: oft die Fußzeile, unten außer Sicht) */
+  const steuerOrt = useMemo(() => {
+    const b = bausteine.find((x) => !x.aus && (x.typ === 'fusszeile' ? aufloesen(x).an('kontakt') : zusammenfassung(x).includes('{steuernummer}')));
+    return b ? BAUSTEINE[b.typ].name : null;
+  }, [bausteine]);
   /** Bausteine, ohne die eine Pflichtangabe fehlen würde (§ 33/§ 34a UStDV): nicht ausblenden, nicht entfernen */
   const pflichtBausteine = useMemo(() => {
     const fehlen = (liste: readonly Baustein[]) => pflichtCheck(doc, liste).filter((p) => !p.ok).length;
@@ -1027,6 +1033,14 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
                     <span>Deine erste Änderung wird automatisch „Meine {ARTEN[art].label}“.</span>
                   </span>
                 )}
+                {pflicht.length ? (
+                  <span className={`vl-pflicht-stand${pflichtFehlt ? ' bad' : ''}`}>
+                    {pflichtFehlt ? <TriangleAlert /> : <CircleCheck />}
+                    {pflichtFehlt
+                      ? `${pflichtFehlt} Pflichtangabe${pflichtFehlt === 1 ? '' : 'n'} fehlt – Einzelheiten unten`
+                      : `Pflichtangaben vollständig${steuerOrt ? ` · Steuernummer in „${steuerOrt}“` : ''}`}
+                  </span>
+                ) : null}
                 <span className="vl-legende">
                   Angaben in ‹ › füllt Kladdy beim Ausstellen aus. Bausteine mit <Asterisk className="ic vl-leg-ic" /> Pflicht bleiben im Beleg – ihren Text kannst du ändern.
                 </span>
@@ -1312,10 +1326,12 @@ function BausteinKarte({ b, index, anzahl, pflicht, setze, schieben, umschalten:
           </span>
         ) : (
           <>
-            <button type="button" className="btn subtle sm" onClick={ausEin}>
-              {b.aus ? <Eye /> : <EyeOff />}
-              {b.aus ? 'Einblenden' : 'Ausblenden'}
-            </button>
+            {b.typ === 'abstand' || b.typ === 'trennlinie' ? null : (
+              <button type="button" className="btn subtle sm" onClick={ausEin}>
+                {b.aus ? <Eye /> : <EyeOff />}
+                {b.aus ? 'Einblenden' : 'Ausblenden'}
+              </button>
+            )}
             <button type="button" className="btn subtle sm vl-del-btn" onClick={weg}>
               <X />
               Entfernen

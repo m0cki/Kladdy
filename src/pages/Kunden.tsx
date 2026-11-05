@@ -13,7 +13,9 @@ import {
   hatNotiz,
   kundenIndex,
   kundenListe,
+  tagMonat,
   terminKurz,
+  wochentag,
   terminLang,
   vorText,
   zaehleFilter,
@@ -276,14 +278,24 @@ function Leer({ gesamt, q, filter, alleZeigen, sucheLeeren }: { gesamt: number; 
 
 /* ---------- eine Zeile ---------- */
 
+/** Vergangener Tag wie die Termine: im laufenden Jahr „Fr 06.11.“, sonst „22.04.2025“ (das „vor …“ steht darunter). */
+function tagKurz(datum: string, heute: string): string {
+  return datum.slice(0, 4) !== heute.slice(0, 4) ? datumKurz(datum) : `${wochentag(datum)} ${tagMonat(datum)}`;
+}
+
 function LeistungZelle({ t, q }: { t: KundenTreffer; q: string }) {
   const x = t.info;
-  // nur Vergangenes (der nächste Termin steht in der Spalte davor); Suchtreffer zeigen den gefundenen Eintrag
-  const e = t.eintrag ?? x.letzterBesuch ?? null;
+  // dieselbe Sache wie oben in der Spalte davor: Termin zum Nachtragen › nächster Termin › letzter Besuch;
+  // Suchtreffer zeigen den gefundenen Eintrag
+  const termin = t.eintrag ? null : (x.nachtragen[0] ?? x.naechster ?? null);
+  const e = t.eintrag ?? termin ?? x.letzterBesuch ?? null;
   if (!e) return null;
-  // Badge: Status des Eintrags, bei bezahlten der Hinweis auf offene/überfällige Rechnungen des Kunden
+  // Badge: Status des Eintrags (nicht beim Termin – der steht schon daneben), bei bezahlten der Hinweis auf offene
+  // bzw. überfällige Rechnungen des Kunden
   const b =
-    e.status !== 'bezahlt'
+    e === termin
+      ? null
+      : e.status !== 'bezahlt'
       ? STATUS_BADGE[e.status]
       : x.offen.some((v) => v.status === 'ueberfaellig')
         ? STATUS_BADGE.ueberfaellig
@@ -377,20 +389,23 @@ function Zeile({ t, q, h, gewaehlt, suchFeld }: { t: KundenTreffer; q: string; h
       </td>
       <td className="c num ku-c-bes">{x.besuche || <span className="ku-leer" aria-label="keine">–</span>}</td>
       <td className="l ku-c-last">
-        {x.zuletzt ? <span className="ku-z num">{datumKurz(x.zuletzt)}</span> : n || nt ? null : <span className="ku-z muted">noch kein Besuch</span>}
-        {n ? (
-          <small className="ku-z ku-next" title={`Nächster Termin: ${terminLang(n.z, h)} · ${n.titel}`}>
-            <CalendarDays />
-            nächster: {terminKurz(n.z, h)}
-          </small>
-        ) : nt && !x.zuletzt ? (
-          <small className="ku-z warn-t" title={`Termin nachtragen: ${terminLang(nt.z, h)} · ${nt.titel}`}>
+        {/* oben, was die Sortierung bestimmt: nachtragen › nächster Termin › letzter Besuch */}
+        {nt ? (
+          <span className="ku-z ku-top warn-t" title={`Termin nachtragen: ${terminLang(nt.z, h)} · ${nt.titel}`}>
             <CalendarDays />
             {terminKurz(nt.z, h)} nachtragen
-          </small>
+          </span>
+        ) : n ? (
+          <span className="ku-z ku-top ku-next" title={`Nächster Termin: ${terminLang(n.z, h)} · ${n.titel}`}>
+            <CalendarDays />
+            {terminKurz(n.z, h)}
+          </span>
         ) : x.zuletzt ? (
-          <small className="ku-z">{vorText(x.zuletzt, h)}</small>
-        ) : null}
+          <span className="ku-z num ku-war">{tagKurz(x.zuletzt, h)}</span>
+        ) : (
+          <span className="ku-z muted">noch kein Besuch</span>
+        )}
+        {x.zuletzt ? <small className="ku-z">{nt || n ? `zuletzt ${tagKurz(x.zuletzt, h)}` : vorText(x.zuletzt, h)}</small> : null}
       </td>
       <td className="l ku-c-leist">
         <LeistungZelle t={t} q={q} />

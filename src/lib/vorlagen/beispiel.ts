@@ -142,6 +142,7 @@ export function beispielbeleg(art: Belegart, firma: Firma, ust_modus: UstModus, 
       positionen: [{ beschreibung: 'Rasenmähen inkl. Kantenschnitt', menge: 1, einheit: 'pausch.', einzelpreis_cent: 6500 }],
       zahlungsweg: 'bar',
       eigenbeleg: null,
+      buchung_nr: `${heute.slice(0, 4)}-0123`,
     };
   }
   if (art === 'eigenbeleg') {

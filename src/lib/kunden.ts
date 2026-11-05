@@ -254,8 +254,11 @@ function auswerten(k: KundeZeile, zeilen: readonly VerlaufZeile[], heute: string
   const seit = fruehester && fruehester < angelegt ? fruehester : angelegt;
 
   let sortKey: string;
-  // wer einen kommenden Termin hat, steht oben (nächster zuerst) – auch Stammkunden; die Spalte zeigt „nächster: …“
-  if (naechster) sortKey = '9' + String(99_999_999 - Number(naechster.z.datum.replace(/-/g, '')));
+  // ganz oben: Termine zum Nachtragen (ältester zuerst), dann wer einen kommenden Termin hat (nächster zuerst) – auch
+  // Stammkunden; die Spalte zeigt genau das oben in der Zelle
+  const nachtragen = eintraege.filter((e) => e.status === 'nachtragen').sort((a, b) => cmp(a.z.datum, b.z.datum))[0];
+  if (nachtragen) sortKey = '99' + String(99_999_999 - Number(nachtragen.z.datum.replace(/-/g, '')));
+  else if (naechster) sortKey = '9' + String(99_999_999 - Number(naechster.z.datum.replace(/-/g, '')));
   else if (zuletzt) sortKey = zuletzt;
   else if (vergangen.length) sortKey = vergangen[0].z.datum;
   else if (eintraege.length) sortKey = eintraege[eintraege.length - 1].z.datum;
@@ -422,8 +425,8 @@ const WOCHENTAGE = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 /** „März 2025“ */
 export const monatJahr = (iso: string): string => `${MONATE[Number(iso.slice(5, 7)) - 1]} ${iso.slice(0, 4)}`;
 
-const wochentag = (iso: string): string => WOCHENTAGE[new Date(utc(iso)).getUTCDay()];
-const tagMonat = (iso: string): string => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.`;
+export const wochentag = (iso: string): string => WOCHENTAGE[new Date(utc(iso)).getUTCDay()];
+export const tagMonat = (iso: string): string => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.`;
 
 /** Uhrzeit eines Termins: „08:00–10:00“, „08:00“ oder ''. */
 export const zeitspanne = (von: string | null, bis: string | null): string => (von ? (bis ? `${von}–${bis}` : von) : '');

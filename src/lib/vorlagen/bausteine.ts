@@ -205,6 +205,8 @@ export const BAUSTEINE: Readonly<Record<BausteinTyp, BausteinDef>> = {
       { key: 'worte', label: 'Betrag in Worten', typ: 'toggle', default: true },
       { key: 'kunde', label: 'Erhalten von (Kunde)', typ: 'toggle', default: true },
       { key: 'zweck', label: 'Für (Leistung)', typ: 'toggle', default: true },
+      // gedruckt, sobald die Quittung gebucht ist (Nummer aus Ein- & Ausgänge, steht im Schnappschuss)
+      { key: 'buchungsnr', label: 'Buchungs-Nr. (wenn gebucht)', typ: 'toggle', default: true },
       { key: 'von', label: 'Bezeichnung „erhalten von“', typ: 'text', default: 'Erhalten von' },
       { key: 'fuer', label: 'Bezeichnung „für“', typ: 'text', default: 'Für' },
     ],
@@ -324,6 +326,8 @@ export interface QuittungAngaben {
   worte: boolean;
   kunde: boolean;
   zweck: boolean;
+  /** Buchungsnummer drucken, wenn der Beleg eine hat (zählt nicht für „alles aus“) */
+  buchungsnr: boolean;
   nr: boolean;
   leer: boolean;
 }
@@ -339,7 +343,7 @@ export function quittungAngaben(b: Pick<Aufgeloest, 'an' | 'text'>): QuittungAng
   };
   const leer = !Object.values(a).some(Boolean);
   const formular = b.text('stil') === 'formular';
-  return { ...a, formular, nr: formular && !leer, leer };
+  return { ...a, buchungsnr: b.an('buchungsnr'), formular, nr: formular && !leer, leer };
 }
 
 /** Steht der Baustein immer unten (Fußzeile) oder per Einstellung „Am Seitenende“? */
