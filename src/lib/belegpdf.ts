@@ -84,6 +84,7 @@ export function dokumentAusJson(v: unknown): BelegDokument | null {
     leistung_von: strOderNull(v.leistung_von),
     leistung_bis: strOderNull(v.leistung_bis),
     faellig_am: strOderNull(v.faellig_am),
+    buchung_nr: strOderNull(v.buchung_nr),
     kunde: kundeAusJson(v.kunde),
     betreff: str(v.betreff),
     einleitung: str(v.einleitung),
@@ -164,6 +165,7 @@ export function dokumentAusZeile(b: BelegVoll, positionen: readonly PositionZeil
           }
         : null,
     ausgestellt_am: null,
+    buchung_nr: art === 'quittung' ? (b.buchung_nummer ?? null) : null,
     firma,
     ust_modus: ustModus,
     storno_von: storno && b.storno_von_nummer ? { nummer: b.storno_von_nummer, datum: b.storno_von_datum ?? '' } : null,

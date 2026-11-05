@@ -42,6 +42,13 @@ describe('daten.tex', () => {
     expect(makro(d, 'Firma')).toBe(String.raw`Mustermann Haus- \& Gartenservice`);
   });
 
+  it('Quittung: Buchungsnummer aus dem Schnappschuss, ohne Angabe leer', () => {
+    expect(makro(datenTex({ ...quittung(), buchung_nr: '2026-0246' }), 'BuchungsNr')).toBe('2026-0246');
+    expect(makro(datenTex(quittung()), 'BuchungsNr')).toBe('');
+    // gedruckt nur, wenn es eine gibt (ältere Quittungen ohne Angabe bleiben, wie sie waren)
+    expect(mainTex('quittung', standardVorlage('quittung'), '#6366f1').tex).toContain(String.raw`\ifdefempty{\BuchungsNr}{}`);
+  });
+
   it('jedes Makro genau einmal definiert, Klammern ausgeglichen', () => {
     for (const doc of [rechnung(), quittung()]) {
       const d = datenTex(doc);

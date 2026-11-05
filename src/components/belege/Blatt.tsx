@@ -629,6 +629,7 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
               <span>in Worten:</span> {betragInWorten(x.summe)}
             </p>
           )}
+          {doc.buchung_nr ? <p className="blk-text grau blk-buchnr">Buchungs-Nr. {doc.buchung_nr}</p> : null}
         </div>
       );
     }
@@ -656,6 +657,7 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
         {a.worte && <Feld label="Betrag in Worten">{betragInWorten(x.summe)}</Feld>}
         {a.kunde && <Feld label={feld(b, x, 'von')}>{kunde}</Feld>}
         {a.zweck && <Feld label={feld(b, x, 'fuer')}>{fuer}</Feld>}
+        {doc.buchung_nr ? <p className="blk-text grau blk-buchnr">Buchungs-Nr. {doc.buchung_nr}</p> : null}
       </>
     );
   },

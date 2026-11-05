@@ -51,7 +51,7 @@ export const MAKRO_NAMEN = [
   'Betreff', 'Einleitung', 'Positionen', 'Gesamt', 'BetragInWorten', 'Zahlungsart', 'Steuerhinweis', 'Zahlungshinweis',
   'Schlusstext', 'Gruss',
   'KundeAnzeige', 'KundeAdresseEinzeilig', 'FirmaPLZ', 'FirmaStadt', 'LeistungsdatumLabel', 'Zahlungsziel', 'AnzahlPositionen',
-  'QuittungFuer', 'Quittiert', 'EigenbelegGrund', 'GebuchtAls', 'UnterschriftDatum', 'Storniert', 'GiroCode',
+  'QuittungFuer', 'Quittiert', 'EigenbelegGrund', 'GebuchtAls', 'BuchungsNr', 'UnterschriftDatum', 'Storniert', 'GiroCode',
   'ZahlungswegKurz',
 ] as const;
 
@@ -123,6 +123,7 @@ export function makroWerte(doc: BelegDokument): Record<MakroName, string> {
     Quittiert: e1(quittiertText(doc)),
     EigenbelegGrund: e1(eigenbelegGrundText(doc)),
     GebuchtAls: e1(gebuchtText(doc)),
+    BuchungsNr: e1(doc.buchung_nr ?? ''),
     UnterschriftDatum: e1(unterschriftDatum(doc)),
     Storniert: doc.storniert ? '1' : '',
     // fester Dateiname (kein Nutzerwert); belegAssets liefert die Datei, sobald main.tex sie einbindet

@@ -346,7 +346,7 @@ a.kpi { cursor: pointer; }
 .textarea { height: auto; min-height: 76px; padding: 10px 12px; line-height: 1.5; resize: vertical; }
 .select { appearance: none; -webkit-appearance: none; padding-right: 34px; cursor: pointer;
   background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
-  background-position: calc(100% - 17px) 17px, calc(100% - 12px) 17px; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; }
+  background-position: calc(100% - 17px) calc(50% - 1px), calc(100% - 12px) calc(50% - 1px); background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; }
 .input::placeholder, .textarea::placeholder { color: var(--muted); }
 .input:hover, .select:hover, .textarea:hover { border-color: var(--border-strong); }
 .input:focus, .select:focus, .textarea:focus { border-color: var(--accent-line); background: var(--surface); box-shadow: 0 0 0 4px var(--accent-soft); }

@@ -222,3 +222,4 @@
 /* ohne Logo: der Platzhalter erscheint erst, wenn man auf den Kopf zeigt oder ihn wählt */
 .sheet.editable .blk-logo-slot { opacity: 0; transition: opacity .15s; }
 .sheet.editable .blk:hover .blk-logo-slot, .sheet.editable .blk.blk-sel .blk-logo-slot { opacity: 1; }
+.sheet .blk-buchnr { margin: 1mm 0 2mm; }

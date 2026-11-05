@@ -1436,6 +1436,14 @@ async fn ausstellen_in(
     dok.insert("positionen".into(), positionen_dokument(&e.positionen));
     dok.insert("zahlungsweg".into(), zahlungsweg);
     dok.insert("quittiert".into(), quittiert);
+    // Quittung: die Buchungsnummer steht mit auf dem Blatt (wie „Gebucht als“ beim Eigenbeleg) – Papier im Ordner und
+    // Buchung finden sich so gegenseitig. Steht im Schnappschuss, ältere Quittungen bleiben, wie sie ausgestellt wurden.
+    if art == "quittung" {
+        dok.insert(
+            "buchung_nr".into(),
+            zahlung.as_ref().map(|z| z.nummer.clone()).into(),
+        );
+    }
     dok.insert("ausgestellt_am".into(), a.heute.clone().into());
     if art == "eigenbeleg" {
         let kategorie_name: Option<String> =
@@ -2424,6 +2432,9 @@ mod tests {
             assert_eq!(d["kunde"]["plz"], "12390");
             assert_eq!(d["positionen"][0]["einzelpreis_cent"], 6_500);
             assert_eq!(d["zahlungsweg"], "bar");
+            // Buchungsnummer der Einnahme steht mit auf der Quittung
+            let bnr = spalte(&mut c, "buchungen", "nummer", b).await;
+            assert_eq!(d["buchung_nr"].as_str(), bnr.as_deref());
             assert_eq!(d["schlusstext"], "Danke!");
             assert_eq!(d["ausgestellt_am"], HEUTE);
             assert_eq!(d["firma"]["name"], "Mustermann Haus- & Gartenservice");

@@ -81,6 +81,7 @@ import {
   bausteineFuer,
   datumText,
   istBelegart,
+  tageZwischen,
   type BelegDokument,
   type Belegart,
   type EigenbelegGrund,
@@ -1636,7 +1637,11 @@ function AusgestelltAktionen({ beleg, zeile, mailen }: { beleg: BelegVoll; zeile
   const status = (() => {
     if (beleg.art === 'storno') return `Stornobeleg vom ${datumText(beleg.datum)}`;
     if (beleg.status === 'storniert') return `Storniert${beleg.storniert_am ? ` am ${datumText(beleg.storniert_am)}` : ''}`;
-    if (beleg.art === 'rechnung' && beleg.status === 'offen') return `Offen · fällig ${datumText(beleg.faellig_am)}`;
+    if (beleg.art === 'rechnung' && beleg.status === 'offen') {
+      // gleiche Sprache wie Kopf und Liste: überfällig ist überfällig
+      const ueber = beleg.faellig_am && beleg.faellig_am < heuteIso() ? tageZwischen(beleg.faellig_am, heuteIso()) : 0;
+      return ueber > 0 ? `Überfällig seit ${ueber} ${ueber === 1 ? 'Tag' : 'Tagen'} · fällig war ${datumText(beleg.faellig_am)}` : `Offen · fällig ${datumText(beleg.faellig_am)}`;
+    }
     if (beleg.art === 'angebot') return beleg.status === 'angenommen' ? 'In Rechnung umgewandelt' : beleg.status === 'abgelehnt' ? 'Vom Kunden abgelehnt' : `gültig bis ${datumText(beleg.faellig_am)}`;
     if (beleg.status === 'bezahlt') {
       const was = beleg.art === 'eigenbeleg' ? 'Ausgabe gebucht' : beleg.art === 'quittung' ? 'Bezahlt' : 'Bezahlt';

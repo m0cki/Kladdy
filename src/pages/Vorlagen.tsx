@@ -1063,13 +1063,13 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
                   <span className="vl-stand">
                     <span className="vl-stand-chip">
                       <Pencil />
-                      Mitgeliefert – frei bearbeitbar
+                      Mitgeliefert
                     </span>
-                    <span>Deine erste Änderung speichert Kladdy automatisch als „Meine {ARTEN[art].label}“.</span>
+                    <span>Deine erste Änderung wird automatisch „Meine {ARTEN[art].label}“.</span>
                   </span>
                 )}
                 <span className="vl-legende">
-                  <span className="vl-ph-txt">Türkis</span> = Angaben, die Kladdy beim Ausstellen einsetzt (z. B. Firma, Kunde, Datum)
+                  <span className="vl-ph-txt">Firma</span> = setzt Kladdy ein · <Lock className="ic vl-leg-ic" /> Pflicht = bleibt im Beleg, Text änderbar
                 </span>
               </div>
             </div>

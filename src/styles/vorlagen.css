@@ -266,3 +266,6 @@
 /* Stand der Vorlage: Hinweis, kein Knopf */
 .vl-stand-chip:not(.eigen) { background: transparent; padding-left: 0; color: var(--text); }
 .vl-legende { display: block; margin-top: 6px; font-size: .78rem; line-height: 1.5; color: var(--text-2); }
+.vl-legende .vl-leg-ic { width: 12px; height: 12px; vertical-align: -1px; }
+/* Platzhalter nicht nur über die Farbe: gepunktet unterstrichen */
+.vl-ph-txt { text-decoration: underline dotted; text-underline-offset: 3px; text-decoration-thickness: 1px; }

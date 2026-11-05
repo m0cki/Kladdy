@@ -106,6 +106,8 @@ export interface BelegDokument {
   quittiert: { am: string; zahlungsweg: Zahlungsart } | null;
   /** nur Eigenbeleg */
   eigenbeleg: { grund: EigenbelegGrund; grund_text: string; gebucht: { nummer: string; kategorie: string } | null } | null;
+  /** Quittung: Nummer der Buchung (Ein- & Ausgänge), beim Ausstellen festgehalten; fehlt bei älteren Schnappschüssen */
+  buchung_nr?: string | null;
   /** Ausstellungstag (Unterschrift beim Eigenbeleg); null = `datum` */
   ausgestellt_am: string | null;
   /** Schnappschuss der Firmendaten beim Ausstellen */

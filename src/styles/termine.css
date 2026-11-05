@@ -74,7 +74,7 @@ button.tm-kunde:hover { color: var(--accent-text); text-decoration: underline; }
 .tm-adr .ic { width: 14px; height: 14px; flex: none; }
 .tm-adr:hover { color: var(--accent-text); }
 .tm-adr:hover span { text-decoration: underline; }
-.tm-ntz { display: inline-grid; place-items: center; flex: none; width: 24px; height: 24px; border-radius: 7px; color: var(--warn); cursor: help; transition: background .15s; }
+.tm-ntz { display: inline-grid; place-items: center; flex: none; width: 24px; height: 24px; border-radius: 7px; color: var(--text-2); cursor: help; transition: background .15s; }
 .tm-ntz .ic { width: 15px; height: 15px; }
 .tm-ntz:hover, .tm-ntz:focus-visible { background: color-mix(in oklab, var(--warn) 16%, transparent); }
 
@@ -241,3 +241,4 @@ a.ku-hw.tm-hw:hover { border-color: var(--accent-line); }
 
 .tm-frage { color: var(--text-2) !important; font-weight: 600; }
 .tm-nach .tm-items { grid-template-columns: 62px 32px minmax(0, 1fr) 76px 172px auto; } /* Nachtragen: Frage und zwei Knöpfe brauchen mehr Platz */
+.tm-nach .tm-adr span { white-space: normal; }

@@ -457,7 +457,7 @@ function Liste({
               {anzahlText(r.zeilen.length)}
               {r.zeilen.some((b) => sperre(b)) ? (
                 <span className="bu-foot-legende">
-                  <Lock /> festgeschrieben – ändern nur per Storno
+                  <Lock /> an ausgestellten Beleg gebunden – ändern per Storno
                 </span>
               ) : null}
             </span>

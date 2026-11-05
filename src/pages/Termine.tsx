@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { formatBetrag } from '../lib/money';
 import {
   ArrowLeftRight,
   CalendarDays,
@@ -496,8 +497,7 @@ function Zeile({
       <div className="tm-info">
         {b ? (
           <span className={`tm-betrag ${b.ist ? 'ist' : ''}`} title={b.titel}>
-            {b.ist ? '' : 'ca. '}
-            {betragKurz(b.cent)}
+            {b.ist ? formatBetrag(b.cent) : `ca. ${betragKurz(b.cent)}`}
           </span>
         ) : null}
         <BelegChip t={t} />
