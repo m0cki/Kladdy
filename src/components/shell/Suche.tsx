@@ -74,14 +74,15 @@ const SEITEN: Ziel[] = [
 /** Ohne Eingabe: die fünf Menüpunkte. */
 const SPRINGEN: Ziel[] = NAV.map((n) => ({ id: `springen:${n.to}`, art: 'seite' as const, gruppe: 'Springen zu', label: n.label, icon: n.icon, run: go(n.to) }));
 
-const EINSTELLUNGS_ZIELE: Ziel[] = EINSTELLUNGEN.map((e) => {
+// nur fertige Bereiche (wie in der Seitenleiste der Einstellungen)
+const EINSTELLUNGS_ZIELE: Ziel[] = EINSTELLUNGEN.filter((e) => !bereich(e.bereich).phase).map((e) => {
   const b = bereich(e.bereich);
   return {
     id: `einstellung:${e.id}`,
     art: 'einstellung',
     gruppe: 'Einstellungen',
     label: e.label,
-    sub: `Einstellungen · ${b.label}${b.phase ? ` (kommt mit Phase ${b.phase})` : ''}`,
+    sub: `Einstellungen · ${b.label}`,
     keywords: e.keywords,
     icon: SlidersHorizontal,
     run: go(bereichPfad(e.bereich, e.id)),

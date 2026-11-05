@@ -424,7 +424,7 @@ function Liste({ zeilen, naechste }: { zeilen: BelegZeile[]; naechste: Partial<R
               title="Entwürfe und für Termine vorbereitete Belege – noch ohne Nummer, nicht im Belegregister"
               onClick={() => waehleReiter(reiter === 'entwuerfe' ? 'alle' : 'entwuerfe')}
             >
-              <span className="bl-entwuerfe-l">ohne Nr.:</span> Entwürfe <span className="cnt">{zahl(r.reiter.entwuerfe)}</span>
+              Entwürfe <span className="cnt">{zahl(r.reiter.entwuerfe)}</span>
             </button>
             <ZeitraumLeiste zeitraum={zeitraum} />
             {r.ohneZeitraum ? (

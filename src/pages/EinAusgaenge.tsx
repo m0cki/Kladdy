@@ -629,10 +629,10 @@ function Summenzeile({ zeilen, label }: { zeilen: readonly BuchungZeile[]; label
   return (
     <span className="bu-summen" aria-label={`Summen ${label}`}>
       <span>
-        Einnahmen <b className="ein">{formatBetrag(s.einnahmen, { vorzeichen: 'immer' })}</b>
+        Einnahmen <b className={s.einnahmen ? 'ein' : undefined}>{formatBetrag(s.einnahmen, { vorzeichen: 'immer' })}</b>
       </span>
       <span>
-        Ausgaben <b className="aus">{formatBetrag(-s.ausgaben, { vorzeichen: 'immer' })}</b>
+        Ausgaben <b className={s.ausgaben ? 'aus' : undefined}>{formatBetrag(-s.ausgaben, { vorzeichen: 'immer' })}</b>
       </span>
       <span>
         Saldo <b>{formatBetrag(s.saldo, { vorzeichen: 'immer' })}</b>

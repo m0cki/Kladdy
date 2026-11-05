@@ -243,3 +243,11 @@
 .vl-karte-kopf[hidden] { display: none; }
 .vl-inline { padding-top: 10px; padding-bottom: 12px; }
 
+/* Aktionen in einer Zeile; Bausteine mit nur einer Auswahl (Abstand, Trennlinie) kompakt */
+.vl-reihe { padding: 2px; }
+.vl-karte-aktionen { flex-wrap: nowrap; }
+.vl-karte.kompakt { gap: 8px; }
+.vl-karte.kompakt .vl-karte-aktionen { padding-bottom: 8px; }
+.vl-karte.kompakt .field { flex-direction: row; align-items: center; gap: 10px; }
+.vl-karte.kompakt .field label { margin: 0; }
+.vl-karte.kompakt .field .select { width: auto; min-width: 160px; height: 34px; font-size: .86rem; }

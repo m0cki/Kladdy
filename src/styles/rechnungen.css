@@ -324,12 +324,10 @@
 .bl-zr .period-nav b { min-width: 96px; }
 .bl-buchnr { display: block; margin-top: 1px; font-size: .74rem; color: var(--text-2); font-variant-numeric: tabular-nums; }
 
-.bl-storno-btn.danger-text { color: var(--neg); }
-.bl-storno-btn.danger-text .ic { color: var(--neg); }
+.bl-storno-btn:hover, .bl-storno-btn:hover .ic { color: var(--neg); }
 /* Belegnummern in Textschrift mit gleich breiten Ziffern (keine Monospace mit durchgestrichener Null) */
 .bl-nr a, .bl-nr .bl-draftnr { font-family: var(--font); font-variant-numeric: tabular-nums; font-weight: 650; letter-spacing: 0; }
 /* Gruppenzeile in der Belegliste */
 .bl-table tr.bl-gruppe td { padding: 10px 14px 6px; font-size: .78rem; font-weight: 650; color: var(--text-2); background: var(--surface-2); }
-.bl-table tr.bl-gruppe.alarm td { color: var(--neg); }
+.bl-table tr.bl-gruppe.alarm td { color: var(--text); } /* Alarm trägt schon Zeile und Status – die Überschrift bleibt ruhig */
 .bl-table tr.bl-gruppe td { text-align: left; }
-.bl-entwuerfe-l { font-weight: 500; color: var(--muted); }

@@ -108,7 +108,8 @@ function EinstellungsMenue({ pathname }: { pathname: string }) {
       <div className="sb-section">
         <div className="sb-title">Einstellungen</div>
         <ul className="sb-list">
-          {BEREICHE.map(({ id, label, icon: Icon, phase }) => {
+          {/* noch nicht fertige Bereiche (phase) erscheinen erst, wenn es sie gibt – kein „kommt bald“ */}
+          {BEREICHE.filter((b) => !b.phase).map(({ id, label, icon: Icon, phase }) => {
             const to = bereichPfad(id);
             const active = isActive(pathname, to);
             return (

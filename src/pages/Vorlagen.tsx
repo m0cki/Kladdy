@@ -1233,6 +1233,9 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
               {[letzter.nummer ?? 'Entwurf', letzter.kunde_name, letzter.nummer && 'als Entwurf'].filter(Boolean).join(' · ')}
             </span>
           ) : null}
+          {ansicht === 'vorschau' && !laedt ? (
+            <BlattGross kompakt doc={doc} bausteine={bausteine} titel={blanko ? 'Blanko in Lesegröße' : 'Vorlage in Lesegröße'} />
+          ) : null}
           <button
             type="button"
             className={blanko ? 'btn-primary sm' : 'btn ghost'}
@@ -1275,11 +1278,6 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
         ) : (
           <LatexAnsicht art={art} bausteine={bausteine} accent={accent} blanko={blanko} />
         )}
-        {ansicht === 'vorschau' && !laedt ? (
-          <div className="vl-unter-blatt">
-            <BlattGross doc={doc} bausteine={bausteine} titel={blanko ? 'Blanko in Lesegröße' : 'Vorlage in Lesegröße'} />
-          </div>
-        ) : null}
         {ansicht === 'latex' ? (
           <button type="button" className="link vl-latex-link" onClick={() => setAnsicht('vorschau')}>
             Zurück zur Vorschau
@@ -1315,7 +1313,11 @@ function BausteinKarte({ b, index, anzahl, pflicht, setze, schieben, umschalten:
   const platzhalter = (key: string, name: PlatzhalterName) => felder.current[key]?.platzhalter(name);
 
   return (
-    <div className="vl-karte" aria-label={`Einstellungen: ${def.name}`} role="group">
+    <div
+      className={`vl-karte ${def.felder.length === 1 && def.felder[0].typ === 'select' ? 'kompakt' : ''}`}
+      aria-label={`Einstellungen: ${def.name}`}
+      role="group"
+    >
       <div className="vl-karte-kopf" hidden={zusammenfassung(b) === def.beschreibung && !b.aus}>
         <p className="vl-karte-text">
           <Icon />
@@ -1324,8 +1326,7 @@ function BausteinKarte({ b, index, anzahl, pflicht, setze, schieben, umschalten:
         </p>
       </div>
       <div className="vl-karte-aktionen">
-        <span className="vl-reihe" role="group" aria-label="Reihenfolge">
-          <span className="vl-reihe-l">Reihenfolge</span>
+        <span className="vl-reihe" role="group" aria-label="Reihenfolge" title="Reihenfolge im Blatt">
           <button type="button" className="icon-btn sm" title="Nach oben" aria-label="Nach oben" disabled={index === 0} onClick={() => schieben(-1)}>
             <ArrowUp />
           </button>

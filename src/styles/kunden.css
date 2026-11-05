@@ -53,9 +53,9 @@ small.ku-z .ic { width: 12px; height: 12px; vertical-align: -1.5px; margin-right
 .ku-c-bes { font-weight: 600; }
 .ku-table td.ku-c-ums { color: var(--text-2); }
 .ku-table mark { background: color-mix(in oklab, var(--accent) 30%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
-.ku-ntz { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; color: var(--warn); vertical-align: middle; transition: background .15s; }
+.ku-ntz { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; color: var(--text-2); vertical-align: middle; transition: background .15s; }
 .ku-ntz .ic { width: 16px; height: 16px; }
-.ku-ntz:hover, .ku-ntz.on { background: color-mix(in oklab, var(--warn) 16%, transparent); }
+.ku-ntz:hover, .ku-ntz.on { background: var(--surface-3); color: var(--text); }
 .ku-table tr.row:focus-visible td { background: var(--accent-soft); outline: none; }
 .ku-table tr.ku-leer td { padding: 0; white-space: normal; border-bottom: 0; }
 .ku-table .empty { padding: 48px 16px; }
