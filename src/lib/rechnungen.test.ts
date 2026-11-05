@@ -148,7 +148,7 @@ describe('Liste', () => {
   });
 
   it('Spalte „Fällig / Zahlung“ und Betrag', () => {
-    expect(faelligText(zeile({}), HEUTE)).toMatchObject({ text: '7 T. überfällig', klasse: 'neg' });
+    expect(faelligText(zeile({}), HEUTE)).toMatchObject({ text: '7 Tage überfällig', klasse: 'neg' });
     expect(faelligText(zeile({ faellig_am: HEUTE }), HEUTE).text).toBe('heute fällig');
     expect(faelligText(zeile({ faellig_am: '2026-10-23' }), HEUTE).text).toBe('in 1 Tag');
     expect(faelligText(zeile({ art: 'quittung', status: 'bezahlt', zahlungsart: 'bar', bezahlt_am: '2026-10-05' }), HEUTE).text).toBe('bar · 05.10.');

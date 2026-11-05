@@ -1596,6 +1596,18 @@ function ScanKarte({ beleg, onDatei }: { beleg: BelegVoll; onDatei: (pfad: strin
     if (pfad) onDatei(pfad);
   };
   const sub = beleg.art === 'eigenbeleg' ? 'Ausdrucken, unterschreiben, einscannen – gehört zum Beleg.' : 'Optional: Scan oder Foto des unterschriebenen Belegs.';
+  // optional (nicht beim Eigenbeleg): eine Zeile, die Datei kann trotzdem aufs Fenster gezogen werden
+  if (beleg.scan_beleg_id == null && beleg.art !== 'eigenbeleg') {
+    return (
+      <button type="button" className="bl-scan-zeile reveal" style={reveal(1)} data-card="scan" onClick={() => void waehlen()}>
+        <Paperclip />
+        <span>
+          <b>Unterschriebenes Exemplar anhängen</b>
+          <small>optional · PDF oder Foto, auch aufs Fenster ziehen</small>
+        </span>
+      </button>
+    );
+  }
   return (
     <section className="card bl-card bl-scan reveal" style={reveal(1)} data-card="scan">
       <div className="card-head">

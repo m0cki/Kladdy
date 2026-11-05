@@ -123,7 +123,7 @@ export function offeneRechnungen(zeilen: readonly BelegZeile[]): BelegZeile[] {
     .sort((a, b) => schluessel(a).localeCompare(schluessel(b)) || a.id - b.id);
 }
 
-/** Zweite Zeile einer offenen Rechnung: „7 T. überfällig“, „heute fällig“, „in 3 Tagen“. */
+/** Zweite Zeile einer offenen Rechnung: „7 Tage überfällig“, „heute fällig“, „in 3 Tagen“. */
 export const offenFaellig = (z: BelegZeile, heute: string): { text: string; ueberfaellig: boolean } => {
   const f = faelligText(z, heute);
   return { text: f.text, ueberfaellig: f.klasse === 'neg' };

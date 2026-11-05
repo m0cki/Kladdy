@@ -375,7 +375,7 @@ function Zeile({ t, q, h, gewaehlt, suchFeld }: { t: KundenTreffer; q: string; h
           ) : null}
         </span>
       </td>
-      <td className="c num ku-c-bes">{x.besuche || null}</td>
+      <td className="c num ku-c-bes">{x.besuche || <span className="ku-leer" aria-label="keine">–</span>}</td>
       <td className="l ku-c-last">
         {x.zuletzt ? <span className="ku-z num">{datumKurz(x.zuletzt)}</span> : n || nt ? null : <span className="ku-z muted">noch kein Besuch</span>}
         {n ? (
@@ -395,7 +395,7 @@ function Zeile({ t, q, h, gewaehlt, suchFeld }: { t: KundenTreffer; q: string; h
       <td className="l ku-c-leist">
         <LeistungZelle t={t} q={q} />
       </td>
-      <td className="num ku-c-ums">{x.umsatz ? formatBetrag(x.umsatz) : null}</td>
+      <td className="num ku-c-ums">{x.umsatz ? formatBetrag(x.umsatz) : <span className="ku-leer" aria-label="keine">–</span>}</td>
       <td className="c ku-c-ntz">
         {notiz ? (
           <span className={`ku-ntz ${q && normalize(notiz).includes(nq) ? 'on' : ''}`} title={`Notiz: ${notiz}`} role="img" aria-label={`Notiz: ${notiz}`}>

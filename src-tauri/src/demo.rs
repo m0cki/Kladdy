@@ -554,8 +554,8 @@ pub async fn fuellen(
             .bind((r.art != "angebot").then_some(&r.datum))
             .bind(&r.faellig_am)
             .bind(&r.betreff)
-            // Schlusstext wie bei neuen Belegen (lib/vorlagen/dokument.ts HINWEIS_14B), Angebote und Eigenbelege ohne
-            .bind((r.art == "quittung" || r.art == "rechnung").then_some(HINWEIS_14B))
+            // Schlusstext wie bei neuen Belegen (lib/vorlagen/dokument.ts HINWEIS_14B): nur Rechnungen
+            .bind((r.art == "rechnung").then_some(HINWEIS_14B))
             .bind(summe(&r.positionen))
             .bind(r.termin.map(|t| termin_ids[t]))
             .bind(&r.bezahlt_am)

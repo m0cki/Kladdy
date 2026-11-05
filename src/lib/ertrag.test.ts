@@ -157,7 +157,7 @@ describe('Nummer, offene Rechnungen, Prüfung', () => {
       zeile({ id: 6, art: 'angebot', status: 'offen' }),
     ]);
     expect(liste.map((z) => z.id)).toEqual([2, 1]);
-    expect(offenFaellig(liste[0], HEUTE)).toEqual({ text: '12 T. überfällig', ueberfaellig: true });
+    expect(offenFaellig(liste[0], HEUTE)).toEqual({ text: '12 Tage überfällig', ueberfaellig: true });
     expect(offenFaellig(liste[1], HEUTE)).toEqual({ text: 'in 8 Tagen', ueberfaellig: false });
   });
 

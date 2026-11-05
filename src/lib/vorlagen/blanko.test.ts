@@ -35,7 +35,7 @@ describe('Blanko-Dokument', () => {
     expect(w.steuernummer).toBe(BEISPIEL_FIRMA.steuernummer);
     expect(w.inhaber).toBe(BEISPIEL_FIRMA.inhaber);
     expect(w.art).toBe('Quittung');
-    expect(w.schlusstext).toContain('§ 14b UStG');
+    expect(w.schlusstext).toBe(''); // Quittung: kein § 14b-Hinweis vorgegeben (Kleinbetragsrechnung)
     expect(luecken(blanko())).toBe(BELEG_PLATZHALTER);
     expect(luecken(beispielbeleg('quittung', BEISPIEL_FIRMA, 'klein', '2026-11-04')).size).toBe(0);
   });

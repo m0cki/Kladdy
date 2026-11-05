@@ -28,7 +28,7 @@
  * Logik in lib/vorlagen/baukasten.ts, Stile in styles/vorlagen.css. */
 import { Fragment, useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent, type RefObject } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ArrowDown, ArrowUp, Blocks, Building2, Check, CircleCheck, Clock, Eye, EyeOff, FileText, GripVertical, Heading, Info, Landmark, List, LoaderCircle, Lock, Mail, Minus, MoveVertical, Package, PanelTop, Pencil, Plus, Printer, QrCode, Receipt, RotateCcw, Send, Sigma, Signature, SquareDashed, Stamp, Trash2, TriangleAlert, Type, Users, X, type LucideIcon } from 'lucide-react';
+import { ArrowDown, ArrowUp, Asterisk, Blocks, Building2, Check, CircleCheck, Clock, Eye, EyeOff, FileText, GripVertical, Heading, Info, Landmark, List, LoaderCircle, Lock, Mail, Minus, MoveVertical, Package, PanelTop, Pencil, Plus, Printer, QrCode, Receipt, RotateCcw, Send, Sigma, Signature, SquareDashed, Stamp, Trash2, TriangleAlert, Type, Users, X, type LucideIcon } from 'lucide-react';
 import { BlattVorschau, type BlattBearbeitung } from '../components/belege/Blatt';
 import { FormatEditor, type FormatEditorHandle } from '../components/belege/FormatEditor';
 import { PageHead, reveal } from '../components/ui/PageHead';
@@ -1028,7 +1028,7 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
                   </span>
                 )}
                 <span className="vl-legende">
-                  Angaben in ‹ › füllt Kladdy beim Ausstellen aus. Bausteine mit <Lock className="ic vl-leg-ic" /> bleiben im Beleg – ihren Text kannst du ändern.
+                  Angaben in ‹ › füllt Kladdy beim Ausstellen aus. Bausteine mit <Asterisk className="ic vl-leg-ic" /> Pflicht bleiben im Beleg – ihren Text kannst du ändern.
                 </span>
               </div>
             </div>
@@ -1082,7 +1082,7 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
                         {def.name}
                         {pflichtBausteine.has(i) ? (
                           <span className="vl-pflicht" title="Enthält eine Pflichtangabe – bleibt im Beleg (Texte sind trotzdem änderbar)">
-                            <Lock />
+                            <Asterisk />
                             Pflicht
                           </span>
                         ) : null}
@@ -1307,7 +1307,7 @@ function BausteinKarte({ b, index, anzahl, pflicht, setze, schieben, umschalten:
         <span className="spacer" />
         {pflicht ? (
           <span className="vl-pflicht-hinweis" title="Der Baustein bleibt im Beleg; seine Texte und Einstellungen darfst du ändern">
-            <Lock />
+            <Asterisk />
             Pflicht – bleibt im Beleg, Texte änderbar
           </span>
         ) : (

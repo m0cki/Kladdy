@@ -49,7 +49,8 @@ export const HINWEIS_14B = 'Hinweis für Privatkunden bei Arbeiten an Haus oder 
 /** Standardtexte der Maske je Art (Prototyp TEXTE). */
 export const STANDARD_TEXTE: Readonly<Record<Belegart, { einleitung: string; schlusstext: string }>> = {
   rechnung: { einleitung: 'vielen Dank für Ihren Auftrag. Ich berechne Ihnen folgende Leistungen:', schlusstext: HINWEIS_14B },
-  quittung: { einleitung: '', schlusstext: HINWEIS_14B },
+  // Quittungen sind meist Kleinbetragsrechnungen (§ 33 UStDV) – dort ist der § 14b-Hinweis nicht vorgeschrieben
+  quittung: { einleitung: '', schlusstext: '' },
   angebot: { einleitung: 'vielen Dank für Ihre Anfrage. Gerne biete ich Ihnen an:', schlusstext: 'Ich freue mich auf Ihren Auftrag.' },
   eigenbeleg: { einleitung: '', schlusstext: '' },
 };

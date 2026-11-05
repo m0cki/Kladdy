@@ -422,12 +422,6 @@ function Liste({ zeilen, naechste }: { zeilen: BelegZeile[]; naechste: Partial<R
                   <>
                     {t.label}
                     <span className="cnt">{zahl(r.reiter[t.value])}</span>
-                    {t.value === 'offen' && r.ueberfaellig > 0 ? (
-                      <span className="bl-ueber" title="Überfällige Rechnungen (auch aus früheren Zeiträumen)">
-                        <TriangleAlert />
-                        {zahl(r.ueberfaellig)} überfällig
-                      </span>
-                    ) : null}
                   </>
                 ),
               }))}

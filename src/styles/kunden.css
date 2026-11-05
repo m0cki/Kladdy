@@ -190,3 +190,4 @@ a.ku-hw:hover { filter: brightness(1.06); }
 .ku-table .ku-c-adr { width: 16%; }
 .ku-table .ku-c-leist { width: 21%; }
 .ku-table td .cell-main .t b { overflow-wrap: normal; word-break: normal; hyphens: auto; }
+.ku-leer { color: var(--muted); opacity: .7; }

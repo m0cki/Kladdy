@@ -253,7 +253,7 @@ export function faelligText(z: BelegZeile, heute: string): { text: string; klass
   if (z.status === 'storniert') return { text: `storniert${z.storniert_am ? ` ${datumText(z.storniert_am).slice(0, 6)}` : ''}`, klasse: 'muted' };
   if (z.art === 'rechnung' && z.status === 'offen' && z.faellig_am) {
     const n = tageZwischen(heute, z.faellig_am);
-    if (n < 0) return { text: `${-n} T. überfällig`, klasse: 'neg', titel: `fällig war ${datumText(z.faellig_am)}` };
+    if (n < 0) return { text: `${-n} ${n === -1 ? 'Tag' : 'Tage'} überfällig`, klasse: 'neg', titel: `fällig war ${datumText(z.faellig_am)}` };
     if (n === 0) return { text: 'heute fällig', klasse: 'warn' };
     return { text: `in ${n} ${n === 1 ? 'Tag' : 'Tagen'}`, klasse: '', titel: `fällig am ${datumText(z.faellig_am)}` };
   }
