@@ -43,7 +43,7 @@ export async function ladeOhneBelegAnzahl(): Promise<number> {
   const r = await eine<{ n: number }>(
     `SELECT COUNT(*) AS n FROM buchungen b
       WHERE b.storno_von_id IS NULL AND b.art = 'zahlung' AND b.rechnung_id IS NULL
-        AND NOT ${STORNIERT} AND ${BELEGE} = 0`,
+        AND NOT ${STORNIERT} AND ${BELEGE} = 0 AND TRIM(COALESCE(b.belegnummer, '')) = ''`,
   );
   return r?.n ?? 0;
 }

@@ -71,9 +71,11 @@ const KUNDEN: KundeKurz[] = [
 ];
 
 describe('Regeln', () => {
-  it('fehltBeleg: nur Zahlungen ohne Datei, nicht storniert, ohne eigenen Beleg', () => {
+  it('fehltBeleg: nur Zahlungen ohne Datei und ohne Belegnummer, nicht storniert, ohne eigenen Beleg', () => {
     expect(fehltBeleg(zeile({ id: 1 }))).toBe(true);
     expect(fehltBeleg(zeile({ id: 1, belege_anzahl: 1 }))).toBe(false);
+    expect(fehltBeleg(zeile({ id: 1, belegnummer: 'Quittungsblock 17' }))).toBe(false);
+    expect(fehltBeleg(zeile({ id: 1, belegnummer: '  ' }))).toBe(true);
     expect(fehltBeleg(zeile({ id: 1, storniert: 1 }))).toBe(false);
     expect(fehltBeleg(zeile({ id: 1, rechnung_id: 4 }))).toBe(false);
     expect(fehltBeleg(zeile({ id: 1, art: 'afa' }))).toBe(false);

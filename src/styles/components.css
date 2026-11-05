@@ -191,10 +191,10 @@ button.chip:hover { border-color: var(--border-strong); color: var(--text); }
 .btn:disabled, .btn-primary:disabled { opacity: .45; pointer-events: none; }
 .btn-primary {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 42px; padding: 0 16px; border-radius: 12px; font-weight: 650; font-size: .88rem; white-space: nowrap;
-  background: var(--accent); color: var(--on-accent); box-shadow: 0 8px 22px -10px var(--accent); transition: transform .25s var(--spring), filter .2s, background .3s;
+  background: var(--accent); color: var(--on-accent); box-shadow: 0 1px 2px rgb(0 0 0 / .16); transition: transform .25s var(--spring), filter .2s, background .3s;
 }
 .btn-primary .ic { width: 17px; height: 17px; }
-.btn-primary:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.btn-primary:hover { filter: brightness(1.06); }
 .btn-primary:active { transform: scale(.97); }
 .btn-primary.sm { height: 36px; padding: 0 13px; border-radius: 10px; font-size: .84rem; }
 /* Hauptaktion im Seitenkopf („+ Erfassen“, „+ Termin eintragen“, „+ Kunde anlegen“): so hoch wie Zeitraum-Umschalter und Suche */
@@ -615,3 +615,4 @@ input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 7px; }
 .euer-table .euer-bereich { min-width: 240px; }
 .euer-table .euer-zeile { display: block; width: 76px; margin-left: auto; }
 .euer-table .hint { margin: 4px 0 0; }
+.sb-nav .sb-badge.warn { background: color-mix(in oklab, var(--warn) 20%, transparent); color: var(--warn); }

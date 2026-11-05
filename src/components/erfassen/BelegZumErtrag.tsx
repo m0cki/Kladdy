@@ -93,7 +93,9 @@ export function BelegZumErtrag({ form, ertrag, setErtrag, stamm, ladeFehler, bel
         <BelegKasten form={form} ertrag={ertrag} setErtrag={setErtrag} stamm={stamm} naechste={naechste} belege={belege} nimmtBelege={nimmtBelege} fehler={fehler} />
       ) : null}
       {stamm && ertrag.weg === 'offen' ? <OffeneListe offene={offene} ertrag={ertrag} heute={h} fehler={fehler} onOffen={onOffen} /> : null}
-      {ertrag.weg === 'ohne' ? <NurBuchen buchung={stamm ? naechsteBelegNummer(stamm.kreise, 'buchung', h, h) : null} /> : null}
+      {ertrag.weg === 'ohne' ? (
+        <NurBuchen buchung={stamm ? naechsteBelegNummer(stamm.kreise, 'buchung', h, h) : null} papier={ertrag.papier} onPapier={(papier) => setErtrag({ papier })} />
+      ) : null}
     </>
   );
 }
@@ -101,14 +103,20 @@ export function BelegZumErtrag({ form, ertrag, setErtrag, stamm, ladeFehler, bel
 /* ---------- Nur buchen ---------- */
 
 /** Papier-Weg: buchen ohne Beleg aus Kladdy; die Buchungsnummer verbindet Papierquittung und Buchung. */
-function NurBuchen({ buchung }: { buchung: string | null }) {
+function NurBuchen({ buchung, papier, onPapier }: { buchung: string | null; papier: boolean; onPapier: (papier: boolean) => void }) {
   return (
     <div className="bu-nur">
+      <label className="bu-nur-check">
+        <input type="checkbox" checked={papier} onChange={(e) => onPapier(e.target.checked)} />
+        <span>
+          <b>Papierquittung liegt im Ordner</b>
+          <small>Ohne eingetragene Nummer gilt die Buchung dann als „Papier“ belegt.</small>
+        </span>
+      </label>
       <p>
-        <b>Gebucht wird ohne Beleg aus Kladdy.</b> Schreib die Buchungsnummer{' '}
-        {buchung ? <span className="mono bu-nur-nr">{buchung}</span> : null} auf deine Papierquittung, dann findest du
-        beides wieder. Eine Quittung aus Kladdy kannst du später jederzeit nachholen (Ein- & Ausgänge › Buchung ›
-        „Quittung ausstellen“).
+        <b>Gebucht wird ohne Beleg aus Kladdy.</b> Damit Zettel und Buchung zusammenfinden, schreib die Buchungsnummer{' '}
+        {buchung ? <span className="mono bu-nur-nr">{buchung}</span> : null} auf deine Papierquittung – oder trag links die
+        Nummer aus deinem Quittungsblock ein. Eine Quittung aus Kladdy kannst du später jederzeit nachholen.
       </p>
       <p className="muted">Blanko-Quittungen zum Ausfüllen von Hand druckst du unter Rechnungen & Quittungen › Neu.</p>
     </div>

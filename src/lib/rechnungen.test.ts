@@ -118,18 +118,19 @@ describe('Liste', () => {
   const oktober = { von: '2026-10-01', bis: '2026-10-31' };
   const nr = { feld: 'nr', richtung: -1 } as const;
 
-  it('Zeitraum nach Belegdatum, „Offen“ und Suche über alle Zeiträume', () => {
+  it('alle Zähler im Zeitraum, ältere offene als Hinweis, Suche über alle Zeiträume', () => {
     const r = filtere(alle, { reiter: 'ausgestellt', q: '', zeitraum: oktober, sortierung: nr, heute: HEUTE });
     expect(r.zeilen.map((z) => z.id)).toEqual([4, 2]);
-    expect(r.reiter).toEqual({ ausgestellt: 2, offen: 1, bezahlt: 1, entwuerfe: 1 });
+    expect(r.reiter).toEqual({ ausgestellt: 2, offen: 0, bezahlt: 1, entwuerfe: 1 });
+    expect(r.offenFrueher).toBe(1);
     const entwuerfe = filtere(alle, { reiter: 'entwuerfe', q: '', zeitraum: oktober, sortierung: nr, heute: HEUTE });
     expect(entwuerfe.zeilen.map((z) => z.id)).toEqual([3]);
-    expect(entwuerfe.ohneZeitraum).toBe(true);
+    expect(entwuerfe.ohneZeitraum).toBe(false);
     expect(r.ueberfaellig).toBe(1);
     expect(r.ohneZeitraum).toBe(false);
-    const offen = filtere(alle, { reiter: 'offen', q: '', zeitraum: oktober, sortierung: nr, heute: HEUTE });
+    const offen = filtere(alle, { reiter: 'offen', q: '', zeitraum: null, sortierung: nr, heute: HEUTE });
     expect(offen.zeilen.map((z) => z.id)).toEqual([1]);
-    expect(offen.ohneZeitraum).toBe(true);
+    expect(offen.offenFrueher).toBe(0);
     const suche = filtere(alle, { reiter: 'bezahlt', q: 'kaiser', zeitraum: oktober, sortierung: nr, heute: HEUTE });
     expect(suche.zeilen.map((z) => z.id)).toEqual([4, 1]);
     const betrag = filtere(alle, { reiter: 'ausgestellt', q: '65,00', zeitraum: null, sortierung: nr, heute: HEUTE });

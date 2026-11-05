@@ -8,7 +8,7 @@ import { ArrowLeft } from 'lucide-react';
 import { BEREICHE, bereichPfad, isEinstellungen } from '../../lib/einstellungen-index';
 import { datenbankVerfuegbar } from '../../lib/db';
 import { NAV, START } from '../../lib/navigation';
-import { ladeOhneBelegAnzahl } from '../../lib/queries/buchungen';
+import { } from '../../lib/queries/buchungen';
 import { ladeUeberfaelligAnzahl } from '../../lib/queries/rechnungen';
 import { ladeTerminZaehler } from '../../lib/queries/termine';
 import { heute } from '../../lib/zeitraum';
@@ -17,22 +17,8 @@ import { Marke } from '../ui/Firmenlogo';
 
 const isActive = (path: string, to: string) => path === to || path.startsWith(to + '/');
 
-/** Zähler an „Ein- & Ausgänge“: Zahlungen ohne Beleg (§6.1). Neu geladen nach jedem Schreiben (datenStand). */
-function useOhneBeleg(): number {
-  const stand = useUi((s) => s.datenStand);
-  const [n, setN] = useState(0);
-  useEffect(() => {
-    if (!datenbankVerfuegbar()) return;
-    let aktiv = true;
-    ladeOhneBelegAnzahl()
-      .then((x) => aktiv && setN(x))
-      .catch(() => undefined);
-    return () => {
-      aktiv = false;
-    };
-  }, [stand]);
-  return n;
-}
+/* Kein Zähler an „Ein- & Ausgänge“: Buchungen ohne Datei sind beim Arbeiten mit Papierquittungen normal (Filter „ohne Beleg“
+ * in der Liste bleibt). */
 
 /** Roter Zähler an „Rechnungen & Quittungen“: überfällige Rechnungen (§6.1). */
 function useUeberfaellig(): number {
@@ -69,7 +55,6 @@ function useTermineZaehler(): { heute: number; offen: number } {
 }
 
 function Hauptmenue({ pathname }: { pathname: string }) {
-  const ohneBeleg = useOhneBeleg();
   const ueberfaellig = useUeberfaellig();
   const termine = useTermineZaehler();
   return (
@@ -83,13 +68,8 @@ function Hauptmenue({ pathname }: { pathname: string }) {
                 <Link to={to} title={label} aria-current={active ? 'page' : undefined}>
                   <Icon />
                   <span className="sb-label">{label}</span>
-                  {to === '/ein-ausgaenge' && ohneBeleg > 0 ? (
-                    <span className="sb-badge" title={`${ohneBeleg} ohne Beleg`}>
-                      {ohneBeleg}
-                    </span>
-                  ) : null}
                   {to === '/termine' && termine.offen > 0 ? (
-                    <span className="sb-badge alarm" title={`${termine.offen} nachtragen bzw. ohne Beleg`}>
+                    <span className="sb-badge warn" title={`${termine.offen} Termin${termine.offen === 1 ? '' : 'e'} nachtragen`} aria-label={`${termine.offen} nachtragen`}>
                       {termine.offen}
                     </span>
                   ) : to === '/termine' && termine.heute > 0 ? (
@@ -98,7 +78,7 @@ function Hauptmenue({ pathname }: { pathname: string }) {
                     </span>
                   ) : null}
                   {to === '/belege' && ueberfaellig > 0 ? (
-                    <span className="sb-badge alarm" title={`${ueberfaellig} überfällig`}>
+                    <span className="sb-badge alarm" title={`${ueberfaellig} Rechnung${ueberfaellig === 1 ? '' : 'en'} überfällig`} aria-label={`${ueberfaellig} überfällig`}>
                       {ueberfaellig}
                     </span>
                   ) : null}

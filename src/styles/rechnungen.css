@@ -274,3 +274,17 @@
 /* Unterschriebenes Exemplar: kompakt unter den Belegdaten */
 .bl-scan .bl-drop { min-height: 0; padding: 12px 14px; flex-direction: row; gap: 10px; justify-content: flex-start; text-align: left; }
 .bl-scan .bl-drop small { margin-left: auto; }
+
+/* Hinweis auf offene Rechnungen aus früheren Monaten (Zähler der Reiter gelten nur für den Zeitraum) */
+.bl-frueher { display: inline-flex; align-items: center; gap: 6px; margin-left: 10px; padding: 5px 10px; border-radius: 999px; font-size: .78rem; font-weight: 600;
+  color: var(--text-2); background: var(--surface-2); border: 1px solid var(--border); }
+.bl-frueher:hover { border-color: var(--border-strong); color: var(--text); }
+.bl-frueher .ic { width: 14px; height: 14px; }
+.bl-frueher.alarm { color: var(--neg); border-color: color-mix(in oklab, var(--neg) 40%, transparent); background: color-mix(in oklab, var(--neg) 8%, var(--surface)); }
+.bl-hinweiszeile { padding: 8px 14px; border-bottom: 1px solid var(--border); }
+.bl-hinweiszeile .bl-frueher { margin-left: 0; }
+.bl-tabsl .bl-zr { margin-left: 4px; }
+.bl-list .page-actions { flex-wrap: nowrap; align-items: center; }
+.bl-list .page-actions .bl-filter { width: 230px; flex: none; }
+.bl-list .page-actions .bl-filter .input { height: 42px; }
+.bl-list .page-actions .bl-filter .ic { top: 13px; }

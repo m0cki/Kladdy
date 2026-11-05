@@ -343,7 +343,7 @@ function Liste({ zeilen, kategorien, zeitraumLabel }: { zeilen: BuchungZeile[]; 
                 <div className="bu-pop-sec">
                   <label className="toggle-row bu-pop-ob">
                     <span>
-                      Nur ohne Beleg
+                      Nur ohne Beleg (weder Datei noch Belegnummer)
                       <small>{anzahlText(r.ohneBeleg)}</small>
                     </span>
                     <span className="switch">
@@ -490,7 +490,7 @@ function Zeile({ b, q }: { b: BuchungZeile; q: string }) {
               className="badge warn bu-missing"
               title={`Für diesen Eintrag fehlt noch der Beleg. ${b.typ === 'einnahme' ? 'Datei anhängen oder Quittung bzw. Rechnung erstellen.' : 'Datei anhängen oder Eigenbeleg erstellen.'}`}
             >
-              {nr ? 'Datei fehlt' : 'Beleg fehlt'}
+              Beleg fehlt
             </span>
           ) : null}
           {!nr && !b.belege_anzahl && !fehltBeleg(b) ? <span className="bu-dash">ohne Beleg</span> : null}

@@ -5,7 +5,7 @@
  */
 
 /* ============ Monogramm: nur der Farbton kommt aus dem Namen (--h, Monogramm.tsx) ============ */
-.ku-mono { --b: hsl(var(--h, 210) 55% 48%); }
+.ku-mono { --b: color-mix(in oklab, var(--accent) 78%, var(--text-2)); } /* einheitlich ruhig statt Zufallsfarben je Name */
 
 /* ============ Schublade: Fuß gehört dem Inhalt (Portal), Platzhalter ohne eigene Box ============ */
 .ku-fuss { display: contents; }

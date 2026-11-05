@@ -105,6 +105,8 @@ describe('Start und Hinweise', () => {
     expect(ertragStart({ beleg: 'quittung' }, 'quittung', 'ohne').weg).toBe('beleg');
     expect(ertragStart({ termin: 4 }, 'quittung', 'ohne').weg).toBe('beleg');
     expect(ertragStart({ entwurf: 9 }, 'rechnung', 'ohne').weg).toBe('beleg');
+    expect(ertragStart({}, 'quittung', 'ohne').papier).toBe(true);
+    expect(ertragStart({}, 'quittung').papier).toBe(false);
   });
 
   it('Vorschau der nächsten Buchungsnummer wie der Belegnummern', () => {

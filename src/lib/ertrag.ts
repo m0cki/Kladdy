@@ -48,7 +48,12 @@ export interface Ertrag {
   leistung: string;
   /** „Offene Rechnung zuordnen“: die gewählte Rechnung */
   offenId: number | null;
+  /** „Nur buchen“: eine Papierquittung liegt im Ordner (ohne eingetragene Nummer wird die Buchung als „Papier“ belegt) */
+  papier: boolean;
 }
+
+/** Belegnummer, die eine Buchung mit Papierquittung ohne eigene Nummer bekommt (gilt dann nicht als „ohne Beleg“). */
+export const PAPIER_BELEG = 'Papier';
 
 /** Start: vom Aufrufer vorgewählter Beleg ⇒ „Beleg erstellen“; mit mitgebrachter Datei (Drop) ⇒ „Nur buchen“; sonst
  *  die Einstellung „Neue Einnahme“ (`standardWeg`).
@@ -66,6 +71,7 @@ export function ertragStart(
     adresse: '',
     leistung: '',
     offenId: null,
+    papier: standardWeg === 'ohne',
   };
 }
 

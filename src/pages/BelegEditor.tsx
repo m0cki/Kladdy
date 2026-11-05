@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { open as dateiDialog } from '@tauri-apps/plugin-dialog';
 import {
+  Ban,
   Banknote,
   Blocks,
   CalendarDays,
@@ -97,6 +98,7 @@ import {
   formularZuDokument,
   neuesFormular,
   preisEingabe,
+  statusMenue,
   type BelegFormular,
   type BelegZeile,
   type FormularFehler,
@@ -676,6 +678,12 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
               Löschen
             </button>
           ) : null}
+          {!editierbar && zeile && statusMenue(zeile, h).punkte.some((p) => p.aktion === 'stornieren') ? (
+            <button type="button" className="btn ghost bl-storno-btn" title="Beleg ungültig machen – die Nummer bleibt vergeben, eine Einnahme wird zurückgenommen (GoBD)" onClick={() => statusAktionAusfuehren('stornieren', zeile, navigate)}>
+              <Ban />
+              Stornieren …
+            </button>
+          ) : null}
           {!editierbar && zeile ? (
             <button type="button" className="btn ghost" onClick={() => statusAktionAusfuehren('duplizieren', zeile, navigate)}>
               <Copy />
@@ -781,9 +789,9 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
                   </select>
                 </label>
               ) : (
-                <span className="bl-vl" title="Beim Ausstellen eingefroren – ein Nachdruck sieht aus wie das Original">
+                <span className="bl-vl" title="Die Vorlage ist beim Ausstellen mitgespeichert – ein Nachdruck sieht genauso aus wie das Original, auch wenn du die Vorlage später änderst">
                   <Blocks />
-                  Vorlage <b>eingefroren</b>
+                  Gedruckt wie beim Ausstellen
                 </span>
               )}
               {editierbar ? (

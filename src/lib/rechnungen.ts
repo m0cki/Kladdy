@@ -119,9 +119,9 @@ export const anzahlUeberfaellig = (zeilen: readonly BelegZeile[], heute: string)
 export type Reiter = 'ausgestellt' | 'offen' | 'bezahlt' | 'entwuerfe';
 export const REITER: readonly { value: Reiter; label: string; titel: string }[] = [
   { value: 'ausgestellt', label: 'Ausgestellt', titel: 'Alle Belege mit Nummer im gewählten Zeitraum' },
-  { value: 'offen', label: 'Offen', titel: 'Offene Rechnungen aus allen Zeiträumen, überfällige zuerst' },
+  { value: 'offen', label: 'Offen', titel: 'Offene Rechnungen im gewählten Zeitraum' },
   { value: 'bezahlt', label: 'Bezahlt', titel: 'Bezahlte Rechnungen, Quittungen und gebuchte Eigenbelege im gewählten Zeitraum' },
-  { value: 'entwuerfe', label: 'Entwürfe', titel: 'Entwürfe und für Termine vorbereitete Belege (noch ohne Nummer), alle Zeiträume' },
+  { value: 'entwuerfe', label: 'Entwürfe', titel: 'Entwürfe und für Termine vorbereitete Belege (noch ohne Nummer) im gewählten Zeitraum' },
 ];
 
 /** Reiter aus der Adresse (?reiter=…); alte Werte: „alle“ ⇒ Ausgestellt. */
@@ -139,8 +139,6 @@ export function passtReiter(z: BelegZeile, r: Reiter): boolean {
   return !!z.nummer;
 }
 
-/** Reiter, die unabhängig vom Zeitraum alles zeigen */
-export const REITER_OHNE_ZEITRAUM: ReadonlySet<Reiter> = new Set<Reiter>(['offen', 'entwuerfe']);
 
 export type ListenZeitraumModus = 'monat' | 'jahr' | 'gesamt';
 export const LISTEN_ZEITRAEUME: readonly { value: ListenZeitraumModus; label: string }[] = [
@@ -192,11 +190,13 @@ export function vergleiche(a: BelegZeile, b: BelegZeile, s: Sortierung): number 
 
 export interface ListenErgebnis {
   zeilen: BelegZeile[];
-  /** Zähler an den Reitern: im Zeitraum, „Offen“ und „Entwürfe“ immer über alle */
+  /** Zähler an den Reitern: alle im selben Zeitraum (Ausgestellt = Offen + Bezahlt + Angebote/Stornos) */
   reiter: Record<Reiter, number>;
   ueberfaellig: number;
-  /** Suche, „Offen“ oder „Entwürfe“: über alle Zeiträume (die Suche auch über alle Reiter) */
+  /** Suche: über alle Zeiträume und alle Reiter */
   ohneZeitraum: boolean;
+  /** offene Rechnungen mit Belegdatum vor dem Zeitraum (Hinweis „aus früheren Monaten“) */
+  offenFrueher: number;
 }
 
 export function filtere(
@@ -208,12 +208,13 @@ export function filtere(
   const imZr = alle.filter(imZeitraum);
   const reiter: Record<Reiter, number> = {
     ausgestellt: imZr.filter((z) => passtReiter(z, 'ausgestellt')).length,
-    offen: alle.filter((z) => passtReiter(z, 'offen')).length,
+    offen: imZr.filter((z) => passtReiter(z, 'offen')).length,
     bezahlt: imZr.filter((z) => passtReiter(z, 'bezahlt')).length,
-    entwuerfe: alle.filter((z) => passtReiter(z, 'entwuerfe')).length,
+    entwuerfe: imZr.filter((z) => passtReiter(z, 'entwuerfe')).length,
   };
+  const offenFrueher = o.zeitraum ? alle.filter((z) => passtReiter(z, 'offen') && !!z.datum && z.datum < (o.zeitraum?.von ?? '')).length : 0;
   const suche = woerter.length > 0;
-  const ohneZeitraum = suche || REITER_OHNE_ZEITRAUM.has(o.reiter);
+  const ohneZeitraum = suche;
   const basis = ohneZeitraum ? alle : imZr;
   const zeilen = basis
     .filter((z) => suche || passtReiter(z, o.reiter))
@@ -223,7 +224,7 @@ export function filtere(
       return woerter.every((w) => h.includes(w));
     })
     .sort((a, b) => vergleiche(a, b, o.sortierung));
-  return { zeilen, reiter, ueberfaellig: anzahlUeberfaellig(alle, o.heute), ohneZeitraum };
+  return { zeilen, reiter, ueberfaellig: anzahlUeberfaellig(alle, o.heute), ohneZeitraum, offenFrueher };
 }
 
 /** Spalte „Fällig / Zahlung“ (Prototyp faelligHTML). `klasse`: 'neg' | 'warn' | 'muted' | ''. */

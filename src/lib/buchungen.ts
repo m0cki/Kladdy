@@ -65,8 +65,11 @@ export interface BuchungZeile {
 /* ================= Regeln ================= */
 
 /** Fehlt der Beleg? Nur echte Zahlungen, nicht storniert, ohne Datei und ohne eigenen Beleg (QU/RE). */
-export const fehltBeleg = (b: Pick<BuchungZeile, 'art' | 'storniert' | 'belege_anzahl' | 'rechnung_id'>): boolean =>
-  b.art === 'zahlung' && !b.storniert && !b.belege_anzahl && b.rechnung_id == null;
+/** Fehlt der Beleg? Nein, wenn eine Datei dranhängt, ein eigener Beleg (QU/RE) verknüpft ist oder eine Belegnummer
+ *  eingetragen ist (z. B. die Nummer einer Papierquittung oder eines Kassenbons – der Beleg liegt dann im Ordner). */
+export const fehltBeleg = (
+  b: Pick<BuchungZeile, 'art' | 'storniert' | 'belege_anzahl' | 'rechnung_id'> & { belegnummer?: string | null },
+): boolean => b.art === 'zahlung' && !b.storniert && !b.belege_anzahl && b.rechnung_id == null && !b.belegnummer?.trim();
 
 export type Sperre = 'storniert' | 'beleg' | 'festgeschrieben' | 'modul';
 

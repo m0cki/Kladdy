@@ -12,7 +12,7 @@
 .vl-blocks { list-style: none; margin: 0 -8px; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .vl-blocks.zieht, .vl-blocks.zieht * { cursor: grabbing; }
 .vl-blk {
-  position: relative; display: flex; align-items: center; gap: 8px; padding: 7px 6px 7px 4px; border-radius: var(--radius-sm); cursor: pointer;
+  position: relative; display: flex; align-items: center; gap: 8px; padding: 4px 6px 4px 4px; border-radius: var(--radius-sm); cursor: pointer;
   transition: background .2s, opacity .2s, box-shadow .2s;
 }
 .vl-blk:hover { background: var(--hover); }
@@ -26,9 +26,11 @@
 .vl-blk:hover .vl-grip, .vl-grip:focus-visible { opacity: 1; }
 .vl-grip:hover { color: var(--text); }
 .vl-grip .ic { width: 16px; height: 16px; }
-.vl-ic { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; flex: none; background: var(--surface-2); border: 1px solid var(--border); color: var(--accent-text); }
+.vl-ic { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; flex: none; background: var(--surface-2); border: 1px solid var(--border); color: var(--accent-text); }
 .vl-ic .ic { width: 16px; height: 16px; }
-.vl-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; text-align: left; border-radius: 6px; }
+.vl-meta { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; text-align: left; border-radius: 6px; }
+.vl-meta b { flex: none; }
+.vl-meta small { flex: 1; min-width: 0; }
 .vl-meta b { font-size: .86rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vl-meta small { font-size: .72rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vl-blk .icon-btn { opacity: 0; transition: opacity .15s, background .2s, color .2s; }
@@ -190,3 +192,9 @@
 .fe-feld > .fe-leiste.fest { position: absolute; top: 6px; right: 6px; z-index: 1; padding: 1px; border-color: transparent; background: transparent; }
 .fe-feld:has(> .fe-leiste.fest) > .fe-eingabe { padding-right: 104px; }
 .fe-feld > .fe-leiste.fest .fe-btn { height: 26px; min-width: 26px; }
+
+/* Pflichtangaben als aufklappbare Zusammenfassung (offen, sobald etwas fehlt) */
+.vl-check-karte > summary { list-style: none; cursor: pointer; margin-bottom: 0; }
+.vl-check-karte > summary::-webkit-details-marker { display: none; }
+.vl-check-karte[open] > summary { margin-bottom: 12px; }
+.vl-check-karte > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 6px; }
