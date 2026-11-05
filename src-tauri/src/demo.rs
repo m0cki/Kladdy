@@ -530,8 +530,8 @@ pub async fn fuellen(
             // Trigger festgeschrieben (Migration 0007), genau wie beim Ausstellen in rechnungen.rs.
             let id = sqlx::query(
                 "INSERT INTO rechnungen (art, nummer, status, kunde_id, kunde_name, kunde_adresse, kunde_nummer, datum,
-                   faellig_am, betreff, summe_cent, termin_id, bezahlt_am, erstellt_am, geaendert_am)
-                 VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                   leistung_von, faellig_am, betreff, summe_cent, termin_id, bezahlt_am, erstellt_am, geaendert_am)
+                 VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             )
             .bind(&r.art)
             .bind(&r.status)
@@ -540,6 +540,8 @@ pub async fn fuellen(
             .bind(adresse)
             .bind(kundennummer)
             .bind(&r.datum)
+            // Leistungsdatum wie in der Maske: ohne eigene Angabe das Belegdatum (Angebote haben keins)
+            .bind((r.art != "angebot").then_some(&r.datum))
             .bind(&r.faellig_am)
             .bind(&r.betreff)
             .bind(summe(&r.positionen))
