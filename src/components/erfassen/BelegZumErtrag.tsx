@@ -141,8 +141,8 @@ function NurBuchen({
         <span>
           <b>Papierquittung im Ordner</b>
           <small>
-            Nummer der Quittung eintragen – oder leer lassen und {buchung ? <span className="mono bu-nur-nr">{buchung}</span> : 'die Buchungsnummer'} auf den
-            Zettel schreiben.
+            Nummer der Quittung eintragen. Hat sie keine, schreib die Buchungsnummer{' '}
+            {buchung ? <span className="mono bu-nur-nr">{buchung}</span> : null} auf den Zettel.
           </small>
         </span>
       </label>

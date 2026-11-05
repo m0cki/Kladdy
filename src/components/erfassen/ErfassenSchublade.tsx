@@ -1178,7 +1178,7 @@ function FormularInhalt(props: InhaltProps) {
               );
             })}
           </div>
-          {form.zahlungsart === 'bar' && !ro && weg !== 'beleg' ? (
+          {form.zahlungsart === 'bar' && !ro && ausgabe ? (
             <p className="hint">Bargeld einzeln und zeitnah festhalten (§ 146 AO) – Bon bzw. Quittung aufheben.</p>
           ) : null}
         </section>

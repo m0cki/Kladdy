@@ -202,7 +202,7 @@ function NeuMenue({ naechste }: { naechste: Partial<Record<Belegart, string>> })
           <Printer />
           <span>
             <b>Blanko-Quittung</b>
-            <small>Von Hand ausfüllen, ohne Nummer – zuordnen über die Buchungsnummer</small>
+            <small>Von Hand ausfüllen – eigene Nummer eintragen und beim Buchen angeben</small>
           </span>
           <span />
         </button>
@@ -223,7 +223,7 @@ function Kopf({ naechste, suche }: { naechste: Partial<Record<Belegart, string>>
           <FileText />
           Rechnungen &amp; Quittungen
         </h1>
-        <p className="page-sub">Alle Belege mit laufender Nummer · es zählt das Belegdatum</p>
+        <p className="page-sub">Quittungen, Rechnungen, Angebote und Eigenbelege mit laufender Nummer · es zählt das Belegdatum</p>
       </div>
       <div className="page-actions">
         {suche}
@@ -404,6 +404,12 @@ function Liste({ zeilen, naechste }: { zeilen: BelegZeile[]; naechste: Partial<R
                   <>
                     {t.label}
                     <span className="cnt">{zahl(r.reiter[t.value])}</span>
+                    {t.value === 'offen' && r.ueberfaellig > 0 ? (
+                      <span className="bl-ueber" title="Überfällige Rechnungen (auch aus früheren Zeiträumen)">
+                        <TriangleAlert />
+                        {zahl(r.ueberfaellig)} überfällig
+                      </span>
+                    ) : null}
                   </>
                 ),
               }))}

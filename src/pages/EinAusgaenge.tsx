@@ -4,7 +4,8 @@
  * Filter und Zeitraum lassen sich per Adresse vorgeben (Sprung aus der Auswertung, lib/buchungen.ts → listenVorgabe).
  * Büroklammer öffnet den Beleg (mehrere: Menü), „Beleg anhängen …“ im Zeilenmenü (nicht bei Gegenbuchungen).
  * Optik und Verhalten wie referenz/prototyp/js/pages/buchungen.js; Logik in lib/buchungen.ts, Daten in lib/queries/buchungen.ts. */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeftRight,
@@ -117,9 +118,7 @@ export default function EinAusgaenge() {
           </h1>
           <p className="page-sub">Alle geschäftlichen Zahlungen · es zählt das Zahlungsdatum</p>
         </div>
-        <div className="bu-head-zeit">
-          <ZeitraumWahl modus={modus} anker={anker} onChange={setZeitraum} />
-        </div>
+        <div className="bu-head-suche" id="bu-suche-slot" />
         <div className="bu-head-neu">
           <button type="button" className="btn-primary head-add" title="Einnahme oder Ausgabe erfassen (⌘N)" onClick={() => erfassen()}>
             <Plus />
@@ -128,7 +127,13 @@ export default function EinAusgaenge() {
         </div>
       </div>
       {zustand.status === 'ok' ? (
-        <Liste key={listenKey} zeilen={zustand.daten.zeilen} kategorien={zustand.daten.kategorien} zeitraumLabel={z.label} />
+        <Liste
+          key={listenKey}
+          zeilen={zustand.daten.zeilen}
+          kategorien={zustand.daten.kategorien}
+          zeitraumLabel={z.label}
+          zeitraumWahl={<ZeitraumWahl modus={modus} anker={anker} onChange={setZeitraum} />}
+        />
       ) : (
         <Ladeansicht zustand={zustand} icon={ArrowLeftRight} was="Ein- und Ausgänge" erneut={erneut} />
       )}
@@ -147,7 +152,21 @@ const TABS: { value: TypFilter; label: string }[] = [
 // Filter überleben den Seitenwechsel (wie im Prototyp: Modulvariable)
 let gemerkterFilter: Filter = LEERER_FILTER;
 
-function Liste({ zeilen, kategorien, zeitraumLabel }: { zeilen: BuchungZeile[]; kategorien: KategorieWahl[]; zeitraumLabel: string }) {
+function Liste({
+  zeilen,
+  kategorien,
+  zeitraumLabel,
+  zeitraumWahl,
+}: {
+  zeilen: BuchungZeile[];
+  kategorien: KategorieWahl[];
+  zeitraumLabel: string;
+  /** Zeitraum steht bei den Reitern (wie auf „Rechnungen & Quittungen“) */
+  zeitraumWahl: ReactNode;
+}) {
+  // Suche steht im Seitenkopf (wie auf „Rechnungen & Quittungen“ und „Kunden“), ihr Zustand bleibt hier
+  const [sucheSlot, setSucheSlot] = useState<HTMLElement | null>(null);
+  useLayoutEffect(() => setSucheSlot(document.getElementById('bu-suche-slot')), []);
   const [f, setF] = useState<Filter>(gemerkterFilter);
   const [q, setQ] = useState(f.q); // Eingabe sofort, Filter kurz entprellt
   const [pop, setPop] = useState(false);
@@ -265,26 +284,30 @@ function Liste({ zeilen, kategorien, zeitraumLabel }: { zeilen: BuchungZeile[]; 
               ),
             }))}
           />
+          {zeitraumWahl}
+          {sucheSlot ? createPortal(
           <label className="bu-search">
-            <Search />
-            <input
-              type="search"
-              className="input sm"
-              value={q}
-              placeholder="Suchen …"
-              aria-label="Einnahmen und Ausgaben durchsuchen (Text, Nr., Name, Betrag)"
-              autoComplete="off"
-              spellCheck={false}
-              onChange={(e) => setQ(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape' && q) {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  sucheLeeren();
-                }
-              }}
-            />
-          </label>
+              <Search />
+              <input
+                type="search"
+                className="input sm"
+                value={q}
+                placeholder="Suchen …"
+                aria-label="Einnahmen und Ausgaben durchsuchen (Text, Nr., Name, Betrag)"
+                autoComplete="off"
+                spellCheck={false}
+                onChange={(e) => setQ(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape' && q) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    sucheLeeren();
+                  }
+                }}
+              />
+            </label>,
+            sucheSlot,
+          ) : null}
           <span className="spacer" />
           {r.ohneBeleg || f.ohneBeleg ? (
             <button type="button" className={`bu-ob-link ${f.ohneBeleg ? 'on' : ''}`} onClick={() => setF((x) => ({ ...x, ohneBeleg: !x.ohneBeleg }))}>

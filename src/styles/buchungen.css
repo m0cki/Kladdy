@@ -369,3 +369,10 @@
 .bu-nur-opt > span { display: grid; gap: 2px; }
 .bu-nur-opt small { color: var(--text-2); font-size: .78rem; line-height: 1.4; }
 .bu-nur-in { margin-left: 27px; width: calc(100% - 27px); }
+/* Suche im Seitenkopf, links vom Erfassen-Knopf (wie Rechnungen & Quittungen) */
+.bu-head-suche { flex: none; align-self: center; display: flex; }
+.bu-head-suche .bu-search { width: 230px; max-width: none; flex: none; }
+.bu-head-suche .bu-search .input { height: 42px; }
+.bu-head-neu { flex: 0 0 auto; }
+.bu-bar-top .zr, .bu-bar-top .period { flex: none; }
+#bf-betrag::placeholder { color: var(--muted); opacity: .55; }

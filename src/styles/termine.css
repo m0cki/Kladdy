@@ -86,7 +86,7 @@ button.tm-kunde:hover { color: var(--accent-text); text-decoration: underline; }
 .tm-chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 99px; font-size: .72rem; font-weight: 600; white-space: nowrap;
   border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2); transition: border-color .15s, color .15s, background .15s; }
 .tm-chip .ic { width: 13px; height: 13px; color: var(--muted); }
-.tm-chip.vor { border-style: dashed; border-color: var(--accent-line); background: var(--accent-soft); color: var(--text); }
+.tm-chip.vor { border-style: dashed; border-color: var(--border-strong); background: transparent; color: var(--text-2); } /* vorbereitet: leise, steht oft da */
 .tm-chip.vor .ic { color: var(--accent-text); }
 .tm-chip.ok { font-family: var(--mono); color: var(--text); border-color: color-mix(in oklab, var(--pos) 40%, transparent); background: color-mix(in oklab, var(--pos) 10%, transparent); }
 .tm-chip.ok .tm-ok { color: var(--pos); width: 14px; height: 14px; }

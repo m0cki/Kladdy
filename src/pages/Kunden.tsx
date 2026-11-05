@@ -186,6 +186,7 @@ function Liste({ index, h, o, setO, tbodyRef, suchFeld, sucheLeeren }: ListeProp
     <section className="card flush ku-liste reveal" style={reveal(1)}>
       <div className="ku-bar">
         <Seg
+          className="tabs"
           ariaLabel="Kunden filtern"
           value={o.filter}
           onChange={(filter) => setO((x) => ({ ...x, filter }))}

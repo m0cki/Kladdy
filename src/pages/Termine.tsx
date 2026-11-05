@@ -259,6 +259,7 @@ function Agenda({
     <section className="card flush tm-liste reveal" style={reveal(1)}>
       <div className="tm-bar">
         <Seg<TerminFilter>
+          className="tabs"
           ariaLabel="Termine filtern"
           value={filter}
           onChange={(f) => {

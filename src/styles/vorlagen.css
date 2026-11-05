@@ -217,4 +217,26 @@
 /* Griff und Aktionen gut sichtbar und groß genug */
 .vl-grip { opacity: .8; width: 22px; }
 .vl-grip .ic { width: 18px; height: 18px; }
-.vl-blk .icon-btn { opacity: .55; }
+.vl-blk .icon-btn { opacity: 0; }
+.vl-blk:hover .icon-btn, .vl-blk:focus-within .icon-btn { opacity: 1; }
+.vl-blk.on .icon-btn { opacity: 0; pointer-events: none; } /* beim gewählten stehen beschriftete Knöpfe darunter */
+
+/* Stand der Vorlage dauerhaft sichtbar */
+.vl-stand { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; }
+.vl-stand-chip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 99px; font-size: .78rem; font-weight: 650;
+  background: var(--surface-3); color: var(--text-2); }
+.vl-stand-chip .ic { width: 13px; height: 13px; }
+.vl-stand-chip.eigen { background: color-mix(in oklab, var(--pos) 14%, transparent); color: var(--pos); }
+/* Pflichtbausteine */
+.vl-pflicht { display: inline-flex; align-items: center; gap: 3px; margin-left: 8px; padding: 0 7px; border-radius: 99px; font-size: .72rem; font-weight: 650;
+  background: var(--surface-3); color: var(--text-2); vertical-align: 1px; }
+.vl-pflicht .ic { width: 11px; height: 11px; }
+.vl-pflicht-hinweis { display: inline-flex; align-items: center; gap: 5px; font-size: .78rem; color: var(--text-2); font-weight: 600; }
+.vl-pflicht-hinweis .ic { width: 13px; height: 13px; }
+/* beschriftete Aktionen des gewählten Bausteins */
+.vl-karte-aktionen { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+.vl-karte-aktionen .btn.sm { height: 32px; padding: 0 10px; font-size: .8rem; gap: 5px; }
+.vl-karte-aktionen .btn.sm .ic { width: 14px; height: 14px; }
+.vl-del-btn:hover { color: var(--neg); }
+.vl-reihe { display: inline-flex; align-items: center; gap: 2px; padding: 2px 4px 2px 10px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border); }
+.vl-reihe-l { font-size: .78rem; color: var(--text-2); font-weight: 600; margin-right: 4px; }

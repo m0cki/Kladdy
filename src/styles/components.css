@@ -244,7 +244,7 @@ button.chip:hover { border-color: var(--border-strong); color: var(--text); }
 .seg-ind { position: absolute; left: 0; top: 0; border-radius: 9px; background: var(--surface); box-shadow: 0 1px 3px rgb(0 0 0 / .18), 0 0 0 1px var(--border-strong); }
 .seg.ready .seg-ind { transition: transform .35s var(--ease), width .35s var(--ease); }
 .seg.tabs { background: transparent; border: 0; padding: 0; gap: 4px; }
-.seg.tabs button { padding: 8px 14px; font-size: .86rem; }
+.seg.tabs button { padding: 8px 11px; font-size: .86rem; }
 .seg.tabs .seg-ind { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent-line); }
 .seg.full { display: flex; }
 .seg.full button { flex: 1; justify-content: center; }
@@ -622,7 +622,7 @@ input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 7px; }
 
 /* Hinweis unter dem Menüpunkt in Worten (statt Zähler ohne Erklärung) */
 .sb-nav .sb-label { display: flex; flex-direction: column; min-width: 0; }
-.sb-nav .sb-hint { font-size: .72rem; font-weight: 600; line-height: 1.2; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sb-nav .sb-hint { font-size: .76rem; font-weight: 650; line-height: 1.2; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sb-nav .sb-hint.warn { color: var(--warn); }
 .sb-nav .sb-hint.alarm { color: var(--neg); }
 .sb-collapsed .sb-hint { display: none; }

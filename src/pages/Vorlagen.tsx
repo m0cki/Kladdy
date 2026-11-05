@@ -180,9 +180,9 @@ const TX_KLASSE: Readonly<Record<TexTeilArt, string>> = { kommentar: 'tx-c', bef
 /** Hinweis unter dem Blanko-Formular: von Hand ausgefüllt heißt nicht gebucht */
 const BLANKO_HINWEIS: Readonly<Record<Belegart, string>> = {
   quittung:
-    'Ohne Nummer, nichts wird gespeichert. Buchen über „+ Erfassen“ › „Nur buchen“, dann die Buchungsnummer ins Feld „Nr.“ schreiben.',
+    'Ohne Nummer gedruckt, nichts wird gespeichert. Trag deine eigene Quittungsnummer ins Feld „Nr.“ ein (z. B. 17) und gib sie beim Buchen unter „Nur buchen“ › „Papierquittung“ an.',
   eigenbeleg:
-    'Ohne Nummer, nichts wird gespeichert. Die Ausgabe über „+ Erfassen“ buchen, dann die Buchungsnummer ins Feld „Nr.“ schreiben.',
+    'Ohne Nummer gedruckt, nichts wird gespeichert. Trag eine eigene Nummer ins Feld „Nr.“ ein und gib sie beim Buchen der Ausgabe als Beleg-Nr. an.',
   rechnung: '',
   angebot: '',
 };
@@ -849,6 +849,12 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
     [echtDoc, blanko, art, basis, logo],
   );
   const pflicht = useMemo(() => pflichtCheck(doc, bausteine), [doc, bausteine]);
+  /** Bausteine, ohne die eine Pflichtangabe fehlen würde (§ 33/§ 34a UStDV): nicht ausblenden, nicht entfernen */
+  const pflichtBausteine = useMemo(() => {
+    const fehlen = (liste: readonly Baustein[]) => pflichtCheck(doc, liste).filter((p) => !p.ok).length;
+    const jetzt = fehlen(bausteine);
+    return new Set(bausteine.flatMap((b, i) => (!b.aus && fehlen(bausteine.filter((_, k) => k !== i)) > jetzt ? [i] : [])));
+  }, [doc, bausteine]);
   const eigeneFirma = basis.firma !== BEISPIEL_FIRMA;
 
   const quelleWaehlen = (q: Vorschauquelle) => {
@@ -1040,19 +1046,27 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
               </div>
               <div className="card-sub">
                 {wahl.id != null ? (
-                  <>
-                    <b>{wahl.name}</b> · eigene Vorlage
+                  <span className="vl-stand">
+                    <span className="vl-stand-chip eigen">
+                      <Check />
+                      Eigene Vorlage „{wahl.name}“ · gespeichert
+                    </span>
                     {gespeichert > 0 && (
                       <span key={gespeichert} className="vl-saved">
-                        <Check />
-                        gespeichert
+                        gerade eben
                       </span>
                     )}
-                  </>
+                  </span>
                 ) : geaendert && !mitDb ? (
                   `${wahl.name} · geändert, nur auf dieser Seite`
                 ) : (
-                  `${wahl.name} (mitgeliefert) – änderst du etwas, entsteht automatisch „Meine ${ARTEN[art].label}“`
+                  <span className="vl-stand">
+                    <span className="vl-stand-chip">
+                      <Lock />
+                      Mitgeliefert, unverändert
+                    </span>
+                    <span>Deine erste Änderung wird als „Meine {ARTEN[art].label}“ gespeichert.</span>
+                  </span>
                 )}
               </div>
             </div>
@@ -1102,7 +1116,15 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
                       <Icon />
                     </span>
                     <button type="button" className="vl-meta" aria-current={i === sel ? 'true' : undefined}>
-                      <b>{def.name}</b>
+                      <b>
+                        {def.name}
+                        {pflichtBausteine.has(i) ? (
+                          <span className="vl-pflicht" title="Enthält eine Pflichtangabe – kann nicht ausgeblendet oder entfernt werden">
+                            <Lock />
+                            Pflicht
+                          </span>
+                        ) : null}
+                      </b>
                       <small>
                         {zerlegen(zusammenfassung(b)).map((t, k) =>
                           t.art === 'text' ? t.text : (
@@ -1113,6 +1135,8 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
                         )}
                       </small>
                     </button>
+                    {pflichtBausteine.has(i) ? null : (
+                    <>
                     <button
                       type="button"
                       className="icon-btn sm vl-eye"
@@ -1137,6 +1161,8 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
                     >
                       <X />
                     </button>
+                    </>
+                    )}
                   </li>
                   {i === sel && !zug ? (
                     <li className="vl-inline" onClick={(e) => e.stopPropagation()}>
@@ -1145,8 +1171,11 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
                         b={b}
                         index={sel}
                         anzahl={bausteine.length}
+                        pflicht={pflichtBausteine.has(sel)}
                         setze={(key, wert) => setzen(sel, key, wert)}
                         schieben={(richtung) => schieben(sel, richtung, false)}
+                        umschalten={() => aendern(umschalten(bausteine, sel))}
+                        entfernen={() => wegnehmen(sel)}
                       />
                     </li>
                   ) : null}
@@ -1267,11 +1296,15 @@ interface KarteProps {
   b: Baustein | undefined;
   index: number;
   anzahl: number;
+  /** enthält eine Pflichtangabe: nicht ausblenden, nicht entfernen */
+  pflicht: boolean;
   setze: (key: string, wert: Einstellung) => void;
   schieben: (richtung: -1 | 1) => void;
+  umschalten: () => void;
+  entfernen: () => void;
 }
 
-function BausteinKarte({ b, index, anzahl, setze, schieben }: KarteProps) {
+function BausteinKarte({ b, index, anzahl, pflicht, setze, schieben, umschalten: ausEin, entfernen: weg }: KarteProps) {
   const felder = useRef<Record<string, FormatEditorHandle | null>>({});
   if (!b) return null;
   const def = BAUSTEINE[b.typ];
@@ -1289,14 +1322,35 @@ function BausteinKarte({ b, index, anzahl, setze, schieben }: KarteProps) {
           {def.beschreibung}
           {b.aus ? ' – im Blatt ausgeblendet' : ''}
         </p>
-        <div className="row vl-move">
+      </div>
+      <div className="vl-karte-aktionen">
+        <span className="vl-reihe" role="group" aria-label="Reihenfolge">
+          <span className="vl-reihe-l">Reihenfolge</span>
           <button type="button" className="icon-btn sm" title="Nach oben" aria-label="Nach oben" disabled={index === 0} onClick={() => schieben(-1)}>
             <ArrowUp />
           </button>
           <button type="button" className="icon-btn sm" title="Nach unten" aria-label="Nach unten" disabled={index >= anzahl - 1} onClick={() => schieben(1)}>
             <ArrowDown />
           </button>
-        </div>
+        </span>
+        <span className="spacer" />
+        {pflicht ? (
+          <span className="vl-pflicht-hinweis">
+            <Lock />
+            Pflichtangabe – bleibt im Beleg
+          </span>
+        ) : (
+          <>
+            <button type="button" className="btn subtle sm" onClick={ausEin}>
+              {b.aus ? <Eye /> : <EyeOff />}
+              {b.aus ? 'Einblenden' : 'Ausblenden'}
+            </button>
+            <button type="button" className="btn subtle sm vl-del-btn" onClick={weg}>
+              <X />
+              Entfernen
+            </button>
+          </>
+        )}
       </div>
       {def.felder.length ? (
         <div className="form">

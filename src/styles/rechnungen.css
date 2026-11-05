@@ -309,9 +309,15 @@
 .bl-fs:disabled .seg button.active { flex: none; justify-content: flex-start; }
 
 /* Entwürfe stehen neben dem Register, nicht darin */
-.bl-entwuerfe { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; font-size: .84rem; font-weight: 600;
+.bl-entwuerfe { display: inline-flex; align-items: center; gap: 6px; padding: 7px 10px; border-radius: 999px; font-size: .84rem; font-weight: 600;
   color: var(--text-2); border: 1px dashed var(--border-strong); background: transparent; }
 .bl-entwuerfe .cnt { font-size: .74rem; color: var(--muted); }
 .bl-entwuerfe:hover { color: var(--text); border-color: var(--accent-line); }
 .bl-entwuerfe.on { color: var(--accent-text); border-style: solid; border-color: var(--accent); background: var(--accent-soft); }
 .bl-fs:disabled #bl-ziel::-webkit-inner-spin-button, .bl-fs:disabled #bl-ziel::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+.bl-ueber { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; padding: 1px 7px; border-radius: 99px; font-size: .74rem; font-weight: 650;
+  color: var(--neg); background: color-mix(in oklab, var(--neg) 12%, transparent); }
+.bl-ueber .ic { width: 12px; height: 12px; }
+.bl-tabsl { gap: 8px 10px; }
+.bl-zr .period-nav b { min-width: 96px; }
