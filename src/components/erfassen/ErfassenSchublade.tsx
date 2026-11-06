@@ -1194,7 +1194,7 @@ function FormularInhalt(props: InhaltProps) {
           hatDateien ? (
             <BelegDropzone kompakt titel="Weiteren Beleg hierher ziehen oder klicken" text="" />
           ) : !ausgabe && ertragBereich != null ? (
-            <BelegDropzone kompakt titel="Scan oder Abrechnung anhängen (optional) – hierher ziehen oder klicken" text="" />
+            <BelegDropzone kompakt titel="Scan oder Datei anhängen (optional)" text="" />
           ) : (
             <BelegDropzone
               titel={ausgabe ? 'Beleg hierher ziehen' : 'Abrechnung oder Zahlungsnachweis hierher ziehen'}

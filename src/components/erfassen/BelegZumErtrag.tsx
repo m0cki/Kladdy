@@ -130,20 +130,14 @@ function NurBuchen({
   onNummer: (nummer: string) => void;
 }) {
   return (
-    <div className="bu-nur" role="radiogroup" aria-label="Papierquittung">
+    <div className="bu-nur">
+      {/* ein Haken statt zweier Optionen: abgeheftet oder nicht */}
       <label className="bu-nur-opt">
-        <input type="radio" name="bu-papier" checked={!papier} onChange={() => onPapier(false)} />
-        <span>
-          <b>Kein Papierbeleg</b>
-        </span>
-      </label>
-      <label className="bu-nur-opt">
-        <input type="radio" name="bu-papier" checked={papier} onChange={() => onPapier(true)} />
+        <input type="checkbox" checked={papier} onChange={(e) => onPapier(e.target.checked)} />
         <span>
           <b>Papierquittung im Ordner</b>
           <small>
-            Auf den Zettel ins Feld „Buchungs-Nr.“ kommt {buchung ? <span className="mono bu-nur-nr">{buchung}</span> : 'die Buchungsnummer'}. Hat die Quittung
-            eine eigene Nummer, trag sie hier ein.
+            Auf den Zettel ins Feld „Buchungs-Nr.“ kommt {buchung ? <span className="mono bu-nur-nr">{buchung}</span> : 'die Buchungsnummer'}.
           </small>
         </span>
       </label>
@@ -151,7 +145,7 @@ function NurBuchen({
         <input
           className="input bu-nr-in bu-nur-in"
           aria-label="Nummer der Papierquittung"
-          placeholder="Nr. der Papierquittung (optional)"
+          placeholder="Eigene Nr. der Quittung (optional)"
           autoComplete="off"
           spellCheck={false}
           value={nummer}
