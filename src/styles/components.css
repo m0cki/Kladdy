@@ -641,3 +641,11 @@ input[type="range"]:not(.hue) { box-shadow: inset 0 0 0 1px var(--border-strong)
   --accent-line: color-mix(in oklab, var(--accent-text) 50%, transparent);
   --accent-soft: color-mix(in oklab, var(--accent-text) 14%, transparent);
 }
+
+/* Globale Suche als kompakter Befehls-Knopf (⌘K) – breitet sich erst beim Benutzen aus; so steht oben nicht ein
+   zweites großes Suchfeld neben der Suche der Seite */
+#search { max-width: 190px; transition: max-width .25s var(--ease); }
+#search:focus-within, #search.open { max-width: 380px; }
+#search input { height: 38px; padding-right: 56px; font-size: .88rem; background: transparent; }
+#search .search-ic { top: 10px; }
+#search > kbd { top: 7px; }
