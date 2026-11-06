@@ -1602,7 +1602,7 @@ function ScanKarte({ beleg, onDatei }: { beleg: BelegVoll; onDatei: (pfad: strin
       <button type="button" className="bl-scan-zeile reveal" style={reveal(1)} data-card="scan" onClick={() => void waehlen()}>
         <Paperclip />
         <span>
-          <b>Unterschriebenes Exemplar anhängen</b>
+          <b>{beleg.art === 'quittung' ? 'Unterschriebenes Exemplar anhängen' : 'Datei zum Beleg anhängen'}</b>
           <small>optional · PDF oder Foto, auch aufs Fenster ziehen</small>
         </span>
       </button>

@@ -811,7 +811,7 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
   const pflichtFehlt = pflicht.filter((p) => !p.ok).length;
   /** Baustein, in dem die Steuernummer steht (Rechnung: oft die Fußzeile, unten außer Sicht) */
   const steuerOrt = useMemo(() => {
-    const b = bausteine.find((x) => !x.aus && (x.typ === 'fusszeile' ? aufloesen(x).an('kontakt') : zusammenfassung(x).includes('{steuernummer}')));
+    const b = bausteine.find((x) => !x.aus && (x.typ === 'fusszeile' ? aufloesen(x).an('kontakt') : x.typ === 'anschrift_meta' ? aufloesen(x).an('steuernr') : zusammenfassung(x).includes('{steuernummer}')));
     return b ? BAUSTEINE[b.typ].name : null;
   }, [bausteine]);
   /** Bausteine, ohne die eine Pflichtangabe fehlen würde (§ 33/§ 34a UStDV): nicht ausblenden, nicht entfernen */
@@ -1038,7 +1038,7 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
                     {pflichtFehlt ? <TriangleAlert /> : <CircleCheck />}
                     {pflichtFehlt
                       ? `${pflichtFehlt} Pflichtangabe${pflichtFehlt === 1 ? '' : 'n'} fehlt – Einzelheiten unten`
-                      : `Pflichtangaben vollständig${steuerOrt && art !== 'quittung' ? ` · Steuernummer in „${steuerOrt}“` : ''}`}
+                      : `Pflichtangaben vollständig${steuerOrt === BAUSTEINE.fusszeile.name && art !== 'quittung' ? ` · Steuernummer in „${steuerOrt}“` : ''}`}
                   </span>
                 ) : null}
               </div>

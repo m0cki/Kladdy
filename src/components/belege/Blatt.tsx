@@ -376,6 +376,7 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
       if (b.an('datum')) rows.push(['Datum', <Luecke />]);
       if (b.an('leistung') && doc.art !== 'angebot') rows.push(['Leistungsdatum', <Luecke />]);
       if (b.an('kundennr')) rows.push(['Kunden-Nr.', <Luecke />]);
+      if (b.an('steuernr') && doc.firma.steuernummer.trim()) rows.push(['Steuernummer', doc.firma.steuernummer]);
       if (b.an('faellig')) rows.push([doc.art === 'angebot' ? 'Gültig bis' : 'Fällig am', <Luecke />]);
       return (
         <>
@@ -392,6 +393,7 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
     if (b.an('datum')) rows.push(['Datum', datumText(doc.datum)]);
     if (b.an('leistung') && doc.art !== 'angebot' && doc.leistung_von) rows.push([leistungLabel(doc), leistungText(doc)]);
     if (b.an('kundennr') && e.nummer) rows.push(['Kunden-Nr.', e.nummer]);
+    if (b.an('steuernr') && doc.firma.steuernummer.trim()) rows.push(['Steuernummer', doc.firma.steuernummer]);
     if (b.an('faellig') && doc.faellig_am) rows.push([doc.art === 'angebot' ? 'Gültig bis' : 'Fällig am', datumText(doc.faellig_am)]);
     const adr = [e.anzeige, ...e.zeilen].filter(Boolean);
     return (

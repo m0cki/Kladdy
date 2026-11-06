@@ -108,7 +108,7 @@ export function pflichtCheck(doc: BelegDokument, bausteine: readonly Baustein[],
       [e.name, e.zeilen[e.zeilen.length - 1]].filter(Boolean).join(', '));
   }
 
-  const steuerGedruckt = hat('fusszeile', (b) => b.an('kontakt')) || druckt('steuernummer');
+  const steuerGedruckt = hat('fusszeile', (b) => b.an('kontakt')) || hat('anschrift_meta', (b) => b.an('steuernr')) || druckt('steuernummer');
   if (quittung && !blanko && gesamt <= kleinbetrag) {
     // § 33 UStDV: die Kleinbetragsrechnung braucht keine Steuernummer – erst darüber. Blanko bleibt streng: der Betrag
     // wird von Hand eingetragen und kann über der Grenze liegen.

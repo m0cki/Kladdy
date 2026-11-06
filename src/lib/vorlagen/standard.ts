@@ -33,7 +33,7 @@ export const STANDARD_VORLAGEN: Readonly<Record<Belegart, readonly VorlagenDesig
         { typ: 'kopf', logo: true, claim: '{inhaber}' },
         { typ: 'abstand', groesse: 'gross' },
         { typ: 'absenderzeile' },
-        { typ: 'anschrift_meta', nr: true, datum: true, leistung: true, kundennr: true, faellig: false },
+        { typ: 'anschrift_meta', nr: true, datum: true, leistung: true, kundennr: true, steuernr: true, faellig: false },
         { typ: 'abstand', groesse: 'mittel' },
         { typ: 'titel', text: '{art} {nr}' },
         { typ: 'betreff' },

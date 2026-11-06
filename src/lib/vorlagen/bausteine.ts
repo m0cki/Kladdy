@@ -118,6 +118,7 @@ export const BAUSTEINE: Readonly<Record<BausteinTyp, BausteinDef>> = {
       { key: 'datum', label: 'Datum', typ: 'toggle', default: true },
       { key: 'leistung', label: 'Leistungsdatum', typ: 'toggle', default: true },
       { key: 'kundennr', label: 'Kunden-Nr.', typ: 'toggle', default: true },
+      { key: 'steuernr', label: 'Steuernummer', typ: 'toggle', default: false },
       { key: 'faellig', label: 'Fälligkeit / gültig bis', typ: 'toggle', default: false },
     ],
   },

@@ -33,6 +33,13 @@ describe('Pflichtangaben (§ 2.3)', () => {
     expect(pflichtTitel(rechnung(), l)).toBe('Rechnung: 1 Pflichtangabe fehlt');
   });
 
+  it('Steuernummer in den Belegdaten reicht, auch ohne Fußzeile', () => {
+    const ohneFuss = standardVorlage('rechnung').filter((b) => b.typ !== 'fusszeile');
+    expect(punkt(pflichtCheck(rechnung(), ohneFuss), 'Steuernummer').ok).toBe(true);
+    const ohneBeides = ohneFuss.map((b) => (b.typ === 'anschrift_meta' ? { ...b, steuernr: false } : b));
+    expect(punkt(pflichtCheck(rechnung(), ohneBeides), 'Steuernummer').ok).toBe(false);
+  });
+
   it('§ 19-Baustein ausgeblendet zählt wie entfernt', () => {
     const v = standardVorlage('rechnung').map((b) => (b.typ === 'steuerhinweis' ? { ...b, aus: true } : b));
     expect(punkt(pflichtCheck(rechnung(), v), 'Entgelt und § 19-Hinweis').ok).toBe(false);

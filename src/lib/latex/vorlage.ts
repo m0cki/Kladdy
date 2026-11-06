@@ -314,6 +314,7 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => Schnipsel>>
         b.an('datum') && L`\KMeta{Datum}{\KLuecke}`,
         b.an('leistung') && x.art !== 'angebot' && L`\KMeta{Leistungsdatum}{\KLuecke}`,
         b.an('kundennr') && L`\KMeta{Kunden-Nr.}{\KLuecke}`,
+        b.an('steuernr') && L`\ifdefempty{\Steuernummer}{}{\KMeta{Steuernummer}{\Steuernummer}}`,
         b.an('faellig') && L`\KMeta{${x.art === 'angebot' ? 'Gültig bis' : 'Fällig am'}}{\KLuecke}`,
       ];
       return fest(
@@ -334,6 +335,7 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => Schnipsel>>
       b.an('datum') && L`\KMeta{Datum}{\Datum}`,
       b.an('leistung') && x.art !== 'angebot' && L`\ifdefempty{\Leistungsdatum}{}{\KMeta{\LeistungsdatumLabel}{\Leistungsdatum}}`,
       b.an('kundennr') && L`\ifdefempty{\Kundennummer}{}{\KMeta{Kunden-Nr.}{\Kundennummer}}`,
+      b.an('steuernr') && L`\ifdefempty{\Steuernummer}{}{\KMeta{Steuernummer}{\Steuernummer}}`,
       b.an('faellig') && L`\ifdefempty{\Faellig}{}{\KMeta{${x.art === 'angebot' ? 'Gültig bis' : 'Fällig am'}}{\Faellig}}`,
     ];
     return fest(
