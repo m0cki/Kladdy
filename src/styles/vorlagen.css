@@ -3,7 +3,7 @@
  * Pflichtangaben-Check; rechts die klebende Vorschau (Blatt aus blatt.css) bzw. die LaTeX-Ansicht.
  * Ziehen läuft über Zeiger-Ereignisse (Seite pages/Vorlagen.tsx). Farben ausschließlich über Tokens (§9). */
 
-.vl-layout { display: grid; grid-template-columns: minmax(320px, 400px) minmax(0, 1fr); gap: var(--gap); align-items: start; }
+.vl-layout { display: grid; grid-template-columns: minmax(300px, 340px) minmax(0, 1fr); gap: var(--gap); align-items: start; }
 .vl-sk-liste { height: 420px; }
 .vl-sk-feld { height: 220px; }
 .vl-sk-blatt { height: 640px; }
@@ -91,7 +91,8 @@
 .vl-doc { display: inline-flex; align-items: center; gap: 6px; font-size: .8rem; color: var(--muted); }
 .vl-doc .ic { width: 16px; height: 16px; }
 /* Blatt höher als das Fenster (A4): in der Bühne blättern, statt unten abgeschnitten zu kleben */
-.vl-right .vl-desk { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.vl-right .vl-desk { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 12px; }
+/* Blatt so groß wie möglich: schmale Bausteinspalte, schmaler Rand ums Blatt */
 .vl-right > .vl-toolbar, .vl-right > .vl-blanko-hint, .vl-right > .vl-latex-link { flex: none; }
 .vl-pdf-hinweis { margin: -4px 0 0; }
 .vl-blanko-hinweis { margin: 8px 0 0; }
