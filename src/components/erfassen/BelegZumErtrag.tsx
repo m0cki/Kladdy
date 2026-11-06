@@ -6,7 +6,7 @@
  * - Offene Rechnung zuordnen: Liste der offenen Rechnungen; die Wahl übernimmt Betrag, Text und Kunde.
  * - Ohne eigenen Beleg: die Dateifläche darunter (zeichnet die Schublade selbst).
  * Logik in lib/ertrag.ts, gespeichert wird in ErfassenSchublade (beleg_ausstellen bzw. beleg_bezahlt). */
-import { Clock, FileText, Info, NotebookPen, Paperclip, Receipt, TriangleAlert, User } from 'lucide-react';
+import { Clock, FileText, Info, NotebookPen, Paperclip, ReceiptEuro, TriangleAlert, User } from 'lucide-react';
 import type { Formular } from '../../lib/buchungen';
 import type { VorgemerkterBeleg } from '../../lib/belege';
 import {
@@ -48,7 +48,7 @@ interface Props {
   onNummer: (nummer: string) => void;
 }
 
-const ART_ICON = { quittung: Receipt, rechnung: FileText } as const;
+const ART_ICON = { quittung: ReceiptEuro, rechnung: FileText } as const;
 
 export function BelegZumErtrag({ form, ertrag, setErtrag, stamm, ladeFehler, belege, nimmtBelege, fehler, onWeg, onOffen, onNummer }: Props) {
   const h = heute();
@@ -196,7 +196,7 @@ function BelegKasten({
               value: 'quittung',
               label: (
                 <>
-                  <Receipt />
+                  <ReceiptEuro />
                   Quittung
                 </>
               ),

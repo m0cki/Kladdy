@@ -19,7 +19,7 @@ import {
   MapPin,
   Pencil,
   Plus,
-  Receipt,
+  ReceiptEuro,
   RotateCcw,
   StickyNote,
   TriangleAlert,
@@ -407,7 +407,7 @@ function Leer({ filter }: { filter: TerminFilter }) {
 
 /* ================= Zeile ================= */
 
-const ART_ICON: Readonly<Record<ErtragsArt, LucideIcon>> = { quittung: Receipt, rechnung: FileText };
+const ART_ICON: Readonly<Record<ErtragsArt, LucideIcon>> = { quittung: ReceiptEuro, rechnung: FileText };
 
 function Zeile({
   t,
@@ -613,9 +613,9 @@ function BelegChip({ t }: { t: Termin }) {
 
 const MENUE_ICON: Readonly<Record<TerminAktion, LucideIcon>> = {
   abhaken: Check,
-  ausstellen: Receipt,
+  ausstellen: ReceiptEuro,
   ohne: Check,
-  mitbeleg: Receipt,
+  mitbeleg: ReceiptEuro,
   nichterledigt: RotateCcw,
   absagen: X,
   wieder: RotateCcw,

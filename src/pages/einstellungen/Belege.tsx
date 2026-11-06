@@ -2,7 +2,7 @@
  * und für vorbereitete Belege bei Terminen), Zahlungsziel neuer Rechnungen und Gültigkeit neuer Angebote.
  * Gespeichert in einstellungen['belege'] über lib/queries/einstellungen.ts (jede Änderung ins Protokoll). */
 import { useEffect, useState } from 'react';
-import { FileText, NotebookPen, Receipt } from 'lucide-react';
+import { FileText, NotebookPen, ReceiptEuro } from 'lucide-react';
 import {
   BELEG_EINSTELLUNGEN_STANDARD,
   ladeBelegEinstellungen,
@@ -67,7 +67,7 @@ function Formular({ daten, neuLaden }: { daten: BelegEinstellungen; neuLaden: ()
               value: 'quittung',
               label: (
                 <>
-                  <Receipt />
+                  <ReceiptEuro />
                   Quittung
                 </>
               ),
@@ -95,7 +95,7 @@ function Formular({ daten, neuLaden }: { daten: BelegEinstellungen; neuLaden: ()
           value={daten.einnahme_weg}
           onChange={(v) => void speichern({ ...daten, einnahme_weg: v })}
           options={[
-            { value: 'beleg', label: (<><Receipt />Beleg gleich ausstellen</>) },
+            { value: 'beleg', label: (<><ReceiptEuro />Beleg gleich ausstellen</>) },
             { value: 'ohne', label: (<><NotebookPen />Nur buchen</>) },
           ]}
         />

@@ -4,7 +4,7 @@
  * Optik und Verhalten wie referenz/prototyp/js/pages/belege.js (renderListe); Logik in lib/rechnungen.ts. */
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeftRight, ArrowRight, Blocks, Check, ChevronDown, ChevronLeft, ChevronRight, Clock, FileText, Handshake, Info, Paperclip, Printer, Receipt, Search, Stamp, TriangleAlert, type LucideIcon } from 'lucide-react';
+import { ArrowLeftRight, ArrowRight, Blocks, Check, ChevronDown, ChevronLeft, ChevronRight, Clock, FileText, Handshake, Info, Paperclip, Printer, ReceiptEuro, Search, Stamp, TriangleAlert, type LucideIcon } from 'lucide-react';
 import { speichereQuelle } from '../lib/vorlagen/vorschau';
 import { pdfOeffnenFuer } from '../lib/belegaktionen';
 import { anzahlText } from '../lib/buchungen';
@@ -41,7 +41,7 @@ import { Ladeansicht, useLaden } from './einstellungen/Laden';
 
 export const ART_SYMBOL: Readonly<Record<ListenArt, LucideIcon>> = {
   rechnung: FileText,
-  quittung: Receipt,
+  quittung: ReceiptEuro,
   angebot: Handshake,
   eigenbeleg: Stamp,
   storno: FileText,

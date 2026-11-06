@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { open as dateiDialog } from '@tauri-apps/plugin-dialog';
-import { Ban, Banknote, Blocks, CalendarDays, Check, ChevronLeft, ChevronRight, CircleCheck, Clock, Copy, FileText, FolderSearch, Info, Landmark, List, Lock, Mail, Paperclip, Pencil, Plus, Printer, QrCode, Receipt, Search, Stamp, Store, Trash2, TriangleAlert, type LucideIcon, Upload, Users, X } from 'lucide-react';
+import { Ban, Banknote, Blocks, CalendarDays, Check, ChevronLeft, ChevronRight, CircleCheck, Clock, Copy, FileText, FolderSearch, Info, Landmark, List, Lock, Mail, Paperclip, Pencil, Plus, Printer, QrCode, ReceiptEuro, Search, Stamp, Store, Trash2, TriangleAlert, type LucideIcon, Upload, Users, X } from 'lucide-react';
 import { pdfNachholen, pdfOeffnenFuer } from '../lib/belegaktionen';
 import { setzeDropZiel } from '../lib/belegablage';
 import { ausgestellterBeleg, entwurfOeffnen, mailText, type Schnappschuss } from '../lib/belegpdf';
@@ -724,7 +724,7 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
                     disabled={laeuft}
                     onClick={() => void vorbereitetAusstellen()}
                   >
-                    {art === 'rechnung' ? <FileText /> : <Receipt />}
+                    {art === 'rechnung' ? <FileText /> : <ReceiptEuro />}
                     {art === 'rechnung' ? 'Rechnung schreiben' : 'Quittung ausstellen'}
                   </button>
                 ) : (
@@ -1352,7 +1352,7 @@ function QuittungAngabenKarte({ m, i }: { m: MaskeKontext; i: number }) {
   const { form, set, setForm, editierbar, kunde } = m;
   const gebunden = kunde.art === 'kunde';
   return (
-    <Karte k="angaben" titel="Angaben" icon={Receipt} i={i}>
+    <Karte k="angaben" titel="Angaben" icon={ReceiptEuro} i={i}>
       <div className="bl-stack">
         <div className="field">
           <label className="field-label" htmlFor="bl-von">

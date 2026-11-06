@@ -6,7 +6,7 @@ import {
   Briefcase,
   Calculator,
   Car,
-  CircleDollarSign,
+  Wallet,
   Ellipsis,
   Fuel,
   Gift,
@@ -57,4 +57,4 @@ export function KategorieIcon({ icon, ...props }: { icon: string | null } & Luci
   return <Icon {...props} />;
 }
 
-export const ZAHLUNGSWEG_ICON: Readonly<Record<Zahlungsart, LucideIcon>> = { bar: Banknote, bank: Landmark, paypal: CircleDollarSign };
+export const ZAHLUNGSWEG_ICON: Readonly<Record<Zahlungsart, LucideIcon>> = { bar: Banknote, bank: Landmark, paypal: Wallet };

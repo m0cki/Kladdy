@@ -17,7 +17,7 @@ import {
   FileText,
   Info,
   Plus,
-  Receipt,
+  ReceiptEuro,
   RotateCcw,
   StickyNote,
   Trash2,
@@ -617,7 +617,7 @@ function BelegBereich({
   const fix = t ? belegAus(t) : null;
   if (t && fix) {
     const art = fix.art === 'rechnung' ? 'rechnung' : 'quittung';
-    const Icon = art === 'rechnung' ? FileText : Receipt;
+    const Icon = art === 'rechnung' ? FileText : ReceiptEuro;
     return (
       <section className="tm-beleg-sec">
         <h3>Beleg</h3>
@@ -661,7 +661,7 @@ function BelegBereich({
       );
     }
     const art = ausstellArt(t, stamm.belegArt);
-    const Icon = art === 'rechnung' ? FileText : Receipt;
+    const Icon = art === 'rechnung' ? FileText : ReceiptEuro;
     const b = betragAnzeige(t);
     return (
       <section className="tm-beleg-sec">
@@ -697,7 +697,7 @@ function BelegBereich({
             value: 'quittung',
             label: (
               <>
-                <Receipt />
+                <ReceiptEuro />
                 Quittung
               </>
             ),

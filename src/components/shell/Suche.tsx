@@ -18,7 +18,7 @@ import {
   Minus,
   Moon,
   Plus,
-  Receipt,
+  ReceiptEuro,
   ReceiptText,
   RefreshCw,
   Search,
@@ -105,7 +105,7 @@ const BEFEHLE: Ziel[] = [
   befehl('ausgabe', 'Ausgabe erfassen', 'Kosten eintragen · ⌘N', Minus, () => erfassen({ typ: 'ausgabe' }), ['Erfassen', 'Neu', 'Buchung']),
   befehl('einnahme', 'Einnahme erfassen', 'Geld von Kunden eintragen', Plus, () => erfassen({ typ: 'einnahme' }), ['Erfassen', 'Neu', 'Buchung', 'Umsatz']),
   // Quittung und Rechnung: dieselbe Erfassen-Schublade, Beleg vorgewählt (Beleg und Einnahme in einem Schritt)
-  befehl('quittung', 'Quittung schreiben', 'Einnahme mit Quittung erfassen · nächste Nummer', Receipt, () => erfassen({ typ: 'einnahme', beleg: 'quittung' }), ['Beleg', 'Neu']),
+  befehl('quittung', 'Quittung schreiben', 'Einnahme mit Quittung erfassen · nächste Nummer', ReceiptEuro, () => erfassen({ typ: 'einnahme', beleg: 'quittung' }), ['Beleg', 'Neu']),
   befehl('rechnung', 'Rechnung schreiben', 'Einnahme mit Rechnung – bezahlt oder offen', ReceiptText, () => erfassen({ typ: 'einnahme', beleg: 'rechnung' }), ['Beleg', 'Neu']),
   befehl('termin', 'Termin eintragen', 'Kundentermin, auf Wunsch mit vorbereiteter Quittung', CalendarPlus, go('/termine?neu=1'), ['Neu', 'Kalender']),
   befehl('angebot', 'Angebot schreiben', 'Angebot an einen Kunden – noch keine Einnahme', FileText, go('/belege/neu?art=angebot'), ['Beleg', 'Neu']),
@@ -126,7 +126,7 @@ const LIMITS: Readonly<Record<string, number>> = { ...DATEN_LIMITS, Seiten: 6, E
 const SYMBOL: Readonly<Record<Exclude<DatenSymbol, 'kunde'>, LucideIcon>> = {
   einnahme: Plus,
   ausgabe: Minus,
-  quittung: Receipt,
+  quittung: ReceiptEuro,
   rechnung: ReceiptText,
   angebot: FileText,
   eigenbeleg: Stamp,

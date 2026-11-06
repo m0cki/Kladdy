@@ -28,7 +28,7 @@
  * Logik in lib/vorlagen/baukasten.ts, Stile in styles/vorlagen.css. */
 import { Fragment, useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent, type RefObject } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ArrowDown, ArrowUp, Asterisk, Blocks, Building2, Check, CircleCheck, Clock, Eye, EyeOff, FileText, GripVertical, Heading, Info, Landmark, List, LoaderCircle, Lock, Mail, Minus, MoveVertical, Package, PanelTop, Pencil, Plus, Printer, QrCode, Receipt, RotateCcw, Send, Sigma, Signature, SquareDashed, Stamp, Trash2, TriangleAlert, Type, Users, X, type LucideIcon } from 'lucide-react';
+import { ArrowDown, ArrowUp, Asterisk, Blocks, Building2, Check, CircleCheck, Clock, Eye, EyeOff, FileText, GripVertical, Heading, Info, Landmark, List, LoaderCircle, Lock, Mail, Minus, MoveVertical, Package, PanelTop, Pencil, Plus, Printer, QrCode, ReceiptEuro, RotateCcw, Send, Sigma, Signature, SquareDashed, Stamp, Trash2, TriangleAlert, Type, Users, X, type LucideIcon } from 'lucide-react';
 import { BlattVorschau, type BlattBearbeitung } from '../components/belege/Blatt';
 import { FormatEditor, type FormatEditorHandle } from '../components/belege/FormatEditor';
 import { PageHead, reveal } from '../components/ui/PageHead';
@@ -114,7 +114,7 @@ const ICON: Readonly<Record<BausteinTyp, LucideIcon>> = {
   betrag_worte: Pencil,
   steuerhinweis: Info,
   zahlung: QrCode,
-  quittung_felder: Receipt,
+  quittung_felder: ReceiptEuro,
   eigenbeleg_felder: Stamp,
   gruss: Mail,
   unterschrift: Signature,
