@@ -192,6 +192,14 @@ describe('Quittungsangaben: einzelne Angaben abgeschaltet', () => {
     return { ...q, positionen: [{ ...q.positionen[0], menge: 1, einzelpreis_cent: 30_000 }] };
   };
 
+  it('Steuernummer: bei der Kleinbetragsrechnung nicht nötig, über der Grenze Pflicht (§ 33 UStDV)', () => {
+    const ohneNr = (d: BelegDokument): BelegDokument => ({ ...d, firma: { ...d.firma, steuernummer: '' } });
+    expect(punkt(pflichtCheck(ohneNr(quittung()), standardVorlage('quittung')), 'Steuernummer')).toMatchObject({ ok: true });
+    expect(punkt(pflichtCheck(ohneNr(grosseQuittung()), standardVorlage('quittung')), 'Steuernummer')).toMatchObject({ ok: false });
+    // Rechnungen brauchen sie immer
+    expect(punkt(pflichtCheck(ohneNr(rechnung()), standardVorlage('rechnung')), 'Steuernummer').ok).toBe(false);
+  });
+
   it('alle an (fehlende Schalter = an): alles da, wie bisher', () => {
     expect(pflichtOk(pflichtCheck(quittung(), standardVorlage('quittung')))).toBe(true);
     expect(pflichtOk(pflichtCheck(quittung(), mit('klassisch', { betrag: true, datum: true, kunde: true, zweck: true })))).toBe(true);

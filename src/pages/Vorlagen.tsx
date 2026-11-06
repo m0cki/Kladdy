@@ -1038,7 +1038,7 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
                     {pflichtFehlt ? <TriangleAlert /> : <CircleCheck />}
                     {pflichtFehlt
                       ? `${pflichtFehlt} Pflichtangabe${pflichtFehlt === 1 ? '' : 'n'} fehlt – Einzelheiten unten`
-                      : `Pflichtangaben vollständig${steuerOrt ? ` · Steuernummer in „${steuerOrt}“` : ''}`}
+                      : `Pflichtangaben vollständig${steuerOrt && art !== 'quittung' ? ` · Steuernummer in „${steuerOrt}“` : ''}`}
                   </span>
                 ) : null}
               </div>

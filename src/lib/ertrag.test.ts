@@ -224,8 +224,11 @@ describe('Beleg aus der Schublade', () => {
     expect(mitAdresse.fehlt).toEqual([]);
     expect(mitAdresse.daten?.kunde_adresse).toBe('Am Hang 2\n12345 Musterstadt');
 
-    const ohneFirma = belegVorbereiten(formular(), ertrag(), 6_000, { ...ctx, firma: { ...BEISPIEL_FIRMA, steuernummer: '' } });
-    expect(ohneFirma.fehlt).toEqual(['Steuernummer']);
+    // ohne Steuernummer: Quittung bis 250 € geht (Kleinbetragsrechnung, § 33 UStDV), Rechnung nicht
+    const ohneNr = { ...ctx, firma: { ...BEISPIEL_FIRMA, steuernummer: '' } };
+    expect(belegVorbereiten(formular(), ertrag(), 6_000, ohneNr).fehlt).toEqual([]);
+    const reOhneNr = belegVorbereiten(formular({ wer: 'Clara Neu' }), ertrag({ art: 'rechnung', bezahlt: false, adresse: 'Am Hang 2\n12345 Musterstadt' }), 6_000, ohneNr);
+    expect(reOhneNr.fehlt).toEqual(['Steuernummer']);
     const wahl = belegVorbereiten(formular({ wer: 'Anna Schmidt' }), ertrag(), 6_000, { ...ctx, kunden: [...KUNDEN, { ...KUNDEN[0], id: 3, nummer: 'K-0003' }] });
     expect(wahl.daten).toBeNull();
     expect(wahl.fehlt.some((t) => /Mehrere Kunden/.test(t))).toBe(true);
