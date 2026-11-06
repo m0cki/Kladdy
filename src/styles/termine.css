@@ -243,3 +243,5 @@ a.ku-hw.tm-hw:hover { border-color: var(--accent-line); }
 .tm-nach .tm-items { grid-template-columns: 62px 32px minmax(0, 1fr) 76px 172px auto; } /* Nachtragen: Frage und zwei Knöpfe brauchen mehr Platz */
 .tm-nach .tm-l2 { flex-direction: column; align-items: flex-start; gap: 2px; }
 .tm-nach .tm-frage { display: none; }
+.tm-zeit .tm-erl { font-size: .7rem; font-weight: 650; color: var(--pos); }
+.tm-chip.ok { font-family: var(--font); }

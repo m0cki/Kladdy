@@ -81,7 +81,7 @@ export const STANDARD_VORLAGEN: Readonly<Record<Belegart, readonly VorlagenDesig
         { typ: 'steuerhinweis', groesse: 'klein' },
         { typ: 'text', text: '{schlusstext}', groesse: 'grau' },
         // § 33/§ 34a UStDV: vollständiger Name des leistenden Unternehmers ⇒ Inhaber mit ausgeben
-        { typ: 'absenderzeile', text: 'Ausgestellt von {firma} · Inh. {inhaber} · {strasse} · {plz} {ort} · Steuernr. {steuernummer}', linie: false },
+        { typ: 'absenderzeile', text: 'Ausgestellt von {firma} · {strasse} · {plz} {ort}\nInh. {inhaber} · Steuernr. {steuernummer}', linie: false },
         { typ: 'unterschrift', links: 'Ort, Datum', rechts: 'Unterschrift {firma}' },
       ],
     },

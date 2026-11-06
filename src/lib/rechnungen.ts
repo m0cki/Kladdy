@@ -234,7 +234,7 @@ export function filtere(
     })
     .sort((a, b) => vergleiche(a, b, o.sortierung));
   // Überfälliges zuerst, damit der Hinweis „überfällig“ zu einer sichtbaren Zeile führt (nur bei der Standard-Sortierung)
-  if (!suche && o.sortierung.feld === 'nr' && (o.reiter === 'alle' || o.reiter === 'offen')) {
+  if (!suche && (o.sortierung.feld === 'nr' || (o.sortierung.feld === 'datum' && o.sortierung.richtung < 0)) && (o.reiter === 'alle' || o.reiter === 'offen')) {
     const ueber = (z: BelegZeile) => statusSchluessel(z, o.heute) === 'ueberfaellig';
     zeilen.sort((a, b) => Number(ueber(b)) - Number(ueber(a)));
   }

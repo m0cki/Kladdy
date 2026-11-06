@@ -9,10 +9,11 @@ import { datumKurz, markiere } from '../lib/buchungen';
 import {
   SORT_START,
   STATUS_BADGE,
-  adresseKurz,
+  adresseVoll,
   hatNotiz,
   kundenIndex,
   kundenListe,
+  tageZwischen,
   tagMonat,
   terminKurz,
   wochentag,
@@ -229,7 +230,7 @@ function Liste({ index, h, o, setO, tbodyRef, suchFeld, sucheLeeren }: ListeProp
                   <Fragment key={t.info.k.id}>
                     {neu ? (
                       <tr className="ku-gruppe">
-                        <td colSpan={7}>{gruppe === 'termin' ? 'Mit Termin – nachtragen und nächster zuerst' : 'Ohne Termin – zuletzt da zuerst'}</td>
+                        <td colSpan={7}>{gruppe === 'termin' ? 'Termin geplant' : 'Kein Termin geplant'}</td>
                       </tr>
                     ) : null}
                     <Zeile t={t} q={qt} h={h} gewaehlt={gewaehlt === t.info.k.id} suchFeld={suchFeld} />
@@ -298,8 +299,12 @@ const mitTermin = (t: KundenTreffer): boolean => t.info.nachtragen.length > 0 ||
 
 /** Vergangener Tag wie die Termine: im laufenden Jahr „Fr 06.11.“, sonst „22.04.2025“ (das „vor …“ steht darunter). */
 function tagKurz(datum: string, heute: string): string {
+  if (datum === heute) return 'heute';
+  if (tageZwischen(datum, heute) === 1) return 'gestern';
   return datum.slice(0, 4) !== heute.slice(0, 4) ? datumKurz(datum) : `${wochentag(datum)} ${tagMonat(datum)}`;
 }
+/** heute oder gestern – dann sagt die obere Zeile schon alles */
+const nahe = (datum: string, heute: string): boolean => datum === heute || tageZwischen(datum, heute) === 1;
 
 function LeistungZelle({ t, q }: { t: KundenTreffer; q: string }) {
   const x = t.info;
@@ -354,7 +359,7 @@ function Zeile({ t, q, h, gewaehlt, suchFeld }: { t: KundenTreffer; q: string; h
   const ziffern = /^[\d\s+()/-]+$/.test(q) ? q.replace(/\D/g, '') : '';
   const telTreffer = !!q && !!k.telefon && (normalize(k.telefon).includes(nq) || (ziffern.length >= 3 && x.tel.includes(ziffern)));
   const mailTreffer = !!q && !!k.email && normalize(k.email).includes(nq);
-  const adresse = adresseKurz(k);
+  const adresse = adresseVoll(k);
   const n = x.naechster;
   const nt = x.nachtragen[0];
 
@@ -419,11 +424,12 @@ function Zeile({ t, q, h, gewaehlt, suchFeld }: { t: KundenTreffer; q: string; h
             {terminKurz(n.z, h)}
           </span>
         ) : x.zuletzt ? (
-          <span className="ku-z num ku-war">{tagKurz(x.zuletzt, h)}</span>
+          <span className="ku-z num ku-war">zuletzt {tagKurz(x.zuletzt, h)}</span>
         ) : (
           <span className="ku-z muted">noch kein Besuch</span>
         )}
-        {x.zuletzt ? <small className="ku-z">{nt || n ? `zuletzt ${tagKurz(x.zuletzt, h)}` : vorText(x.zuletzt, h)}</small> : null}
+        {x.zuletzt && (nt || n) ? <small className="ku-z">zuletzt {tagKurz(x.zuletzt, h)}</small> : null}
+        {x.zuletzt && !nt && !n && !nahe(x.zuletzt, h) ? <small className="ku-z">{vorText(x.zuletzt, h)}</small> : null}
       </td>
       <td className="l ku-c-leist">
         <LeistungZelle t={t} q={q} />

@@ -353,3 +353,5 @@
 .bl-scan-zeile span { display: grid; gap: 1px; }
 .bl-scan-zeile b { font-weight: 600; font-size: .88rem; }
 .bl-scan-zeile small { font-size: .76rem; color: var(--text-2); }
+/* Belegnummern überall gleich: Textschrift, normale Ziffern (gleich breite Ziffern sperrten die Bindestriche) */
+.bl-nr a, .bl-nr .bl-draftnr, .bl-buchnr { font-variant-numeric: normal; letter-spacing: 0; }

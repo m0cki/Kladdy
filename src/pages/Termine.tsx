@@ -467,6 +467,7 @@ function Zeile({
         ) : null}
         <b>{t.von ?? '–'}</b>
         <span>{t.bis ?? ''}</span>
+        {t.status === 'erledigt' ? <small className="tm-erl">erledigt</small> : null}
       </div>
       <Monogramm name={name} size="sm" />
       <div className="tm-main">

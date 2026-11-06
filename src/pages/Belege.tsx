@@ -53,7 +53,7 @@ const zahl = (n: number) => new Intl.NumberFormat('de-DE').format(n);
  * bei jedem Start mit dem aktuellen Jahr – die Nummernkreise zählen je Jahr (QU-2026-…), so steht die Liste lückenlos */
 let gemerkt: { reiter: Reiter; sortierung: Sortierung; modus: ListenZeitraumModus; anker: string } = {
   reiter: 'alle',
-  sortierung: { feld: 'nr', richtung: -1 },
+  sortierung: { feld: 'datum', richtung: -1 },
   modus: 'jahr',
   anker: heuteIso(),
 };
@@ -298,7 +298,7 @@ function Liste({ zeilen, naechste }: { zeilen: BelegZeile[]; naechste: Partial<R
   const waehleReiter = (r: Reiter) => {
     setReiter(r);
     if (r === 'offen') setSortierung({ feld: 'faellig', richtung: 1 });
-    else setSortierung((s) => (s.feld === 'faellig' ? { feld: 'nr', richtung: -1 } : s));
+    else setSortierung((s) => (s.feld === 'faellig' ? { feld: 'datum', richtung: -1 } : s));
   };
 
   // Adresse ?reiter=offen (Sprung aus der Auswertung bzw. der Seitenleiste) – übernehmen und wieder leeren
@@ -319,7 +319,7 @@ function Liste({ zeilen, naechste }: { zeilen: BelegZeile[]; naechste: Partial<R
   const r = useMemo(() => filtere(zeilen, { reiter, q, zeitraum: zr, sortierung, heute: h }), [zeilen, reiter, q, zr?.von, zr?.bis, sortierung, h]); // eslint-disable-line react-hooks/exhaustive-deps
   // überfällige Rechnungen, die filtere() bei der Standard-Sortierung vorne einreiht (Gruppenzeilen erklären das)
   const angeheftet =
-    !q.trim() && sortierung.feld === 'nr' && (reiter === 'alle' || reiter === 'offen') ? r.zeilen.filter((z) => statusSchluessel(z, h) === 'ueberfaellig').length : 0;
+    !q.trim() && (sortierung.feld === 'nr' || sortierung.feld === 'datum') && sortierung.richtung < 0 && (reiter === 'alle' || reiter === 'offen') ? r.zeilen.filter((z) => statusSchluessel(z, h) === 'ueberfaellig').length : 0;
   const erster = zeilen.reduce((m, z) => (z.datum && z.datum < m ? z.datum : m), h);
   const letzter = zeilen.reduce((m, z) => (z.datum && z.datum > m ? z.datum : m), h);
   const zeitraum: ZeitraumSteuerung = {
