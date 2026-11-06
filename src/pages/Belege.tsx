@@ -150,7 +150,7 @@ function NeuMenue({ naechste }: { naechste: Partial<Record<Belegart, string>> })
     try {
       speichereQuelle(localStorage, 'quittung', 'blanko');
     } catch {
-      /* ohne Speicher zeigt die Seite das Beispiel; „Blanko“ ist dort ein Klick */
+      /* ohne Speicher startet die Quittung ohnehin mit „Blanko“ (Standard, vorschau.ts) */
     }
     navigate('/belege/vorlagen?art=quittung');
   };

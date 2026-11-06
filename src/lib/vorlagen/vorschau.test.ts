@@ -123,18 +123,34 @@ const speicher = (init: Record<string, string> = {}): KeyValueStore & { data: Re
   return { data, getItem: (k) => data[k] ?? null, setItem: (k, v) => void (data[k] = v) };
 };
 
-describe('Auswahl Beispiel · Letzter Beleg je Art', () => {
-  it('Standard Beispiel, gemerkt je Art', () => {
+describe('Auswahl Beispiel · Letzter Beleg · Blanko je Art', () => {
+  it('Standard Blanko (Quittung, Eigenbeleg) bzw. Beispiel, gemerkt je Art', () => {
     const s = speicher();
-    expect(ladeQuellen(s).rechnung).toBe('beispiel');
+    expect(ladeQuellen(s)).toEqual({ rechnung: 'beispiel', quittung: 'blanko', angebot: 'beispiel', eigenbeleg: 'blanko' });
     speichereQuelle(s, 'quittung', 'beleg');
-    expect(ladeQuellen(s)).toEqual({ rechnung: 'beispiel', quittung: 'beleg', angebot: 'beispiel', eigenbeleg: 'beispiel' });
-    speichereQuelle(s, 'quittung', 'beispiel');
-    expect(ladeQuellen(s).quittung).toBe('beispiel');
+    expect(ladeQuellen(s)).toEqual({ rechnung: 'beispiel', quittung: 'beleg', angebot: 'beispiel', eigenbeleg: 'blanko' });
+    speichereQuelle(s, 'rechnung', 'beleg');
+    expect(ladeQuellen(s).rechnung).toBe('beleg');
   });
 
-  it('kaputte oder fremde Werte ⇒ Beispiel; ohne Speicher kein Fehler', () => {
+  it('„Beispiel“ wird nicht gemerkt: die Seite startet wieder im Standard', () => {
+    const s = speicher();
+    speichereQuelle(s, 'quittung', 'beispiel');
+    expect(ladeQuellen(s).quittung).toBe('blanko');
+    speichereQuelle(s, 'rechnung', 'beleg');
+    speichereQuelle(s, 'rechnung', 'beispiel');
+    expect(ladeQuellen(s).rechnung).toBe('beispiel');
+  });
+
+  it('Blanko nur, wo es das gibt', () => {
+    const s = speicher({ [VORSCHAU_KEY]: JSON.stringify({ quelle: { rechnung: 'blanko', angebot: 'blanko' } }) });
+    expect(ladeQuellen(s)).toMatchObject({ rechnung: 'beispiel', angebot: 'beispiel' });
+    expect(speichereQuelle(s, 'angebot', 'blanko').angebot).toBe('beispiel');
+  });
+
+  it('kaputte oder fremde Werte ⇒ Standard; ohne Speicher kein Fehler', () => {
     expect(ladeQuellen(speicher({ [VORSCHAU_KEY]: '{kaputt' })).rechnung).toBe('beispiel');
+    expect(ladeQuellen(speicher({ [VORSCHAU_KEY]: '{kaputt' })).quittung).toBe('blanko');
     expect(ladeQuellen(speicher({ [VORSCHAU_KEY]: JSON.stringify({ quelle: { rechnung: 'irgendwas' } }) })).rechnung).toBe('beispiel');
     expect(ladeQuellen(undefined).angebot).toBe('beispiel');
     expect(speichereQuelle(undefined, 'angebot', 'beleg').angebot).toBe('beleg');
@@ -153,7 +169,7 @@ describe('zuletzt gezeigtes Design je Art', () => {
     expect(ladeGezeigteDesigns(s)).toEqual({ quittung: 'formular' });
     speichereGezeigtesDesign(s, 'rechnung', 'klassisch');
     expect(JSON.parse(s.data[VORSCHAU_KEY])).toEqual({
-      quelle: { rechnung: 'beleg', quittung: 'beleg', angebot: 'beispiel', eigenbeleg: 'beispiel' },
+      quelle: { rechnung: 'beleg', quittung: 'beleg', angebot: 'beispiel', eigenbeleg: 'blanko' },
       design: { quittung: 'formular', rechnung: 'klassisch' },
     });
   });

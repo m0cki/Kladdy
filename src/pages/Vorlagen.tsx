@@ -754,7 +754,8 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
   const mitBeleg = quelle === 'beleg' && letzter != null;
   /** Blanko-Formular zum Ausfüllen von Hand (nur Quittung und Eigenbeleg) */
   const blanko = quelle === 'blanko' && hatBlanko(art);
-  const quellen = [QUELLE_BEISPIEL, ...(letzter ? [QUELLE_BELEG] : []), ...(hatBlanko(art) ? [QUELLE_BLANKO] : [])];
+  // Blanko zuerst: dort startet die Seite bei Quittung und Eigenbeleg (vorschau.ts), Beispiel ist zum Anschauen
+  const quellen = [...(hatBlanko(art) ? [QUELLE_BLANKO] : []), QUELLE_BEISPIEL, ...(letzter ? [QUELLE_BELEG] : [])];
   const belegId = mitBeleg ? letzter.id : null;
 
   // Letzten Beleg lesen wie die Beleg-Maske (nichts wird geschrieben); weg oder Fehler ⇒ zurück zu den Beispieldaten
@@ -798,12 +799,15 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
     const b = bausteine.find((x) => !x.aus && (x.typ === 'fusszeile' ? aufloesen(x).an('kontakt') : x.typ === 'anschrift_meta' ? aufloesen(x).an('steuernr') : zusammenfassung(x).includes('{steuernummer}')));
     return b ? BAUSTEINE[b.typ].name : null;
   }, [bausteine]);
-  /** Bausteine, ohne die eine Pflichtangabe fehlen würde (§ 33/§ 34a UStDV): nicht ausblenden, nicht entfernen */
+  /** Bausteine, ohne die eine Pflichtangabe fehlen würde (§ 33/§ 34a UStDV): nicht ausblenden, nicht entfernen.
+   *  Ausnahme: „Kopf mit Logo“ bei der Quittung ist nie Pflicht – fehlt ohne ihn eine Angabe (z. B. {inhaber}), zeigt
+   *  das der Pflichtangaben-Check, die Angabe gehört dann in Absenderzeile oder Fußzeile. */
   const pflichtBausteine = useMemo(() => {
     const fehlen = (liste: readonly Baustein[]) => pflichtCheck(doc, liste).filter((p) => !p.ok).length;
     const jetzt = fehlen(bausteine);
-    return new Set(bausteine.flatMap((b, i) => (!b.aus && fehlen(bausteine.filter((_, k) => k !== i)) > jetzt ? [i] : [])));
-  }, [doc, bausteine]);
+    const frei = (b: Baustein) => art === 'quittung' && b.typ === 'kopf';
+    return new Set(bausteine.flatMap((b, i) => (!b.aus && !frei(b) && fehlen(bausteine.filter((_, k) => k !== i)) > jetzt ? [i] : [])));
+  }, [doc, bausteine, art]);
   const eigeneFirma = basis.firma !== BEISPIEL_FIRMA;
 
   const quelleWaehlen = (q: Vorschauquelle) => {

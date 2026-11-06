@@ -1076,8 +1076,10 @@ kursiv oder unterstrichen setzen (`src/lib/vorlagen/formatierung.ts`).
 - **Rechts:** Live-Vorschau auf Papier. Klick auf einen Bereich im Blatt wählt den Baustein aus, Klick auf einen Text
   bearbeitet ihn direkt (siehe Formatierung). Vorschau mit Beispieldaten
   oder einem echten Beleg, bei Quittung und Eigenbeleg auch „Blanko“ (siehe unten). Knopf „PDF“.
-- **Blanko-Formular zum Ausfüllen von Hand** (Quittung und Eigenbeleg): Umschalter „Beispiel · Letzter Beleg · Blanko“
-  über der Vorschau (immer da, „Letzter Beleg“ nur, wenn es einen gibt; je Art gemerkt, `kladdy.vorlagen.v1`). Gedacht
+- **Blanko-Formular zum Ausfüllen von Hand** (Quittung und Eigenbeleg): Umschalter „Blanko · Beispiel · Letzter Beleg“
+  über der Vorschau (immer da, „Letzter Beleg“ nur, wenn es einen gibt). Die Seite startet bei Quittung und Eigenbeleg
+  mit **Blanko**, bei Rechnung und Angebot mit „Beispiel“; „Beispiel“ (Musterdaten zum Anschauen) wird nicht gemerkt,
+  „Letzter Beleg“ und „Blanko“ je Art schon (`kladdy.vorlagen.v1`). Gedacht
   zum Ausdrucken und Ausfüllen mit dem Stift; Rechnung und Angebot (Positionen, Zahlungsaufforderung) bieten es nicht an.
   - **Gedruckt wie immer:** alles aus den Firmendaten (Firmenkopf, Kopf mit Logo, Absenderzeile, Fußzeile, Steuernummer,
     Inhaber, Anschrift), Titel, Steuerhinweis (§ 19), Freitexte und die Standardtexte der Art (`{schlusstext}` =
