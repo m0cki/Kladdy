@@ -359,3 +359,10 @@
 /* Stornieren ist folgenreich (GoBD): rot beschriftet, damit es sich von „Duplizieren“ abhebt */
 .bl-storno-btn, .bl-storno-btn .ic { color: var(--neg); }
 .bl-storno-btn { border-color: color-mix(in oklab, var(--neg) 35%, var(--border)); }
+/* Entwurf: was zum Ausstellen noch fehlt, links neben den Knöpfen (füllt die Leiste und erklärt „Buchen“) */
+.bl-offen { min-width: 0; font-size: .8rem; color: var(--warn); font-weight: 600; line-height: 1.35; }
+:root[data-mode="light"] .bl-offen { color: color-mix(in oklab, var(--warn) 85%, #000); }
+.bl-vl-edit { gap: 5px; }
+.bl-vl-edit .ic { width: 14px; height: 14px; }
+/* Entwurf: Vorlagen-Zeile in einer Zeile – das Bausteine-Symbol steht für „Vorlage“ (Auswahlfeld hat aria-label/Titel) */
+label.bl-vl > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

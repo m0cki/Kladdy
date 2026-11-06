@@ -4,7 +4,7 @@
  * Keine KPI-Kacheln, keine Summen (Statistik nur in der Auswertung). Klick öffnet die Kunden-Schublade.
  * Optik und Verhalten wie referenz/prototyp/js/pages/kunden.js; Logik in lib/kunden.ts, Daten in lib/queries/kunden.ts. */
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
-import { CalendarDays, Mail, Phone, Plus, Search, StickyNote, Users } from 'lucide-react';
+import { CalendarDays, Mail, MessageSquareText, Phone, Plus, Search, StickyNote, Users } from 'lucide-react';
 import { datumKurz, markiere } from '../lib/buchungen';
 import {
   SORT_START,
@@ -438,7 +438,7 @@ function Zeile({ t, q, h, gewaehlt, suchFeld }: { t: KundenTreffer; q: string; h
       <td className="c ku-c-ntz">
         {notiz ? (
           <span className={`ku-ntz ${q && normalize(notiz).includes(nq) ? 'on' : ''}`} title={`Notiz: ${notiz}`} role="img" aria-label={`Notiz: ${notiz}`}>
-            <StickyNote />
+            <MessageSquareText />
           </span>
         ) : null}
       </td>

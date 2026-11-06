@@ -326,6 +326,13 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
     if (kunde.art === 'wahl') liste.unshift({ label: 'Kunde eindeutig', ok: false, hint: `Mehrere Kunden heißen „${kunde.name}“ – bitte wählen, wer gemeint ist` });
     return liste;
   }, [doc, gedruckt, kleinbetrag, naechste, kunde, editierbar]);
+  /** Was zum Ausstellen noch fehlt – sichtbar neben den Knöpfen (dieselbe Prüfung wie beim Ausstellen) */
+  const nochOffen = useMemo(() => {
+    if (ausgestellt) return [];
+    const l = pflicht.filter((p) => !p.ok).map((p) => p.label);
+    if (summe <= 0 && !l.some((x) => /Betrag|Entgelt/.test(x))) l.push('Betrag');
+    return [...new Set(l)];
+  }, [ausgestellt, pflicht, summe]);
   const zeile: BelegZeile | null = beleg
     ? {
         id: beleg.id,
@@ -700,6 +707,11 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
           <div className="bl-actions">
             {editierbar ? (
               <>
+                {nochOffen.length ? (
+                  <span className="bl-offen" title="Das braucht der Beleg noch, bevor er ausgestellt werden kann">
+                    Noch offen: {nochOffen.join(' · ')}
+                  </span>
+                ) : null}
                 <span className="bl-dirty">
                   {dirty ? (
                     <>
@@ -757,6 +769,7 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
                   <select
                     className="select sm"
                     aria-label="Vorlage"
+                    title="Vorlage für diesen Beleg"
                     value={gewaehlt?.schluessel ?? ''}
                     onChange={(e) => {
                       const v = vorlagen.find((x) => x.schluessel === e.target.value);
@@ -777,12 +790,13 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
                 </span>
               )}
               {editierbar ? (
-                <Link className="icon-btn sm" to={`/belege/vorlagen?art=${art}${gewaehlt && !gewaehlt.archiviert ? `&design=${encodeURIComponent(gewaehlt.schluessel)}` : ''}`} title="Vorlagen bearbeiten" aria-label="Vorlagen bearbeiten">
+                <Link className="btn ghost sm bl-vl-edit" to={`/belege/vorlagen?art=${art}${gewaehlt && !gewaehlt.archiviert ? `&design=${encodeURIComponent(gewaehlt.schluessel)}` : ''}`} title="Vorlage im Baukasten bearbeiten">
                   <Pencil />
+                  Bearbeiten
                 </Link>
               ) : null}
             </div>
-            <BlattGross doc={doc} bausteine={gedruckt} titel={`${beleg?.nummer ?? 'Entwurf'} in Lesegröße`} />
+            <BlattGross kompakt={editierbar} doc={doc} bausteine={gedruckt} titel={`${beleg?.nummer ?? 'Entwurf'} in Lesegröße`} />
             {editierbar ? (
               <button type="button" className="btn ghost" title="Nur das Blatt drucken – in der Vorschau „Drucken“ oder „Als PDF sichern“ (⌘P)" onClick={() => void drucken()}>
                 <Printer />

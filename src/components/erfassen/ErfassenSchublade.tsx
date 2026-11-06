@@ -1204,10 +1204,13 @@ function FormularInhalt(props: InhaltProps) {
         ) : null}
         {ausgabe && !ro && !hatDateien ? (
           <div className="bu-nobeleg">
-            <p className="hint warn">
-              <TriangleAlert />
-              Ohne Beleg fehlt der Nachweis fürs Finanzamt. Rechnung oder Kassenbon hierher ziehen.
-            </p>
+            {/* die Warnung erst, wenn ein Betrag da ist – im leeren Formular nur der Weg zum Eigenbeleg */}
+            {(cent ?? 0) > 0 ? (
+              <p className="hint warn">
+                <TriangleAlert />
+                Ohne Beleg fehlt der Nachweis fürs Finanzamt. Rechnung oder Kassenbon hierher ziehen.
+              </p>
+            ) : null}
             <div className="bu-nobeleg-links">
               <button type="button" className="link" title="Eigenbeleg mit diesen Angaben in der Beleg-Maske erstellen – „Buchen“ bucht die Ausgabe mit" onClick={onEigenbeleg}>
                 <FilePlus />

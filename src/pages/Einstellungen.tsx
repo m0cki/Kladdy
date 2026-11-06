@@ -99,7 +99,7 @@ export default function Einstellungen() {
 
   return (
     <div className="page">
-      <PageHead icon={Settings} title="Einstellungen" sub={`${b.label} · gilt nur für diesen Mac`} />
+      <PageHead icon={Settings} title="Einstellungen" sub={`${b.label} · gilt nur für diesen Mac · Änderungen werden sofort gespeichert`} />
       <div className="set-content" ref={inhalt} key={b.id}>
         {Inhalt ? <Inhalt /> : <Platzhalter b={b} />}
       </div>

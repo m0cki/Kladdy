@@ -150,7 +150,7 @@ function Inhalt({ d, wahl, waehle }: { d: UeberblickDaten; wahl: Wahl; waehle: (
   const liste = (o: { typ?: 'einnahme' | 'ausgabe'; ohneBeleg?: boolean } = {}) => listenAdresse({ ...o, modus: wahl.modus, anker: wahl.anker });
 
   const auftragTeile = [plural(a.quittungen, 'Quittung', 'Quittungen'), plural(a.rechnungen, 'Rechnung', 'Rechnungen')];
-  if (a.ohneBeleg) auftragTeile.push(`${zahl(a.ohneBeleg)} ohne Beleg`);
+  if (a.ohneBeleg) auftragTeile.push(`${zahl(a.ohneBeleg)} nur gebucht`); // Einnahme mit Kunde ohne Kladdy-Beleg (z. B. Papierquittung)
 
   const pillen: ReactNode[] = [];
   if (ku)
@@ -197,7 +197,7 @@ function Inhalt({ d, wahl, waehle }: { d: UeberblickDaten; wahl: Wahl; waehle: (
     pillen.push(
       <Link key="ohne" className="status-pill warn" to={liste({ ohneBeleg: true })} title="In Ein- & Ausgänge genau diese Einträge zeigen">
         <i className="status-dot" />
-        <b>{zahl(ohne)} ohne Beleg</b>
+        <b>{plural(ohne, 'Buchung', 'Buchungen')} ohne Beleg</b>
         <span>{z.label} · nachreichen</span>
       </Link>,
     );

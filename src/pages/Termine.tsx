@@ -21,7 +21,7 @@ import {
   Plus,
   ReceiptEuro,
   RotateCcw,
-  StickyNote,
+  MessageSquareText,
   TriangleAlert,
   X,
   type LucideIcon,
@@ -481,7 +481,7 @@ function Zeile({
           )}
           {notizText ? (
             <span className="tm-ntz" tabIndex={0} role="img" aria-label={`${notizTitel}: ${notizText}`} title={`${notizTitel}: ${notizText}`}>
-              <StickyNote />
+              <MessageSquareText />
             </span>
           ) : null}
         </div>

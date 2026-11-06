@@ -654,3 +654,6 @@ input[type="range"]:not(.hue) { box-shadow: inset 0 0 0 1px var(--border-strong)
 .kpi-sub { flex-wrap: wrap; white-space: normal; row-gap: 2px; overflow: visible; }
 .kpi-sub .delta { white-space: nowrap; }
 .kpi-sub .muted { overflow: visible; text-overflow: clip; }
+
+/* Einstellungen: Abschnittstitel klar über den Feldbeschriftungen (vorher kleiner als die Feldinhalte) */
+.set-card h3 { font-size: 1rem; color: var(--text); font-weight: 700; letter-spacing: -.01em; }
