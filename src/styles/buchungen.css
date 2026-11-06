@@ -392,3 +392,6 @@
 .bu-nr { font-family: var(--font); font-size: .76rem; font-variant-numeric: tabular-nums; }
 .bu-nr-chip, .bu-bunr, .bu-nr { font-family: var(--font); font-variant-numeric: normal; letter-spacing: 0; }
 .bu-nr-chip { font-size: .74rem; }
+/* Suche und „Erfassen“ auf einer Linie: beide unten am Seitenkopf, gleiche Höhe wie der Knopf */
+.bu-head-suche { align-self: flex-end; }
+.bu-head-suche .bu-search .input { height: 38px; }

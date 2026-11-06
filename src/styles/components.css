@@ -649,3 +649,8 @@ input[type="range"]:not(.hue) { box-shadow: inset 0 0 0 1px var(--border-strong)
 #search input { height: 38px; padding-right: 56px; font-size: .88rem; background: transparent; }
 #search .search-ic { top: 10px; }
 #search > kbd { top: 7px; }
+
+/* Kennzahl-Kacheln: Vergleichszeile darf umbrechen statt abgeschnitten zu werden („ggü. Vormonat (gleich lang)“) */
+.kpi-sub { flex-wrap: wrap; white-space: normal; row-gap: 2px; overflow: visible; }
+.kpi-sub .delta { white-space: nowrap; }
+.kpi-sub .muted { overflow: visible; text-overflow: clip; }

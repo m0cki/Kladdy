@@ -170,11 +170,11 @@ function Inhalt({ d, wahl, waehle }: { d: UeberblickDaten; wahl: Wahl; waehle: (
     pillen.push(
       <Link key="offen" className={`status-pill ${offen.ueberfaellig ? 'alarm' : 'ok'}`} to="/belege">
         <i className="status-dot" />
-        <b>
-          {plural(offen.anzahl, 'offene Rechnung', 'offene Rechnungen')}
-          {offen.ueberfaellig ? ` · ${zahl(offen.ueberfaellig)} überfällig` : ''}
-        </b>
-        <span>{euro0(offen.summe)}</span>
+        <b>{plural(offen.anzahl, 'offene Rechnung', 'offene Rechnungen')}</b>
+        <span>
+          {offen.ueberfaellig ? `${zahl(offen.ueberfaellig)} überfällig · ` : ''}
+          {euro0(offen.summe)}
+        </span>
       </Link>,
     );
   const prognose = vorschau({ buchungen: d.buchungen, offen: d.offen, ...d.vorschau }, h, 90, d.vorschau.annahmen);
