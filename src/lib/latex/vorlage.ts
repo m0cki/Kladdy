@@ -481,7 +481,7 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => Schnipsel>>
           a.zahlungsart && L`\KForm{Zahlungsart}{${kreuze}}`,
           a.betrag && L`\vspace{1mm}{${fs(13, 1.3)}\noindent\textbf{Gesamtbetrag:}\ \textbf{\Gesamt}\par}\vspace{1mm}`,
           a.worte && L`{${fs(9)}\noindent\textcolor{grau}{in Worten:} \BetragInWorten\par}\vspace{1mm}`,
-          a.buchungsnr && L`\ifdefempty{\BuchungsNr}{}{\vspace{1mm}{${fs(7.5)}\textcolor{grau}{Buchungs-Nr.}}\hspace{1.5mm}{${fs(10)}\bfseries\BuchungsNr}\par\vspace{1mm}}`,
+          a.buchungsnr && L`\ifdefempty{\BuchungsNr}{}{\vspace{1mm}{${fs(8.5)}\textcolor{label}{Buchungs-Nr.}}\hspace{1.5mm}{${fs(10)}\bfseries\BuchungsNr}\par\vspace{1mm}}`,
         ),
       );
     }
@@ -496,7 +496,7 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => Schnipsel>>
         a.worte && L`\KFeld{Betrag in Worten}{\BetragInWorten}`,
         a.kunde && L`\KFeld{${von}}{${kunde}}`,
         a.zweck && L`\KFeld{${fuer}}{${fuerWert}}`,
-        a.buchungsnr && L`\ifdefempty{\BuchungsNr}{}{\vspace{1mm}{${fs(7.5)}\textcolor{grau}{Buchungs-Nr.}}\hspace{1.5mm}{${fs(10)}\bfseries\BuchungsNr}\par\vspace{1mm}}`,
+        a.buchungsnr && L`\ifdefempty{\BuchungsNr}{}{\vspace{1mm}{${fs(8.5)}\textcolor{label}{Buchungs-Nr.}}\hspace{1.5mm}{${fs(10)}\bfseries\BuchungsNr}\par\vspace{1mm}}`,
       ),
     );
   },
@@ -618,6 +618,8 @@ export function rahmenTex(format: Blattformat, linie: string): string {
 const FARBEN: readonly (readonly [string, string])[] = [
   ['ink', '16181D'],
   ['grau', '6B7280'],
+  // Feldbeschriftungen (Betrag, Datum …): dunkler als grau, gedruckt gut lesbar
+  ['label', '4B5563'],
   ['haar', 'D5D8DE'],
   ['leer', '9CA3AF'],
   ['box', 'F3F4F6'],
@@ -663,7 +665,7 @@ function praeambel(art: Belegart, akzentHex: string): string {
     L`\newcommand{\KZeile}[1]{\ifdefempty{#1}{}{#1\par}}`,
     L`\newcommand{\KZeileVor}[2]{\ifdefempty{#2}{}{#1#2\par}}`,
     L`\newcommand{\KMeta}[2]{\noindent\strut\textcolor{grau}{#1}\hfill #2\par\vspace{1.1mm}}`,
-    L`\newcommand{\KFeld}[2]{{${fs(7.5)}\color{grau}#1\par}\vspace{.6mm}{${fs(11, 1.3)}#2\par}\vspace{3mm}}`,
+    L`\newcommand{\KFeld}[2]{{${fs(8.5)}\color{label}#1\par}\vspace{.6mm}{${fs(11, 1.3)}#2\par}\vspace{3mm}}`,
     L`\newcommand{\KForm}[2]{{${fs(10.5, 1.35)}\noindent\textbf{#1:}\ #2\par}\vspace{2mm}}`,
     // Ankreuzfeld 3 mm, angekreuzt mit einem Kreuz (nicht nur Farbe); gezeichnet, keine Sonderzeichen aus der Schrift
     L`\newcommand{\KKaestchen}[1]{\raisebox{-.35mm}{\setlength{\unitlength}{1mm}\begin{picture}(3,3)\put(0,0){\rule{3mm}{.25mm}}\put(0,2.75){\rule{3mm}{.25mm}}\put(0,0){\rule{.25mm}{3mm}}\put(2.75,0){\rule{.25mm}{3mm}}\ifnum#1=1 \put(1.5,1.5){\makebox(0,0){\rotatebox{45}{\rule[-.15mm]{2.7mm}{.3mm}}}}\put(1.5,1.5){\makebox(0,0){\rotatebox{-45}{\rule[-.15mm]{2.7mm}{.3mm}}}}\fi\end{picture}}}`,

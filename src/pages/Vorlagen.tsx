@@ -1030,7 +1030,7 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
                       <Package />
                       Mitgelieferte Vorlage
                     </span>
-                    <span>Deine erste Änderung wird automatisch „Meine {ARTEN[art].label}“.</span>
+                    <span>Kladdy speichert sofort – deine erste Änderung wird „Meine {ARTEN[art].label}“, die mitgelieferte bleibt.</span>
                   </span>
                 )}
                 {pflicht.length ? (
