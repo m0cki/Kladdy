@@ -276,7 +276,7 @@ const SONSTIGES: readonly (readonly [string, string, number, number])[] = [
 type PosZeile = readonly [string, number, string, number];
 const JOBS: readonly { betreff: string; pos: readonly PosZeile[] }[] = [
   { betreff: 'Grünanlagenpflege', pos: [['Grünanlagenpflege Außenbereich', 12, 'Std.', 3800], ['Grünschnitt-Entsorgung', 1, 'pausch.', 6500]] },
-  { betreff: 'Heckenschnitt Außenanlage', pos: [['Heckenschnitt inkl. Entsorgung', 9, 'Std.', 3800]] },
+  { betreff: 'Heckenschnitt Außenanlage', pos: [['Heckenschnitt Außenanlage', 9, 'Std.', 3800]] },
   { betreff: 'Möbelmontage Büro', pos: [['Montage Schreibtische & Schränke', 7, 'Std.', 3800], ['Kleinmaterial', 1, 'pausch.', 2400]] },
   { betreff: 'Laubbeseitigung Herbst', pos: [['Laubbeseitigung Grundstück', 1, 'pausch.', 42000]] },
   { betreff: 'Winterdienst Saison', pos: [['Winterdienst Einsätze', 8, 'Einsatz', 4500]] },
@@ -587,7 +587,7 @@ export function demoDaten(heute: string, seed: number = DEMO_SEED): DemoDaten {
 
   /* ---------- Feste aktuelle Belege: zwei offen (eine überfällig), eine bezahlt, ein Entwurf, ein Angebot ---------- */
   const fest: { kunde: string; datum: string; faellig?: string; status: DemoBelegStatus; bezahltAm?: string; betreff: string; pos: readonly PosZeile[] }[] = [
-    { kunde: 'Kita Sonnenschein e. V.', datum: plusTage(heute, -31), faellig: plusTage(heute, -17), status: 'offen', betreff: 'Heckenschnitt Außenanlage', pos: [['Heckenschnitt inkl. Entsorgung', 16, 'Std.', 3800], ['Grünschnitt-Entsorgung', 1, 'pausch.', 6800]] },
+    { kunde: 'Kita Sonnenschein e. V.', datum: plusTage(heute, -31), faellig: plusTage(heute, -17), status: 'offen', betreff: 'Heckenschnitt Außenanlage', pos: [['Heckenschnitt', 16, 'Std.', 3800], ['Grünschnitt-Entsorgung', 1, 'pausch.', 6800]] },
     { kunde: 'Hausverwaltung Kaiser', datum: plusTage(heute, -6), status: 'offen', betreff: 'Grünanlagenpflege Wohnanlage Seeufer', pos: [['Grünanlagenpflege Wohnanlage Seeufer', 22, 'Std.', 3800], ['Grünschnitt-Entsorgung', 1, 'pausch.', 9500]] },
     { kunde: 'Praxis Dr. Sommer', datum: plusTage(heute, -24), faellig: plusTage(heute, -10), status: 'bezahlt', bezahltAm: plusTage(heute, -12), betreff: 'Möbelmontage Praxisräume', pos: [['Montage Schränke & Regale', 8, 'Std.', 3800], ['Kleinmaterial', 1, 'pausch.', 2900]] },
     { kunde: 'Hausverwaltung Kaiser', datum: plusTage(heute, -1), status: 'entwurf', betreff: 'Laubbeseitigung Wohnanlage Seeufer', pos: [['Laubbeseitigung Wohnanlage Seeufer', 14, 'Std.', 3800]] },

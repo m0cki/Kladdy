@@ -141,7 +141,7 @@ const TX_KLASSE: Readonly<Record<TexTeilArt, string>> = { kommentar: 'tx-c', bef
 /** Hinweis unter dem Blanko-Formular: von Hand ausgefüllt heißt nicht gebucht */
 const BLANKO_HINWEIS: Readonly<Record<Belegart, string>> = {
   quittung:
-    'Ohne Nummer gedruckt, nichts wird gespeichert. Nach dem Buchen („+ Erfassen“ › „Nur buchen“) die Buchungsnummer ins Feld „Buchungs-Nr.“ schreiben – so gehören Zettel und Buchung zusammen.',
+    'Ohne Nummer gedruckt, nichts wird gespeichert. Beim Buchen zeigt Kladdy die Buchungsnummer – sie kommt ins Feld „Buchungs-Nr.“, so gehören Zettel und Buchung zusammen.',
   eigenbeleg:
     'Ohne Nummer gedruckt, nichts wird gespeichert. Trag eine eigene Nummer ins Feld „Nr.“ ein und gib sie beim Buchen der Ausgabe als Beleg-Nr. an.',
   rechnung: '',

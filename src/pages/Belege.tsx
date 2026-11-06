@@ -105,7 +105,7 @@ interface ZeitraumSteuerung {
 
 const NEU: readonly { art: Belegart; sub: string }[] = [
   { art: 'quittung', sub: 'Ausstellen und die Einnahme gleich buchen' },
-  { art: 'rechnung', sub: 'Bezahlt oder offen' },
+  { art: 'rechnung', sub: 'Mit Zahlungsziel – Einnahme, sobald bezahlt' },
   { art: 'angebot', sub: 'Für einen Kunden – noch keine Einnahme' },
   { art: 'eigenbeleg', sub: 'Originalbeleg einer Ausgabe fehlt' },
 ];
