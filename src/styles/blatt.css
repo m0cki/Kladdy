@@ -232,3 +232,6 @@
 @media print { .sheet .blk-abstand::after, .sheet .blk-trennlinie::after { display: none; } }
 /* leere Bausteine im Editor: Platzhalter erst beim Zeigen oder Wählen (sonst wirkt das Blatt unfertig) */
 .sheet.editable .blk:not(:hover):not(.blk-sel) > .blk-platz { border-color: transparent; color: transparent; }
+/* Vorlagen-Editor: das Blatt ist ein Muster, kein Entwurf – kein Wasserzeichen über den Texten, die man anklickt
+   (Belegentwürfe in der Beleg-Maske und Storno behalten es) */
+.sheet.editable.is-draft .sh-wm { display: none; }
