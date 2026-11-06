@@ -244,7 +244,7 @@ function quittungBlanko(a: QuittungAngaben, von: string, fuer: string): string {
     a.worte && L`\KFeld{Betrag in Worten}{\KSchreib}`,
     a.kunde && L`\KFeld{${von}}{\KSchreib}`,
     a.zweck && L`\KFeld{${fuer}}{\KSchreib}`,
-    L`\KFeld{Buchungs-Nr. (aus Kladdy)}{\KSchreib}`,
+    L`\KFeld{Buchungs-Nr.}{\KSchreib}`,
   );
 }
 

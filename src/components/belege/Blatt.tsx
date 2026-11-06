@@ -319,7 +319,7 @@ function quittungBlanko(b: Aufgeloest, x: Ctx): ReactNode {
           <Schreiben />
         </Feld>
       )}
-      <Feld label="Buchungs-Nr. (aus Kladdy)">
+      <Feld label="Buchungs-Nr.">
         <Schreiben />
       </Feld>
     </>
