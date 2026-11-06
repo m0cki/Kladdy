@@ -27,10 +27,12 @@
  *   Änderungen nur auf dieser Seite.
  * Logik in lib/vorlagen/baukasten.ts, Stile in styles/vorlagen.css. */
 import { Fragment, useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent, type RefObject } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ArrowDown, ArrowUp, Asterisk, Blocks, Building2, Check, CircleCheck, Clock, Eye, EyeOff, FileText, GripVertical, Heading, Info, Landmark, List, LoaderCircle, Lock, Mail, Minus, MoveVertical, Package, PanelTop, Pencil, Plus, Printer, QrCode, ReceiptEuro, RotateCcw, Send, Sigma, Signature, SquareDashed, Stamp, Trash2, TriangleAlert, Type, Users, X, type LucideIcon } from 'lucide-react';
 import { BlattVorschau, type BlattBearbeitung } from '../components/belege/Blatt';
 import { FormatEditor, type FormatEditorHandle } from '../components/belege/FormatEditor';
+import { Drawer } from '../components/ui/Drawer';
 import { PageHead, reveal } from '../components/ui/PageHead';
 import { Seg, type SegOption } from '../components/ui/Seg';
 import { Switch } from '../components/ui/Switch';
@@ -725,7 +727,6 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
   const [quelle, setQuelle] = useState<Vorschauquelle>(() => ladeQuellen(speicher())[art]);
   const [echt, setEcht] = useState<Echt | null>(null);
   const listeRef = useRef<HTMLUListElement>(null);
-  const addRef = useRef<HTMLDivElement>(null);
   const lebt = useRef(false);
   /** Text, der gerade im Blatt bearbeitet wird (Baustein-Index, Einstellung) und der Klickpunkt beim Öffnen */
   const [imBlatt, setImBlatt] = useState<{ index: number; key: string; klick: { x: number; y: number } } | null>(null);
@@ -748,23 +749,6 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
       rueckgaengigWeg();
     };
   }, []);
-
-  // Palette schließen: Klick daneben oder Esc
-  useEffect(() => {
-    if (!palette) return;
-    const weg = (e: Event) => {
-      if (!addRef.current?.contains(e.target as Node | null)) setPalette(false);
-    };
-    const taste = (e: { key: string }) => {
-      if (e.key === 'Escape') setPalette(false);
-    };
-    document.addEventListener('pointerdown', weg);
-    document.addEventListener('keydown', taste);
-    return () => {
-      document.removeEventListener('pointerdown', weg);
-      document.removeEventListener('keydown', taste);
-    };
-  }, [palette]);
 
   const logo = useFirmenlogo((s) => s.name);
   const mitBeleg = quelle === 'beleg' && letzter != null;
@@ -1002,7 +986,7 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
   return (
     <div className="vl-layout">
       <div className="stack">
-        <section className={`card reveal vl-liste${palette ? ' offen' : ''}`} style={reveal(1)}>
+        <section className="card reveal" style={reveal(1)}>
           <div className="card-head">
             <div>
               <div className="card-title">
@@ -1162,37 +1146,42 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
           <p className="vl-legende vl-legende-unten">
             Angaben in ‹ › füllt Kladdy beim Ausstellen aus · <Asterisk className="ic vl-leg-ic" /> Pflicht bleibt im Beleg, der Text ist änderbar.
           </p>
-          <div className="vl-add" ref={addRef}>
-            <button type="button" className="btn subtle" aria-expanded={palette} onClick={() => setPalette((p) => !p)}>
+          <div className="vl-add">
+            <button type="button" className="btn subtle" aria-haspopup="dialog" onClick={() => setPalette(true)}>
               <Plus />
               Baustein hinzufügen
             </button>
-            {palette && (
-              <div className="vl-palette" role="dialog" aria-label="Baustein hinzufügen">
-                <div className="vl-pal-head">
-                  <b>Baustein hinzufügen</b>
-                  <small>wird unter dem ausgewählten eingefügt</small>
-                </div>
-                <div className="vl-pal-grid">
-                  {erlaubteTypen(art).map((t) => {
-                    const PIcon = ICON[t];
-                    return (
-                      <button key={t} type="button" className="vl-pal-item" onClick={() => hinzufuegen(t)}>
-                        <PIcon />
-                        <span>
-                          <b>{BAUSTEINE[t].name}</b>
-                          <small>{BAUSTEINE[t].beschreibung}</small>
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
           </div>
         </section>
         <PflichtKarte art={art} liste={pflicht} eigeneFirma={eigeneFirma} quelle={blanko ? 'blanko' : mitBeleg ? 'beleg' : 'beispiel'} />
       </div>
+      {createPortal(
+        <Drawer
+          open={palette}
+          onClose={() => setPalette(false)}
+          title="Baustein hinzufügen"
+          sub={sel >= 0 && sel < bausteine.length ? `Kommt unter „${BAUSTEINE[bausteine[sel].typ].name}“` : 'Kommt ans Ende des Belegs'}
+          icon={Blocks}
+          width={640}
+          className="vl-palette"
+        >
+          <div className="vl-pal-grid">
+            {erlaubteTypen(art).map((t) => {
+              const PIcon = ICON[t];
+              return (
+                <button key={t} type="button" className="vl-pal-item" onClick={() => hinzufuegen(t)}>
+                  <PIcon />
+                  <span>
+                    <b>{BAUSTEINE[t].name}</b>
+                    <small>{BAUSTEINE[t].beschreibung}</small>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </Drawer>,
+        document.body,
+      )}
 
       <div className="vl-right reveal" style={reveal(2)}>
         <div className="vl-toolbar">

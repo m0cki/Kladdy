@@ -48,27 +48,17 @@
 .vl-reset .ic { width: 14px; height: 14px; }
 
 /* ---------- Baustein hinzufügen ---------- */
-/* Offene Palette über den folgenden Karten (jede .card ist durch backdrop-filter/reveal ein eigener Stapelkontext) */
-.vl-liste.offen { position: relative; z-index: 30; }
-.vl-add { position: relative; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+/* Knopf unter der Liste, die Auswahl öffnet als Dialog in der Mitte (immer ganz sichtbar, egal wie weit gescrollt) */
+.vl-add { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
 .vl-add > .btn { width: 100%; }
-.vl-palette {
-  position: absolute; left: -8px; right: -8px; top: calc(100% + 8px); z-index: 20; padding: 8px; border-radius: 16px;
-  background: var(--surface); border: 1px solid var(--border-strong); box-shadow: var(--shadow-lg);
-  transform-origin: top center; animation: vlPalette .25s var(--ease) both;
-}
-@keyframes vlPalette { from { opacity: 0; transform: translateY(-6px) scale(.985); } }
-:root[data-motion="reduced"] .vl-palette { animation-name: fade; animation-duration: .15s; }
-.vl-pal-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 6px 8px 8px; }
-.vl-pal-head b { font-size: .84rem; }
-.vl-pal-head small { font-size: .72rem; color: var(--muted); }
-.vl-pal-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; max-height: 360px; overflow-y: auto; }
-.vl-pal-item { display: flex; align-items: flex-start; gap: 9px; padding: 9px; border-radius: 11px; text-align: left; transition: background .15s; }
+.vl-palette .drawer-body { padding: 14px 16px 18px; }
+.vl-pal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 4px; }
+.vl-pal-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px; border-radius: 11px; text-align: left; transition: background .15s; }
 .vl-pal-item:hover, .vl-pal-item:focus-visible { background: var(--accent-soft); }
-.vl-pal-item > .ic { color: var(--accent-text); margin-top: 1px; }
+.vl-pal-item > .ic { color: var(--accent-text); margin-top: 1px; flex: none; }
 .vl-pal-item span { display: flex; flex-direction: column; min-width: 0; }
-.vl-pal-item b { font-size: .8rem; font-weight: 650; }
-.vl-pal-item small { font-size: .7rem; color: var(--muted); line-height: 1.35; }
+.vl-pal-item b { font-size: .84rem; font-weight: 650; }
+.vl-pal-item small { font-size: .74rem; color: var(--muted); line-height: 1.35; }
 
 /* ---------- Einstellungen ---------- */
 .vl-move { gap: 2px; flex: none; }

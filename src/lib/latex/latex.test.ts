@@ -560,6 +560,14 @@ describe('Blanko-Formular zum Ausfüllen von Hand', () => {
     // Blanko: eigenes Feld für die Buchungsnummer (Zuordnung Zettel ↔ Buchung), in beiden Stilen
     expect(mainTex('quittung', standardVorlage('quittung'), '#6366f1', { blanko: true }).tex).toContain('Buchungs-Nr.');
     expect(mainTex('quittung', standardVorlage('quittung', 'formular'), '#6366f1', { blanko: true }).tex).toContain(String.raw`\KForm{Buchungs-Nr.}{\KSchreib}`);
+    // Der Programmname gehört nicht auf den Beleg des Kunden (nur in den LaTeX-Kommentar)
+    for (const stil of [undefined, 'formular'] as const) {
+      const druck = mainTex('quittung', standardVorlage('quittung', stil), '#6366f1', { blanko: true })
+        .tex.split('\n')
+        .filter((z) => !z.trimStart().startsWith('%'))
+        .join('\n');
+      expect(druck).not.toContain('Kladdy');
+    }
   });
 
   it('Unterschrift: „Ort, Datum“ bleibt leer, die Linie bleibt', () => {
