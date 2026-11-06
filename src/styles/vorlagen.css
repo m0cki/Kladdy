@@ -275,3 +275,4 @@
 .vl-pflicht-stand { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: .8rem; font-weight: 600; color: var(--pos); }
 .vl-pflicht-stand .ic { width: 14px; height: 14px; }
 .vl-pflicht-stand.bad { color: var(--neg); }
+.vl-legende-unten { margin: 4px 0 10px; }

@@ -1041,9 +1041,6 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
                       : `Pflichtangaben vollständig${steuerOrt ? ` · Steuernummer in „${steuerOrt}“` : ''}`}
                   </span>
                 ) : null}
-                <span className="vl-legende">
-                  Angaben in ‹ › füllt Kladdy beim Ausstellen aus. Bausteine mit <Asterisk className="ic vl-leg-ic" /> Pflicht bleiben im Beleg – ihren Text kannst du ändern.
-                </span>
               </div>
             </div>
             {wahl.id != null && (
@@ -1162,6 +1159,9 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
               <li className="vl-empty">Noch keine Bausteine – füge unten welche hinzu.</li>
             )}
           </ul>
+          <p className="vl-legende vl-legende-unten">
+            Angaben in ‹ › füllt Kladdy beim Ausstellen aus · <Asterisk className="ic vl-leg-ic" /> Pflicht bleibt im Beleg, der Text ist änderbar.
+          </p>
           <div className="vl-add" ref={addRef}>
             <button type="button" className="btn subtle" aria-expanded={palette} onClick={() => setPalette((p) => !p)}>
               <Plus />

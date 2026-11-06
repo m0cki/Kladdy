@@ -771,8 +771,8 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
                 </label>
               ) : (
                 <span className="bl-vl" title="Die Vorlage ist beim Ausstellen mitgespeichert – ein Nachdruck sieht genauso aus wie das Original, auch wenn du die Vorlage später änderst">
-                  <Blocks />
-                  Gedruckt wie beim Ausstellen
+                  <Lock />
+                  So wurde der Beleg ausgestellt
                 </span>
               )}
               {editierbar ? (
