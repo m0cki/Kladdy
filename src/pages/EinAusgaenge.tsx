@@ -414,7 +414,7 @@ function Liste({
             <thead>
               <tr>
                 <th className="l bu-c-dat">Datum</th>
-                <th className="l bu-c-bnr" title="Buchungsnummer, darunter der Beleg (Quittung oder Rechnung aus Kladdy, Nummer eines fremden Belegs oder Datei)">Nr. · Beleg</th>
+                <th className="l bu-c-bnr" title="Buchungsnummer, darunter der Beleg (Quittung oder Rechnung aus Kladdy, Nummer eines fremden Belegs oder Datei)">Buchung · Beleg</th>
                 <th className="l">Beschreibung</th>
                 <th className="l bu-c-kat">Kategorie</th>
                 <th className="l bu-c-zw">Zahlungsweg</th>

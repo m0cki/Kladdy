@@ -148,9 +148,11 @@ export function passtReiter(z: BelegZeile, r: Reiter): boolean {
 }
 
 
-export type ListenZeitraumModus = 'monat' | 'jahr' | 'gesamt';
+/** wie Ein- & Ausgänge (Monat · Quartal · Jahr), dazu „Gesamt“ */
+export type ListenZeitraumModus = 'monat' | 'quartal' | 'jahr' | 'gesamt';
 export const LISTEN_ZEITRAEUME: readonly { value: ListenZeitraumModus; label: string }[] = [
   { value: 'monat', label: 'Monat' },
+  { value: 'quartal', label: 'Quartal' },
   { value: 'jahr', label: 'Jahr' },
   { value: 'gesamt', label: 'Gesamt' },
 ];
