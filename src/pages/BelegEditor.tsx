@@ -1125,27 +1125,32 @@ function LeistungenKarte({ m, i }: { m: MaskeKontext; i: number }) {
 /* ---------- Zahlung (Rechnung) ---------- */
 
 function ZahlungsartWahl({ m, id }: { m: MaskeKontext; id: string }) {
+  // dieselben Kacheln wie in „Erfassen“ (Symbol, Name, Zusatz, Häkchen) – ein Auswahlmuster für den Zahlungsweg
   return (
-    <Seg
-      className="full bl-zaseg"
-      ariaLabel="Zahlungsweg"
-      value={m.form.zahlungsart}
-      onChange={(z) => {
-        if (m.editierbar) m.set('zahlungsart', z);
-      }}
-      options={ZAHLUNGSWEGE.map((z) => {
+    <div className="bu-zw bl-zw" role="radiogroup" aria-label="Zahlungsweg">
+      {ZAHLUNGSWEGE.map((z) => {
         const ZIcon = ZAHLUNGSWEG_ICON[z.id];
-        return {
-          value: z.id,
-          label: (
-            <span id={`${id}-${z.id}`} className="bl-za">
-              <ZIcon />
-              {z.name}
-            </span>
-          ),
-        };
+        const an = m.form.zahlungsart === z.id;
+        return (
+          <button
+            key={z.id}
+            id={`${id}-${z.id}`}
+            type="button"
+            className={`bu-zw-opt ${an ? 'on' : ''}`}
+            role="radio"
+            aria-checked={an}
+            disabled={!m.editierbar}
+            onClick={() => {
+              if (m.editierbar) m.set('zahlungsart', z.id);
+            }}
+          >
+            <ZIcon />
+            <b>{z.name}</b>
+            <small>{z.text}</small>
+          </button>
+        );
       })}
-    />
+    </div>
   );
 }
 

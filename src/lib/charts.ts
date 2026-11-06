@@ -197,7 +197,9 @@ export function xBeschriftungen(anzahl: number, abstand: number, mindestens = 46
   const jede = Math.max(1, Math.ceil(mindestens / Math.max(1, abstand)));
   const out: number[] = [];
   for (let i = 0; i < anzahl; i++) if ((anzahl - 1 - i) % jede === 0) out.push(i);
-  return out;
+  if (out[0] === 0) return out;
+  // der erste Wert bekommt immer eine Beschriftung (sonst fehlt der Anfang des Zeitraums); eine zu nahe daneben weicht
+  return [0, ...out.filter((i) => i >= jede)];
 }
 
 /** Nächster Index zu einer Pixelposition (Fadenkreuz), begrenzt auf 0 … anzahl−1. */

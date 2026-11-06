@@ -17,7 +17,7 @@ import {
   type FirmaFeld,
 } from '../../lib/firma';
 import { logoAusDrop, logoWaehlen, logoZuruecksetzen, useFirmenlogo } from '../../lib/logoablage';
-import { ladeFirma, speichereFirma } from '../../lib/queries/einstellungen';
+import { ladeFirma, ladeUstModus, speichereFirma, type UstModus } from '../../lib/queries/einstellungen';
 import { useUi } from '../../store/ui';
 import { Ladeansicht, fehlerText, useLaden } from './Laden';
 import { SetCard } from './SetRow';
@@ -75,6 +75,12 @@ export default function Firma() {
 
 function FirmaFormular({ gespeichert, neuLaden }: { gespeichert: FirmaDaten; neuLaden: () => Promise<void> }) {
   const toast = useUi((s) => s.toast);
+  /* Rechtsgrundlage der Pflichtangaben je Besteuerung: Kleinunternehmer § 34a UStDV, sonst § 14 Abs. 4 UStG */
+  const [ust, setUst] = useState<UstModus>('klein');
+  useEffect(() => {
+    ladeUstModus().then(setUst, () => {});
+  }, []);
+  const grundlage = ust === 'klein' ? '§ 34a UStDV – vereinfachte Rechnung für Kleinunternehmer' : '§ 14 Abs. 4 UStG';
   const [werte, setWerte] = useState<FirmaDaten>(() => anzeige(gespeichert));
   const [fehler, setFehler] = useState<Partial<Record<FirmaFeld, string>>>({});
   /* Gespeicherter Stand: als State für die Anzeige, als Ref für schnelle Folge-Änderungen (zwei Felder kurz nacheinander). */
@@ -168,14 +174,14 @@ function FirmaFormular({ gespeichert, neuLaden }: { gespeichert: FirmaDaten; neu
             <TriangleAlert />
             <span>
               <b>Für Rechnungen und Quittungen fehlt noch:</b> {fehlt.join(' · ')}. Diese Angaben müssen auf jedem Beleg stehen
-              (§ 34a UStDV).
+              ({grundlage}).
             </span>
           </div>
         ) : (
           <div className="set-note ok" data-setting="firma-pflichtangaben">
             <CircleCheck />
             <span>
-              <b>Alles da.</b> Die Pflichtangaben für Rechnungen und Quittungen sind eingetragen (§ 34a UStDV).
+              <b>Alles da.</b> Die Pflichtangaben für Rechnungen und Quittungen sind eingetragen ({grundlage}).
             </span>
           </div>
         )}
