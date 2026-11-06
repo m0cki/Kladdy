@@ -268,7 +268,8 @@ export function faelligText(z: BelegZeile, heute: string): { text: string; klass
   if (z.status === 'bezahlt') {
     const wie = z.art === 'eigenbeleg' ? 'gebucht' : z.art === 'quittung' && z.zahlungsart ? zahlungswegKurz(z.zahlungsart) : 'bezahlt';
     const am = z.bezahlt_am ?? z.datum;
-    return { text: `${wie}${am ? ` · ${datumText(am).slice(0, 6)}` : ''}`, klasse: 'muted' };
+    // am Belegtag bezahlt (Quittung): das Datum steht schon in der Spalte davor
+    return { text: `${wie}${am && am !== z.datum ? ` · ${datumText(am).slice(0, 6)}` : ''}`, klasse: 'muted' };
   }
   return { text: '—', klasse: 'muted' };
 }

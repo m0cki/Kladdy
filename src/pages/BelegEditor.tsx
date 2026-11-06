@@ -604,7 +604,8 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
             <span>{titel}</span>
             {!beleg ? (
               <span className="badge entwurf">Neu</span>
-            ) : zeile ? (
+            ) : zeile && !(zeile.art === 'quittung' && zeile.status === 'bezahlt') ? (
+              // eine ausgestellte Quittung ist immer bezahlt – kein eigenes Badge
               <StatusKnopf z={zeile} heute={h} hier onAktion={(a) => statusAktionAusfuehren(a, zeile, navigate)} />
             ) : null}
             {editierbar && naechste ? (

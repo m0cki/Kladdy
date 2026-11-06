@@ -245,3 +245,7 @@ a.ku-hw.tm-hw:hover { border-color: var(--accent-line); }
 .tm-nach .tm-frage { display: none; }
 .tm-zeit .tm-erl { font-size: .7rem; font-weight: 650; color: var(--pos); }
 .tm-chip.ok { font-family: var(--font); }
+/* Eine Aktionsspalte für alle Gruppen (auch „Nachtragen“): Betrag und Chip stehen überall untereinander;
+   „Erledigt“ und „Absagen“ gleich hoch */
+@container tm (min-width: 921px) { .tm-items, .tm-nach .tm-items { grid-template-columns: 62px 32px minmax(0, 1fr) 76px 172px 228px; } }
+.tm-acts .btn.sm, .tm-acts .tm-btn { height: 32px; padding: 0 12px; font-size: .8rem; border-radius: 9px; }
