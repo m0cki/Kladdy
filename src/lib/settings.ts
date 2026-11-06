@@ -47,7 +47,7 @@ export const FARBSCHEMATA: readonly Farbschema[] = [
     name: 'Petrol',
     beschreibung: 'Schiefergrau mit Petrol, sachlich',
     hell: { akzent: '#0b6a77', tintH: 195, tintS: 16 },
-    dunkel: { akzent: '#2fb0bc', tintH: 195, tintS: 20 },
+    dunkel: { akzent: '#137a85', tintH: 195, tintS: 20 },
   },
   {
     id: 'kladde',
@@ -163,11 +163,13 @@ export function mischen(hex: string, ziel: '#ffffff' | '#000000', anteil: number
 /** Ungünstigste Fläche, auf der Akzent als Schrift steht (Seite bzw. Karte des Modus). */
 const TEXT_GRUND = { light: '#eef1f2', dark: '#1d2427' } as const;
 
-/** Akzent als Schrift: so weit abgedunkelt (hell) bzw. aufgehellt (dunkel), dass er 4,5:1 erreicht. */
+/** Akzent als Schrift: so weit abgedunkelt (hell, 4,6:1) bzw. aufgehellt (dunkel, 6,5:1), dass er gut lesbar ist. */
 export function textAkzent(akzent: string, modus: 'light' | 'dark'): string {
   const ziel = modus === 'light' ? '#000000' : '#ffffff';
+  // im Dunkeln deutlich über dem Minimum: kleine Akzent-Schrift (Nummern-Chips, Platzhalter) soll klar lesbar sein
+  const min = modus === 'light' ? 4.6 : 6.5;
   let f = akzent;
-  for (let i = 1; i <= 20 && kontrast(f, TEXT_GRUND[modus]) < 4.6; i++) f = mischen(akzent, ziel, i * 0.05);
+  for (let i = 1; i <= 20 && kontrast(f, TEXT_GRUND[modus]) < min; i++) f = mischen(akzent, ziel, i * 0.05);
   return f;
 }
 

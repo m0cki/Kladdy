@@ -635,3 +635,9 @@ input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 7px; }
 .sb-nav .sb-hint.warn { color: color-mix(in oklab, var(--warn) 82%, var(--text)); }
 input[type="range"]:not(.hue) { box-shadow: inset 0 0 0 1px var(--border-strong); }
 #search { max-width: 380px; }
+
+/* Dunkel: Konturen und getönte Flächen aus der (hellen) Akzent-Schrift ableiten – der Flächen-Akzent ist gedeckt */
+:root[data-mode="dark"] {
+  --accent-line: color-mix(in oklab, var(--accent-text) 50%, transparent);
+  --accent-soft: color-mix(in oklab, var(--accent-text) 14%, transparent);
+}
