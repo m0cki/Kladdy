@@ -230,7 +230,7 @@ function Liste({ index, h, o, setO, tbodyRef, suchFeld, sucheLeeren }: ListeProp
                   <Fragment key={t.info.k.id}>
                     {neu ? (
                       <tr className="ku-gruppe">
-                        <td colSpan={7}>{gruppe === 'termin' ? 'Termin geplant' : 'Kein Termin geplant'}</td>
+                        <td colSpan={7}>{gruppe === 'termin' ? 'Mit Termin – nachtragen und nächster zuerst' : 'Ohne Termin – zuletzt da zuerst'}</td>
                       </tr>
                     ) : null}
                     <Zeile t={t} q={qt} h={h} gewaehlt={gewaehlt === t.info.k.id} suchFeld={suchFeld} />

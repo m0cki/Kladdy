@@ -149,8 +149,8 @@ export default function EinAusgaenge() {
 
 const TABS: { value: TypFilter; label: string }[] = [
   { value: 'alle', label: 'Alle' },
-  { value: 'einnahme', label: 'Eingänge' },
-  { value: 'ausgabe', label: 'Ausgänge' },
+  { value: 'einnahme', label: 'Einnahmen' },
+  { value: 'ausgabe', label: 'Ausgaben' },
 ];
 
 // Filter überleben den Seitenwechsel (wie im Prototyp: Modulvariable)
