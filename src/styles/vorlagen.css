@@ -48,6 +48,8 @@
 .vl-reset .ic { width: 14px; height: 14px; }
 
 /* ---------- Baustein hinzufügen ---------- */
+/* Offene Palette über den folgenden Karten (jede .card ist durch backdrop-filter/reveal ein eigener Stapelkontext) */
+.vl-liste.offen { position: relative; z-index: 30; }
 .vl-add { position: relative; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
 .vl-add > .btn { width: 100%; }
 .vl-palette {
