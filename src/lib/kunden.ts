@@ -89,19 +89,19 @@ export type EintragStatus =
 
 /** Badge-Klasse (components.css) und Text je Status. */
 export const STATUS_BADGE: Readonly<Record<EintragStatus, { klasse: string; text: string }>> = {
-  bezahlt: { klasse: 'bezahlt', text: 'bezahlt' },
-  offen: { klasse: 'offen', text: 'offen' },
-  ueberfaellig: { klasse: 'ueberfaellig', text: 'überfällig' },
+  bezahlt: { klasse: 'bezahlt', text: 'Bezahlt' },
+  offen: { klasse: 'offen', text: 'Offen' },
+  ueberfaellig: { klasse: 'ueberfaellig', text: 'Überfällig' },
   entwurf: { klasse: 'entwurf', text: 'Entwurf' },
-  vorbereitet: { klasse: 'entwurf', text: 'vorbereitet' },
-  storniert: { klasse: 'storniert', text: 'storniert' },
+  vorbereitet: { klasse: 'entwurf', text: 'Vorbereitet' },
+  storniert: { klasse: 'storniert', text: 'Storniert' },
   angebot: { klasse: 'accent', text: 'Angebot' },
-  angenommen: { klasse: 'pos', text: 'angenommen' },
-  abgelehnt: { klasse: 'entwurf', text: 'abgelehnt' },
-  geplant: { klasse: 'accent', text: 'geplant' },
-  nachtragen: { klasse: 'warn', text: 'nachtragen' },
-  erledigt: { klasse: 'bezahlt', text: 'erledigt' },
-  abgesagt: { klasse: 'entwurf', text: 'abgesagt' },
+  angenommen: { klasse: 'pos', text: 'Angenommen' },
+  abgelehnt: { klasse: 'entwurf', text: 'Abgelehnt' },
+  geplant: { klasse: 'accent', text: 'Geplant' },
+  nachtragen: { klasse: 'warn', text: 'Nachtragen' },
+  erledigt: { klasse: 'bezahlt', text: 'Erledigt' },
+  abgesagt: { klasse: 'entwurf', text: 'Abgesagt' },
 };
 
 export const ART_NAME: Readonly<Record<VerlaufArt, string>> = {
@@ -192,7 +192,7 @@ export interface KundenInfo {
   seit: string;
   geplant: number;
   angebote: number;
-  /** Sortierschlüssel „zuletzt da“ (absteigend): neu angelegt ohne Einträge ganz oben, dann nur kommende Termine
+  /** Sortierschlüssel „zuletzt da“ (absteigend): neu angelegt ohne Einträge ganz oben, dann alle mit kommendem Termin
    *  (nächster zuerst), dann nach letztem Besuch bzw. jüngstem vergangenen Eintrag */
   sortKey: string;
   /** normalisierte Stammdaten und Notiz */
@@ -254,8 +254,12 @@ function auswerten(k: KundeZeile, zeilen: readonly VerlaufZeile[], heute: string
   const seit = fruehester && fruehester < angelegt ? fruehester : angelegt;
 
   let sortKey: string;
-  if (zuletzt) sortKey = zuletzt;
+  // ganz oben: Termine zum Nachtragen (ältester zuerst), dann wer einen kommenden Termin hat (nächster zuerst) – auch
+  // Stammkunden; die Spalte zeigt genau das oben in der Zelle
+  const nachtragen = eintraege.filter((e) => e.status === 'nachtragen').sort((a, b) => cmp(a.z.datum, b.z.datum))[0];
+  if (nachtragen) sortKey = '99' + String(99_999_999 - Number(nachtragen.z.datum.replace(/-/g, '')));
   else if (naechster) sortKey = '9' + String(99_999_999 - Number(naechster.z.datum.replace(/-/g, '')));
+  else if (zuletzt) sortKey = zuletzt;
   else if (vergangen.length) sortKey = vergangen[0].z.datum;
   else if (eintraege.length) sortKey = eintraege[eintraege.length - 1].z.datum;
   else sortKey = '9999' + k.erstellt_am;
@@ -421,8 +425,8 @@ const WOCHENTAGE = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 /** „März 2025“ */
 export const monatJahr = (iso: string): string => `${MONATE[Number(iso.slice(5, 7)) - 1]} ${iso.slice(0, 4)}`;
 
-const wochentag = (iso: string): string => WOCHENTAGE[new Date(utc(iso)).getUTCDay()];
-const tagMonat = (iso: string): string => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.`;
+export const wochentag = (iso: string): string => WOCHENTAGE[new Date(utc(iso)).getUTCDay()];
+export const tagMonat = (iso: string): string => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.`;
 
 /** Uhrzeit eines Termins: „08:00–10:00“, „08:00“ oder ''. */
 export const zeitspanne = (von: string | null, bis: string | null): string => (von ? (bis ? `${von}–${bis}` : von) : '');

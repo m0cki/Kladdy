@@ -26,7 +26,7 @@ import {
   Pencil,
   Phone,
   Plus,
-  Receipt,
+  ReceiptEuro,
   Trash2,
   TriangleAlert,
   User,
@@ -80,7 +80,7 @@ const NOTIZ_BEISPIEL = 'z. B. Hund im Garten, Tor immer schließen';
 const NOTIZ_PAUSE_MS = 900;
 
 const ART_ICON: Readonly<Record<VerlaufArt, LucideIcon>> = {
-  quittung: Receipt,
+  quittung: ReceiptEuro,
   rechnung: FileText,
   angebot: ClipboardList,
   einnahme: ArrowLeftRight,

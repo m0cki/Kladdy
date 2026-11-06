@@ -33,6 +33,13 @@ describe('Pflichtangaben (§ 2.3)', () => {
     expect(pflichtTitel(rechnung(), l)).toBe('Rechnung: 1 Pflichtangabe fehlt');
   });
 
+  it('Steuernummer in den Belegdaten reicht, auch ohne Fußzeile', () => {
+    const ohneFuss = standardVorlage('rechnung').filter((b) => b.typ !== 'fusszeile');
+    expect(punkt(pflichtCheck(rechnung(), ohneFuss), 'Steuernummer').ok).toBe(true);
+    const ohneBeides = ohneFuss.map((b) => (b.typ === 'anschrift_meta' ? { ...b, steuernr: false } : b));
+    expect(punkt(pflichtCheck(rechnung(), ohneBeides), 'Steuernummer').ok).toBe(false);
+  });
+
   it('§ 19-Baustein ausgeblendet zählt wie entfernt', () => {
     const v = standardVorlage('rechnung').map((b) => (b.typ === 'steuerhinweis' ? { ...b, aus: true } : b));
     expect(punkt(pflichtCheck(rechnung(), v), 'Entgelt und § 19-Hinweis').ok).toBe(false);
@@ -191,6 +198,14 @@ describe('Quittungsangaben: einzelne Angaben abgeschaltet', () => {
     // über der Kleinbetragsgrenze: Kunde mit Anschrift ist Pflicht
     return { ...q, positionen: [{ ...q.positionen[0], menge: 1, einzelpreis_cent: 30_000 }] };
   };
+
+  it('Steuernummer: bei der Kleinbetragsrechnung nicht nötig, über der Grenze Pflicht (§ 33 UStDV)', () => {
+    const ohneNr = (d: BelegDokument): BelegDokument => ({ ...d, firma: { ...d.firma, steuernummer: '' } });
+    expect(punkt(pflichtCheck(ohneNr(quittung()), standardVorlage('quittung')), 'Steuernummer')).toMatchObject({ ok: true });
+    expect(punkt(pflichtCheck(ohneNr(grosseQuittung()), standardVorlage('quittung')), 'Steuernummer')).toMatchObject({ ok: false });
+    // Rechnungen brauchen sie immer
+    expect(punkt(pflichtCheck(ohneNr(rechnung()), standardVorlage('rechnung')), 'Steuernummer').ok).toBe(false);
+  });
 
   it('alle an (fehlende Schalter = an): alles da, wie bisher', () => {
     expect(pflichtOk(pflichtCheck(quittung(), standardVorlage('quittung')))).toBe(true);

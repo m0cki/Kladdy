@@ -14,7 +14,7 @@ import {
   Copy,
   FileText,
   Pencil,
-  Receipt,
+  ReceiptEuro,
   RotateCcw,
   Trash2,
   X,
@@ -42,7 +42,7 @@ const SYMBOL: Readonly<Record<StatusAktion, LucideIcon>> = {
   'angebot-offen': Clock,
   'angebot-abgelehnt': Ban,
   oeffnen: Pencil,
-  ausstellen: Receipt,
+  ausstellen: ReceiptEuro,
   'zum-termin': CalendarDays,
   'vorbereitung-weg': Trash2,
   pdf: FileText,
@@ -109,7 +109,9 @@ export function StatusKnopf({ z, heute, hier = false, onAktion }: Props) {
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
   const btn = useRef<HTMLButtonElement>(null);
   const pop = useRef<HTMLDivElement>(null);
-  const nurBadge = z.status === 'entwurf' && !istVorbereitet(z);
+  // Nur Badge: freie Entwürfe; in der Beleg-Maske auch alle ausgestellten Belege – dort stehen „Als bezahlt markieren“,
+  // „Stornieren …“ und „Duplizieren“ als eigene Knöpfe (das Menü am Badge bleibt in der Liste)
+  const nurBadge = (z.status === 'entwurf' && !istVorbereitet(z)) || (hier && !!z.nummer);
 
   const zu = (fokus = false) => {
     setOffen(false);

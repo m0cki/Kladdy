@@ -31,7 +31,7 @@
 .liq-banner-a { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; max-width: 46%; }
 .liq-banner-a .chip { font-weight: 600; color: var(--text); background: var(--surface); padding: 5px 11px; cursor: pointer; }
 .liq-banner-a .chip:hover { border-color: var(--accent-line); background: var(--accent-soft); }
-.liq-banner-a .chip .ic { width: 14px; height: 14px; color: var(--accent); }
+.liq-banner-a .chip .ic { width: 14px; height: 14px; color: var(--accent-text); }
 
 /* ---------- Annahmen ---------- */
 .liq-reset { padding: 6px 10px; font-size: .78rem; }
@@ -49,7 +49,7 @@
 .liq-sl-head output { font-family: var(--num-font); font-variant-numeric: tabular-nums; font-weight: 700; color: var(--text); white-space: nowrap; }
 .liq input[type="range"] { --fill: 0%; background: linear-gradient(90deg, var(--accent) var(--fill), var(--surface-3) var(--fill)); }
 .liq input[type="range"]:disabled { opacity: .4; cursor: not-allowed; }
-.liq-linkbtn { color: var(--accent); font-weight: 600; font-size: inherit; align-self: flex-start; }
+.liq-linkbtn { color: var(--accent-text); font-weight: 600; font-size: inherit; align-self: flex-start; }
 .liq-linkbtn:hover { text-decoration: underline; }
 
 /* ---------- Wiederkehrende Kosten (in den Annahmen) ---------- */
@@ -99,7 +99,7 @@ li:hover .liq-plan-a .icon-btn, .liq-plan-a .icon-btn:focus-visible { opacity: 1
 .liq-what-in { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .liq-what-in > a, .liq-what-in > .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .liq-what-in > a { font-weight: 600; }
-.liq-what-in > a:hover { color: var(--accent); text-decoration: underline; }
+.liq-what-in > a:hover { color: var(--accent-text); text-decoration: underline; }
 .liq-what-in .pill { flex: none; font-style: normal; }
 .liq-ic { --c: var(--muted); width: 24px; height: 24px; border-radius: 7px; flex: none; display: grid; place-items: center; color: var(--c); background: color-mix(in oklab, var(--c) 15%, transparent); }
 .liq-ic .ic { width: 14px; height: 14px; }

@@ -107,3 +107,10 @@
 :root[data-motion="reduced"] .c-draw:not(.dashed):not(.bezug) { stroke-dasharray: none; stroke-dashoffset: 0; animation: fade .4s var(--ease) both; }
 :root[data-motion="reduced"] .c-grow { animation: fade .4s var(--ease) both; }
 :root[data-motion="reduced"] .c-pulse { animation: none; }
+
+/* Dunkelmodus: Diagramme so gut ablesbar wie im Hellen – kräftigere Serienfarben, nicht gewählte Balken weniger blass,
+   Linien und Flächen im hellen Akzent (der Flächen-Akzent der Knöpfe ist im Dunkeln gedeckt) */
+:root[data-mode="dark"] { --series-1: #5b9ff2; --series-2: #ee7440; }
+:root[data-mode="dark"] .chart { --accent: var(--accent-text); }
+:root[data-mode="dark"] .c-bar.blass { opacity: .7; }
+:root[data-mode="dark"] .c-line.bezug { stroke: var(--text-2); }

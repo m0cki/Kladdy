@@ -56,6 +56,8 @@ export interface BelegZeile {
   storniert_am: string | null;
   pdf_beleg_id: number | null;
   scan_beleg_id: number | null;
+  /** Buchungsnummer der verknüpften Zahlung (Quittung, bezahlte Rechnung, Eigenbeleg) */
+  buchung_nummer?: string | null;
 }
 
 export const ART_NAME: Readonly<Record<ListenArt, string>> = {
@@ -80,7 +82,9 @@ export type StatusSchluessel =
   | 'stornobeleg'
   | 'angenommen'
   | 'abgelehnt'
-  | 'abgelaufen';
+  | 'abgelaufen'
+  /** Angebot, auf dessen Antwort gewartet wird (nicht „offen“ wie eine unbezahlte Rechnung) */
+  | 'ausstehend';
 
 /** Status zur Anzeige: „überfällig“, „vorbereitet“ und die Sonderfälle je Art (Prototyp statusKey/statusBadge). */
 export function statusSchluessel(z: Pick<BelegZeile, 'art' | 'status' | 'termin_id' | 'faellig_am'>, heute: string): StatusSchluessel {
@@ -89,7 +93,7 @@ export function statusSchluessel(z: Pick<BelegZeile, 'art' | 'status' | 'termin_
   if (z.status === 'storniert') return 'storniert';
   if (z.art === 'angebot') {
     if (z.status === 'angenommen' || z.status === 'abgelehnt') return z.status;
-    return z.faellig_am && z.faellig_am < heute ? 'abgelaufen' : 'offen';
+    return z.faellig_am && z.faellig_am < heute ? 'abgelaufen' : 'ausstehend';
   }
   if (z.art === 'rechnung' && z.status === 'offen') return z.faellig_am && z.faellig_am < heute ? 'ueberfaellig' : 'offen';
   if (z.art === 'eigenbeleg' && z.status === 'bezahlt') return 'gebucht';
@@ -108,6 +112,7 @@ export const STATUS_BADGE: Readonly<Record<StatusSchluessel, { klasse: string; t
   angenommen: { klasse: 'bezahlt', text: 'Angenommen' },
   abgelehnt: { klasse: 'abgelehnt', text: 'Abgelehnt' },
   abgelaufen: { klasse: 'entwurf', text: 'Abgelaufen' },
+  ausstehend: { klasse: 'vorbereitet', text: 'Ausstehend' },
 };
 
 /** Zahl der überfälligen Rechnungen (Seitenleiste, roter Zähler). */
@@ -116,24 +121,38 @@ export const anzahlUeberfaellig = (zeilen: readonly BelegZeile[], heute: string)
 
 /* ================= Filter, Zeitraum, Suche, Sortierung ================= */
 
-export type Reiter = 'alle' | 'offen' | 'bezahlt';
-export const REITER: readonly { value: Reiter; label: string }[] = [
-  { value: 'alle', label: 'Alle' },
-  { value: 'offen', label: 'Offen' },
-  { value: 'bezahlt', label: 'Bezahlt' },
+export type Reiter = 'alle' | 'offen' | 'bezahlt' | 'angebote' | 'entwuerfe';
+export const REITER: readonly { value: Reiter; label: string; titel: string }[] = [
+  { value: 'alle', label: 'Alle', titel: 'Alle ausgestellten Belege (mit Nummer) im gewählten Zeitraum – Offen, Bezahlt und Angebote sind Teile davon' },
+  { value: 'offen', label: 'Offen', titel: 'Offene Rechnungen im gewählten Zeitraum' },
+  { value: 'bezahlt', label: 'Bezahlt', titel: 'Bezahlte Rechnungen, Quittungen und gebuchte Eigenbelege im gewählten Zeitraum' },
+  { value: 'angebote', label: 'Angebote', titel: 'Angebote im gewählten Zeitraum (noch keine Einnahme)' },
+  { value: 'entwuerfe', label: 'Entwürfe', titel: 'Entwürfe und für Termine vorbereitete Belege (noch ohne Nummer) im gewählten Zeitraum' },
 ];
 
-/** Offen = offene Rechnungen plus Vorbereitungen für geplante Termine; Bezahlt = bezahlte Rechnungen, Quittungen und
- * gebuchte Eigenbelege. Entwürfe, Angebote und Stornos nur unter „Alle“. */
-export function passtReiter(z: BelegZeile, r: Reiter): boolean {
-  if (r === 'offen') return (z.art === 'rechnung' && z.status === 'offen') || (istVorbereitet(z) && z.termin_status === 'geplant');
-  if (r === 'bezahlt') return z.status === 'bezahlt' && z.art !== 'angebot' && z.art !== 'storno';
-  return true;
+/** Reiter aus der Adresse (?reiter=…); alter Wert „ausgestellt“ ⇒ Alle. */
+export function reiterAusAdresse(r: string | null): Reiter | null {
+  if (r === 'ausgestellt') return 'alle';
+  return REITER.some((t) => t.value === r) ? (r as Reiter) : null;
 }
 
-export type ListenZeitraumModus = 'monat' | 'jahr' | 'gesamt';
+/** Belegregister: Alle = ausgestellte Belege (mit Nummer); Offen = offene Rechnungen; Bezahlt = bezahlte Rechnungen,
+ * Quittungen und gebuchte Eigenbelege; Angebote = ausgestellte Angebote – zusammen „Alle“ (bis auf Stornos).
+ * Entwürfe (noch ohne Nummer, auch für Termine vorbereitete) gehören nicht ins Register und stehen getrennt. */
+export function passtReiter(z: BelegZeile, r: Reiter): boolean {
+  if (r === 'offen') return z.art === 'rechnung' && z.status === 'offen' && !!z.nummer;
+  if (r === 'bezahlt') return z.status === 'bezahlt' && z.art !== 'angebot' && z.art !== 'storno';
+  if (r === 'angebote') return z.art === 'angebot' && !!z.nummer;
+  if (r === 'entwuerfe') return !z.nummer;
+  return !!z.nummer;
+}
+
+
+/** wie Ein- & Ausgänge (Monat · Quartal · Jahr), dazu „Gesamt“ */
+export type ListenZeitraumModus = 'monat' | 'quartal' | 'jahr' | 'gesamt';
 export const LISTEN_ZEITRAEUME: readonly { value: ListenZeitraumModus; label: string }[] = [
   { value: 'monat', label: 'Monat' },
+  { value: 'quartal', label: 'Quartal' },
   { value: 'jahr', label: 'Jahr' },
   { value: 'gesamt', label: 'Gesamt' },
 ];
@@ -168,24 +187,26 @@ export const faelligSchluessel = (z: BelegZeile): string =>
 
 const text = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
-/** Wie im Prototyp: Entwürfe oben, dann nach Datum und Nummer; andere Spalten nach ihrem Wert. */
+/** Belegregister: ausgestellte Belege nach Nummer bzw. Datum, Entwürfe (ohne Nummer) dahinter; andere Spalten nach ihrem Wert. */
 export function vergleiche(a: BelegZeile, b: BelegZeile, s: Sortierung): number {
   const r = s.richtung;
   if (s.feld === 'betrag') return r * (a.summe_cent - b.summe_cent) || b.id - a.id;
   if (s.feld === 'kunde') return r * (a.kunde_name ?? '').localeCompare(b.kunde_name ?? '', 'de') || b.id - a.id;
   if (s.feld === 'faellig') return r * text(faelligSchluessel(a), faelligSchluessel(b)) || text(a.nummer ?? '', b.nummer ?? '');
-  if (!a.nummer !== !b.nummer) return a.nummer ? 1 : -1;
+  if (!a.nummer !== !b.nummer) return a.nummer ? -1 : 1;
   if (s.feld === 'datum' || (a.datum !== b.datum && a.art !== b.art)) return r * text(a.datum ?? '', b.datum ?? '') || r * (a.id - b.id);
   return r * text(a.nummer ?? a.datum ?? '', b.nummer ?? b.datum ?? '') || r * (a.id - b.id);
 }
 
 export interface ListenErgebnis {
   zeilen: BelegZeile[];
-  /** Zähler an den Reitern: im Zeitraum, „Offen“ immer über alle */
+  /** Zähler an den Reitern: alle im selben Zeitraum (Ausgestellt = Offen + Bezahlt + Angebote/Stornos) */
   reiter: Record<Reiter, number>;
   ueberfaellig: number;
-  /** Suche oder „Offen“: über alle Zeiträume */
+  /** Suche: über alle Zeiträume und alle Reiter */
   ohneZeitraum: boolean;
+  /** offene Rechnungen mit Belegdatum vor dem Zeitraum (Hinweis „aus früheren Monaten“) */
+  offenFrueher: number;
 }
 
 export function filtere(
@@ -196,21 +217,30 @@ export function filtere(
   const imZeitraum = (z: BelegZeile) => !o.zeitraum || (!!z.datum && z.datum >= o.zeitraum.von && z.datum <= o.zeitraum.bis);
   const imZr = alle.filter(imZeitraum);
   const reiter: Record<Reiter, number> = {
-    alle: imZr.length,
-    offen: alle.filter((z) => passtReiter(z, 'offen')).length,
+    alle: imZr.filter((z) => passtReiter(z, 'alle')).length,
+    offen: imZr.filter((z) => passtReiter(z, 'offen')).length,
     bezahlt: imZr.filter((z) => passtReiter(z, 'bezahlt')).length,
+    angebote: imZr.filter((z) => passtReiter(z, 'angebote')).length,
+    entwuerfe: imZr.filter((z) => passtReiter(z, 'entwuerfe')).length,
   };
-  const ohneZeitraum = woerter.length > 0 || o.reiter === 'offen';
+  const offenFrueher = o.zeitraum ? alle.filter((z) => passtReiter(z, 'offen') && !!z.datum && z.datum < (o.zeitraum?.von ?? '')).length : 0;
+  const suche = woerter.length > 0;
+  const ohneZeitraum = suche;
   const basis = ohneZeitraum ? alle : imZr;
   const zeilen = basis
-    .filter((z) => passtReiter(z, o.reiter))
+    .filter((z) => suche || passtReiter(z, o.reiter))
     .filter((z) => {
       if (!woerter.length) return true;
       const h = heuhaufen(z);
       return woerter.every((w) => h.includes(w));
     })
     .sort((a, b) => vergleiche(a, b, o.sortierung));
-  return { zeilen, reiter, ueberfaellig: anzahlUeberfaellig(alle, o.heute), ohneZeitraum };
+  // Überfälliges zuerst, damit der Hinweis „überfällig“ zu einer sichtbaren Zeile führt (nur bei der Standard-Sortierung)
+  if (!suche && (o.sortierung.feld === 'nr' || (o.sortierung.feld === 'datum' && o.sortierung.richtung < 0)) && (o.reiter === 'alle' || o.reiter === 'offen')) {
+    const ueber = (z: BelegZeile) => statusSchluessel(z, o.heute) === 'ueberfaellig';
+    zeilen.sort((a, b) => Number(ueber(b)) - Number(ueber(a)));
+  }
+  return { zeilen, reiter, ueberfaellig: anzahlUeberfaellig(alle, o.heute), ohneZeitraum, offenFrueher };
 }
 
 /** Spalte „Fällig / Zahlung“ (Prototyp faelligHTML). `klasse`: 'neg' | 'warn' | 'muted' | ''. */
@@ -225,7 +255,7 @@ export function faelligText(z: BelegZeile, heute: string): { text: string; klass
   if (z.status === 'storniert') return { text: `storniert${z.storniert_am ? ` ${datumText(z.storniert_am).slice(0, 6)}` : ''}`, klasse: 'muted' };
   if (z.art === 'rechnung' && z.status === 'offen' && z.faellig_am) {
     const n = tageZwischen(heute, z.faellig_am);
-    if (n < 0) return { text: `${-n} T. überfällig`, klasse: 'neg', titel: `fällig war ${datumText(z.faellig_am)}` };
+    if (n < 0) return { text: `${-n} ${n === -1 ? 'Tag' : 'Tage'} überfällig`, klasse: 'neg', titel: `fällig war ${datumText(z.faellig_am)}` };
     if (n === 0) return { text: 'heute fällig', klasse: 'warn' };
     return { text: `in ${n} ${n === 1 ? 'Tag' : 'Tagen'}`, klasse: '', titel: `fällig am ${datumText(z.faellig_am)}` };
   }
@@ -236,9 +266,10 @@ export function faelligText(z: BelegZeile, heute: string): { text: string; klass
     return n < 0 ? { text: 'abgelaufen', klasse: 'muted' } : { text: `gültig noch ${n} T.`, klasse: '' };
   }
   if (z.status === 'bezahlt') {
-    const wie = z.art === 'eigenbeleg' ? 'gebucht' : z.art === 'quittung' ? zahlungswegKurz(z.zahlungsart) : 'bezahlt';
+    const wie = z.art === 'eigenbeleg' ? 'gebucht' : z.art === 'quittung' && z.zahlungsart ? zahlungswegKurz(z.zahlungsart) : 'bezahlt';
     const am = z.bezahlt_am ?? z.datum;
-    return { text: `${wie}${am ? ` · ${datumText(am).slice(0, 6)}` : ''}`, klasse: 'muted' };
+    // am Belegtag bezahlt (Quittung): das Datum steht schon in der Spalte davor
+    return { text: `${wie}${am && am !== z.datum ? ` · ${datumText(am).slice(0, 6)}` : ''}`, klasse: 'muted' };
   }
   return { text: '—', klasse: 'muted' };
 }
@@ -333,7 +364,7 @@ export function statusMenue(z: BelegZeile, heute: string, hier = false): StatusM
       p.push({ aktion: 'rechnung-oeffnen', label: 'Rechnung öffnen', sub: 'Der Entwurf aus diesem Angebot' });
       return { text: 'Angenommen und in eine Rechnung umgewandelt.', punkte: p };
     }
-    p.push({ aktion: 'angebot-offen', label: 'Offen', sub: 'Wartet auf Antwort des Kunden', art: z.status === 'offen' ? 'on' : undefined });
+    p.push({ aktion: 'angebot-offen', label: 'Ausstehend', sub: 'Wartet auf Antwort des Kunden', art: z.status === 'offen' ? 'on' : undefined });
     p.push({ aktion: 'umwandeln', label: 'Angenommen …', sub: 'In eine Rechnung umwandeln (Entwurf)' });
     p.push({ aktion: 'angebot-abgelehnt', label: 'Abgelehnt', sub: 'Kunde hat abgesagt', art: z.status === 'abgelehnt' ? 'on' : undefined });
     const text = z.status === 'abgelehnt' ? 'Der Kunde hat das Angebot abgelehnt.' : `Wartet auf Antwort${z.faellig_am ? ` – gültig bis ${datumText(z.faellig_am)}` : ''}.`;

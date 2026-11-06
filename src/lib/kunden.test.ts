@@ -228,6 +228,15 @@ describe('Einträge im Verlauf', () => {
 });
 
 describe('Liste', () => {
+  it('wer einen kommenden Termin hat, steht vor Kunden mit jüngerem Besuch (auch Stammkunden)', () => {
+    const stamm = info(kunde({ id: 1, name: 'Stamm' }), [einnahme({ kunde_id: 1, datum: '2026-09-01' }), termin({ kunde_id: 1, datum: '2026-10-20' })]);
+    const frisch = info(kunde({ id: 2, name: 'Frisch' }), [einnahme({ kunde_id: 2, datum: '2026-10-14' })]);
+    expect(stamm.sortKey > frisch.sortKey).toBe(true);
+    // früherer Termin zuerst
+    const bald = info(kunde({ id: 3, name: 'Bald' }), [termin({ kunde_id: 3, datum: '2026-10-16' })]);
+    expect(bald.sortKey > stamm.sortKey).toBe(true);
+  });
+
   const kunden = [
     kunde({ id: 1, name: 'Anna Schmidt', strasse: 'Gartenweg 3', ort: 'Musterstadt', telefon: '0171 234 5678', erstellt_am: '2024-01-01T00:00:00Z' }),
     kunde({ id: 2, name: 'Bernd Müller', ort: 'Neustadt', notiz: 'Hund im Garten', erstellt_am: '2024-01-01T00:00:00Z' }),

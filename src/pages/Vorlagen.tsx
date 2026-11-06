@@ -26,53 +26,11 @@
  *   Bedeutung der Tabelle `vorlagen`: lib/queries/vorlagen.ts. Im Browser ohne Datenbank: nur die Designs,
  *   Änderungen nur auf dieser Seite.
  * Logik in lib/vorlagen/baukasten.ts, Stile in styles/vorlagen.css. */
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent, type RefObject } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent, type RefObject } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import {
-  ArrowDown,
-  ArrowUp,
-  Blocks,
-  Building2,
-  Check,
-  CircleCheck,
-  Clock,
-  Code,
-  Eye,
-  EyeOff,
-  FileText,
-  GripVertical,
-  Heading,
-  Info,
-  Landmark,
-  List,
-  LoaderCircle,
-  Lock,
-  Mail,
-  Minus,
-  MoveVertical,
-  PanelTop,
-  Pencil,
-  Plus,
-  Printer,
-  QrCode,
-  Receipt,
-  RotateCcw,
-  Send,
-  Sigma,
-  Signature,
-  SlidersHorizontal,
-  SquareDashed,
-  Stamp,
-  Trash2,
-  TriangleAlert,
-  Type,
-  Users,
-  X,
-  type LucideIcon,
-} from 'lucide-react';
+import { ArrowDown, ArrowUp, Asterisk, Blocks, Building2, Check, CircleCheck, Clock, Eye, EyeOff, FileText, GripVertical, Heading, Info, Landmark, List, LoaderCircle, Lock, Mail, Minus, MoveVertical, Package, PanelTop, Pencil, Plus, Printer, QrCode, ReceiptEuro, RotateCcw, Send, Sigma, Signature, SquareDashed, Stamp, Trash2, TriangleAlert, Type, Users, X, type LucideIcon } from 'lucide-react';
 import { BlattVorschau, type BlattBearbeitung } from '../components/belege/Blatt';
 import { FormatEditor, type FormatEditorHandle } from '../components/belege/FormatEditor';
-import { EmptyState } from '../components/ui/EmptyState';
 import { PageHead, reveal } from '../components/ui/PageHead';
 import { Seg, type SegOption } from '../components/ui/Seg';
 import { Switch } from '../components/ui/Switch';
@@ -114,7 +72,7 @@ import {
   zusammenfassung,
 } from '../lib/vorlagen/baukasten';
 import { BEISPIEL_FIRMA, beispielbeleg, blankobeleg, firmaOderBeispiel, hatBlanko } from '../lib/vorlagen/beispiel';
-import { ARTEN, BELEGARTEN, PLATZHALTER, istBelegart, type BelegDokument, type Belegart, type PlatzhalterName } from '../lib/vorlagen/dokument';
+import { ARTEN, BELEGARTEN, PLATZHALTER, PLATZHALTER_KURZ, istBelegart, zerlegen, type BelegDokument, type Belegart, type PlatzhalterName, type Textteil } from '../lib/vorlagen/dokument';
 import { pflichtCheck, type Pflichtangabe } from '../lib/vorlagen/pflicht';
 import {
   NAME_MAX,
@@ -139,6 +97,8 @@ import {
 } from '../lib/vorlagen/vorschau';
 import { heute } from '../lib/zeitraum';
 import { useUi } from '../store/ui';
+import { BlattGross } from '../components/belege/BlattGross';
+import { akzentPapier } from '../lib/settings';
 import { Ladeansicht } from './einstellungen/Laden';
 
 /** Symbol je Baustein (wie App.sheet.BLOCKS im Prototyp) */
@@ -154,7 +114,7 @@ const ICON: Readonly<Record<BausteinTyp, LucideIcon>> = {
   betrag_worte: Pencil,
   steuerhinweis: Info,
   zahlung: QrCode,
-  quittung_felder: Receipt,
+  quittung_felder: ReceiptEuro,
   eigenbeleg_felder: Stamp,
   gruss: Mail,
   unterschrift: Signature,
@@ -169,26 +129,6 @@ const ICON: Readonly<Record<BausteinTyp, LucideIcon>> = {
 const ART_OPTIONEN: readonly SegOption<Belegart>[] = BELEGARTEN.map((a) => ({ value: a, label: ARTEN[a].label }));
 
 type Ansicht = 'vorschau' | 'latex';
-const ANSICHTEN: readonly SegOption<Ansicht>[] = [
-  {
-    value: 'vorschau',
-    label: (
-      <>
-        <Eye />
-        Vorschau
-      </>
-    ),
-  },
-  {
-    value: 'latex',
-    label: (
-      <>
-        <Code />
-        LaTeX
-      </>
-    ),
-  },
-];
 
 /** Autosave: so lange nach der letzten Änderung warten (sonst landet jeder Tastendruck im Protokoll) */
 const SPEICHERN_MS = 600;
@@ -200,8 +140,10 @@ const KEINE_OPTIONEN: readonly (readonly [string, string])[] = [];
 const TX_KLASSE: Readonly<Record<TexTeilArt, string>> = { kommentar: 'tx-c', befehl: 'tx-k', klammer: 'tx-b', text: '' };
 /** Hinweis unter dem Blanko-Formular: von Hand ausgefüllt heißt nicht gebucht */
 const BLANKO_HINWEIS: Readonly<Record<Belegart, string>> = {
-  quittung: 'Von Hand ausgefüllte Quittungen trotzdem buchen: Durchschlag oder Kopie aufbewahren und die Einnahme über „+ Erfassen“ eintragen.',
-  eigenbeleg: 'Ausgefüllte Eigenbelege aufbewahren und die Ausgabe über „+ Erfassen“ eintragen.',
+  quittung:
+    'Ohne Nummer gedruckt, nichts wird gespeichert. Beim Buchen zeigt Kladdy die Buchungsnummer – sie kommt ins Feld „Buchungs-Nr.“, so gehören Zettel und Buchung zusammen.',
+  eigenbeleg:
+    'Ohne Nummer gedruckt, nichts wird gespeichert. Trag eine eigene Nummer ins Feld „Nr.“ ein und gib sie beim Buchen der Ausgabe als Beleg-Nr. an.',
   rechnung: '',
   angebot: '',
 };
@@ -473,9 +415,9 @@ export default function Vorlagen() {
       <PageHead
         icon={Blocks}
         title="Vorlagen"
-        sub="Belege aus Bausteinen zusammenstellen – ohne LaTeX. Die App erzeugt daraus im Hintergrund das PDF."
+        sub="So sehen deine Belege aus. Baustein wählen und einstellen – oder direkt ins Blatt klicken und Texte ändern."
         back={{ to: '/belege', label: 'Rechnungen & Quittungen' }}
-        actions={<Seg options={ART_OPTIONEN} value={art} onChange={artWaehlen} ariaLabel="Belegart der Vorlage" />}
+        actions={<Seg className="tabs" options={ART_OPTIONEN} value={art} onChange={artWaehlen} ariaLabel="Belegart der Vorlage" />}
       />
       {!basis || !bereit || !letzte ? (
         <Skelett />
@@ -545,18 +487,6 @@ function VorlagenLeiste({ art, liste, wahl, aktiv, vergeben, waehlen, verwenden,
   const mitDb = datenbankVerfuegbar();
   const [eingabe, setEingabe] = useState<NamensEingabe | null>(null);
   const eigen = wahl.id != null;
-  const optionen: SegOption<string>[] = liste
-    .filter((v) => !v.archiviert)
-    .map((v) => ({
-      value: v.schluessel,
-      label: (
-        <>
-          {v.aktiv && <CircleCheck aria-label="für neue Belege" />}
-          {v.name}
-          {v.id != null && <small className="vl-design-tag">eigene</small>}
-        </>
-      ),
-    }));
   const aktivName = liste.find((v) => v.schluessel === aktiv)?.name ?? '';
   const fehler = eingabe?.gezeigt ? namePruefen(eingabe.wert, vergeben(eingabe.modus === 'umbenennen' ? (wahl.id ?? undefined) : undefined)) : null;
   const nurMac = 'Nur in der Mac-App';
@@ -575,7 +505,18 @@ function VorlagenLeiste({ art, liste, wahl, aktiv, vergeben, waehlen, verwenden,
 
   return (
     <div className="vl-designs reveal" style={reveal(1)}>
-      <Seg options={optionen} value={wahl.schluessel} onChange={waehlen} ariaLabel="Vorlage" />
+      <span className="vl-quelle-l">Vorlage</span>
+      {/* Auswahlfeld statt dritter Umschalter-Reihe: Belegart (Reiter) › Vorlage (Liste) › Vorschau */}
+      <select className="select vl-wahl" aria-label="Vorlage" value={wahl.schluessel} onChange={(e) => waehlen(e.target.value)}>
+        {liste
+          .filter((v) => !v.archiviert)
+          .map((v) => (
+            <option key={v.schluessel} value={v.schluessel}>
+              {v.name}
+              {v.id != null ? ' (eigene)' : ''}
+            </option>
+          ))}
+      </select>
       <div className="vl-design-tools">
         <button
           type="button"
@@ -585,7 +526,7 @@ function VorlagenLeiste({ art, liste, wahl, aktiv, vergeben, waehlen, verwenden,
           onClick={() => oeffnen('neu')}
         >
           <Plus />
-          Neue Vorlage
+          Neue Vorlage …
         </button>
         {eigen && (
           <>
@@ -644,7 +585,7 @@ function VorlagenLeiste({ art, liste, wahl, aktiv, vergeben, waehlen, verwenden,
         </form>
       )}
       <div className="vl-design-info">
-        <span className="vl-design-desc">{eigen ? `Eigene Vorlage auf Basis von „${designName(art, wahl.design)}“` : designFuer(art, wahl.design).beschreibung}</span>
+        <span className="vl-design-desc" hidden>{eigen ? `Eigene Vorlage auf Basis von „${designName(art, wahl.design)}“` : designFuer(art, wahl.design).beschreibung}</span>
         {wahl.aktiv ? (
           <span className="vl-design-aktiv">
             <CircleCheck />
@@ -759,7 +700,7 @@ interface BaukastenProps {
 }
 
 function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, angelegt, gespeichert: seiteGespeichert }: BaukastenProps) {
-  const accent = useUi((s) => s.settings.accent);
+  const accent = useUi((s) => akzentPapier(s.settings));
   const motion = useUi((s) => s.settings.motion);
   const showToast = useUi((s) => s.showToast);
   const mitDb = datenbankVerfuegbar();
@@ -770,9 +711,12 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
   const ziel = useRef<Promise<number> | null>(wahl.id != null ? Promise.resolve(wahl.id) : null);
   /** Design gezeigt und schon geändert (ohne Datenbank: nur auf dieser Seite) */
   const [geaendert, setGeaendert] = useState(false);
-  const [sel, setSel] = useState(0);
+  /** gewählter Baustein; -1 = keiner (Start: Übersicht aller Bausteine, Klick klappt die Einstellungen auf) */
+  const [sel, setSel] = useState(-1);
   const [palette, setPalette] = useState(false);
-  const [ansicht, setAnsicht] = useState<Ansicht>('vorschau');
+  // Erzeugten LaTeX-Code nur auf Wunsch (Fachleute, Fehlersuche): Adresse …/belege/vorlagen?ansicht=latex
+  const [suchParams] = useSearchParams();
+  const [ansicht, setAnsicht] = useState<Ansicht>(suchParams.get('ansicht') === 'latex' ? 'latex' : 'vorschau');
   /** Ziehen am Griff: Baustein `von` an die Einfügestelle `stelle` */
   const [zug, setZug] = useState<{ von: number; stelle: number } | null>(null);
   const [gespeichert, setGespeichert] = useState(0);
@@ -864,6 +808,18 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
     [echtDoc, blanko, art, basis, logo],
   );
   const pflicht = useMemo(() => pflichtCheck(doc, bausteine), [doc, bausteine]);
+  const pflichtFehlt = pflicht.filter((p) => !p.ok).length;
+  /** Baustein, in dem die Steuernummer steht (Rechnung: oft die Fußzeile, unten außer Sicht) */
+  const steuerOrt = useMemo(() => {
+    const b = bausteine.find((x) => !x.aus && (x.typ === 'fusszeile' ? aufloesen(x).an('kontakt') : x.typ === 'anschrift_meta' ? aufloesen(x).an('steuernr') : zusammenfassung(x).includes('{steuernummer}')));
+    return b ? BAUSTEINE[b.typ].name : null;
+  }, [bausteine]);
+  /** Bausteine, ohne die eine Pflichtangabe fehlen würde (§ 33/§ 34a UStDV): nicht ausblenden, nicht entfernen */
+  const pflichtBausteine = useMemo(() => {
+    const fehlen = (liste: readonly Baustein[]) => pflichtCheck(doc, liste).filter((p) => !p.ok).length;
+    const jetzt = fehlen(bausteine);
+    return new Set(bausteine.flatMap((b, i) => (!b.aus && fehlen(bausteine.filter((_, k) => k !== i)) > jetzt ? [i] : [])));
+  }, [doc, bausteine]);
   const eigeneFirma = basis.firma !== BEISPIEL_FIRMA;
 
   const quelleWaehlen = (q: Vorschauquelle) => {
@@ -904,7 +860,7 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
   };
 
   const hinzufuegen = (typ: BausteinTyp) => {
-    const r = einfuegen(bausteine, typ, bausteine.length ? sel : null);
+    const r = einfuegen(bausteine, typ, bausteine.length && sel >= 0 ? sel : null);
     aendern(r.liste, r.index);
     setPalette(false);
     useUi.getState().toast(`Baustein „${BAUSTEINE[typ].name}“ hinzugefügt`);
@@ -914,7 +870,7 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
     const r = entfernen(bausteine, i, sel);
     const weg = r.weg;
     if (!weg) return;
-    aendern(r.liste, r.auswahl);
+    aendern(r.liste, sel < 0 || sel === i ? -1 : r.auswahl);
     showToast({
       key: RUECKGAENGIG,
       text: `„${BAUSTEINE[weg.typ].name}“ entfernt`,
@@ -1039,7 +995,6 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
     }
   };
 
-  const gewaehlt: Baustein | undefined = bausteine[sel];
   const zielStelle = zug && ziehenAendert(zug.von, zug.stelle) ? zug.stelle : null;
   const laeuft = pdf?.status === 'laeuft';
   const nativ = inTauri();
@@ -1056,20 +1011,36 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
               </div>
               <div className="card-sub">
                 {wahl.id != null ? (
-                  <>
-                    <b>{wahl.name}</b> · eigene Vorlage
+                  <span className="vl-stand">
+                    <span className="vl-stand-chip eigen">
+                      <Check />
+                      Eigene Vorlage „{wahl.name}“ · gespeichert
+                    </span>
                     {gespeichert > 0 && (
                       <span key={gespeichert} className="vl-saved">
-                        <Check />
-                        gespeichert
+                        gerade eben
                       </span>
                     )}
-                  </>
+                  </span>
                 ) : geaendert && !mitDb ? (
                   `${wahl.name} · geändert, nur auf dieser Seite`
                 ) : (
-                  `${wahl.name} · mitgeliefert, die erste Änderung legt eine eigene Vorlage an`
+                  <span className="vl-stand">
+                    <span className="vl-stand-chip">
+                      <Package />
+                      Mitgelieferte Vorlage
+                    </span>
+                    <span>Kladdy speichert sofort – deine erste Änderung wird „Meine {ARTEN[art].label}“, die mitgelieferte bleibt.</span>
+                  </span>
                 )}
+                {pflicht.length ? (
+                  <span className={`vl-pflicht-stand${pflichtFehlt ? ' bad' : ''}`}>
+                    {pflichtFehlt ? <TriangleAlert /> : <CircleCheck />}
+                    {pflichtFehlt
+                      ? `${pflichtFehlt} Pflichtangabe${pflichtFehlt === 1 ? '' : 'n'} fehlt – Einzelheiten unten`
+                      : `Pflichtangaben vollständig${steuerOrt === BAUSTEINE.fusszeile.name && art !== 'quittung' ? ` · Steuernummer in „${steuerOrt}“` : ''}`}
+                  </span>
+                ) : null}
               </div>
             </div>
             {wahl.id != null && (
@@ -1087,6 +1058,7 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
                 const Icon = ICON[b.typ];
                 const klasse = [
                   'vl-blk',
+                  (b.typ === 'abstand' || b.typ === 'trennlinie') && 'leise',
                   i === sel && 'on',
                   b.aus && 'aus',
                   zug?.von === i && 'dragging',
@@ -1096,7 +1068,8 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
                   .filter(Boolean)
                   .join(' ');
                 return (
-                  <li key={i} data-i={i} className={klasse} onClick={() => setSel(i)}>
+                  <Fragment key={i}>
+                  <li data-i={i} className={klasse} onClick={() => setSel((s) => (s === i ? -1 : i))}>
                     <span
                       className="vl-grip"
                       role="button"
@@ -1116,9 +1089,27 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
                       <Icon />
                     </span>
                     <button type="button" className="vl-meta" aria-current={i === sel ? 'true' : undefined}>
-                      <b>{def.name}</b>
-                      <small>{zusammenfassung(b)}</small>
+                      <b>
+                        {def.name}
+                        {pflichtBausteine.has(i) ? (
+                          <span className="vl-pflicht" title="Enthält eine Pflichtangabe – bleibt im Beleg (Texte sind trotzdem änderbar)">
+                            <Asterisk />
+                            Pflicht
+                          </span>
+                        ) : null}
+                      </b>
+                      <small>
+                        {nurPlatzhalter(zerlegen(zusammenfassung(b))).map((t, k) =>
+                          t.art === 'text' ? t.text : (
+                            <span key={k} className="vl-ph-txt" title="Setzt Kladdy beim Ausstellen ein">
+                              {PLATZHALTER_KURZ[t.name]}
+                            </span>
+                          ),
+                        )}
+                      </small>
                     </button>
+                    {pflichtBausteine.has(i) ? null : (
+                    <>
                     <button
                       type="button"
                       className="icon-btn sm vl-eye"
@@ -1143,13 +1134,34 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
                     >
                       <X />
                     </button>
+                    </>
+                    )}
                   </li>
+                  {i === sel && !zug ? (
+                    <li className="vl-inline" onClick={(e) => e.stopPropagation()}>
+                      <BausteinKarte
+                        key={`${sel}-${b.typ}`}
+                        b={b}
+                        index={sel}
+                        anzahl={bausteine.length}
+                        pflicht={pflichtBausteine.has(sel)}
+                        setze={(key, wert) => setzen(sel, key, wert)}
+                        schieben={(richtung) => schieben(sel, richtung, false)}
+                        umschalten={() => aendern(umschalten(bausteine, sel))}
+                        entfernen={() => wegnehmen(sel)}
+                      />
+                    </li>
+                  ) : null}
+                  </Fragment>
                 );
               })
             ) : (
               <li className="vl-empty">Noch keine Bausteine – füge unten welche hinzu.</li>
             )}
           </ul>
+          <p className="vl-legende vl-legende-unten">
+            Angaben in ‹ › füllt Kladdy beim Ausstellen aus · <Asterisk className="ic vl-leg-ic" /> Pflicht bleibt im Beleg, der Text ist änderbar.
+          </p>
           <div className="vl-add" ref={addRef}>
             <button type="button" className="btn subtle" aria-expanded={palette} onClick={() => setPalette((p) => !p)}>
               <Plus />
@@ -1179,43 +1191,30 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
             )}
           </div>
         </section>
-        <BausteinKarte
-          key={`${sel}-${gewaehlt?.typ ?? ''}`}
-          b={gewaehlt}
-          index={sel}
-          anzahl={bausteine.length}
-          setze={(key, wert) => setzen(sel, key, wert)}
-          schieben={(richtung) => schieben(sel, richtung, false)}
-        />
         <PflichtKarte art={art} liste={pflicht} eigeneFirma={eigeneFirma} quelle={blanko ? 'blanko' : mitBeleg ? 'beleg' : 'beispiel'} />
       </div>
 
       <div className="vl-right reveal" style={reveal(2)}>
         <div className="vl-toolbar">
-          <Seg options={ANSICHTEN} value={ansicht} onChange={setAnsicht} ariaLabel="Ansicht" />
-          <span className="spacer" />
           {quellen.length > 1 && (
-            <Seg options={quellen} value={blanko ? 'blanko' : mitBeleg ? 'beleg' : 'beispiel'} onChange={quelleWaehlen} ariaLabel="Daten der Vorschau" />
+            <div className="vl-quelle">
+              <span className="vl-quelle-l">Vorschau mit</span>
+              <Seg options={quellen} value={blanko ? 'blanko' : mitBeleg ? 'beleg' : 'beispiel'} onChange={quelleWaehlen} ariaLabel="Daten der Vorschau" />
+            </div>
           )}
-          {blanko ? (
-            <span className="vl-doc" title="Zum Ausdrucken und Ausfüllen von Hand – ohne Nummer, es wird nichts gespeichert">
-              <FileText />
-              Blanko zum Ausfüllen{eigeneFirma ? ' · deine Firmendaten' : ''}
-            </span>
-          ) : mitBeleg ? (
+          <span className="spacer" />
+          {blanko ? null : mitBeleg ? (
             <span className="vl-doc" title="Gezeigt als Entwurf ohne Nummer in den aktuellen Bausteinen – der Beleg selbst bleibt unverändert">
               {laedt ? <LoaderCircle className="ic spin" /> : <FileText />}
               {[letzter.nummer ?? 'Entwurf', letzter.kunde_name, letzter.nummer && 'als Entwurf'].filter(Boolean).join(' · ')}
             </span>
-          ) : (
-            <span className="vl-doc">
-              <FileText />
-              Beispieldaten{eigeneFirma ? ' · deine Firmendaten' : ''}
-            </span>
-          )}
+          ) : null}
+          {ansicht === 'vorschau' && !laedt ? (
+            <BlattGross kompakt doc={doc} bausteine={bausteine} titel={blanko ? 'Blanko in Lesegröße' : 'Vorlage in Lesegröße'} />
+          ) : null}
           <button
             type="button"
-            className="btn ghost"
+            className={blanko ? 'btn-primary sm' : 'btn ghost'}
             disabled={laeuft || laedt || !nativ}
             title={
               !nativ
@@ -1227,9 +1226,17 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
             onClick={() => void pdfErzeugen()}
           >
             {laeuft ? <LoaderCircle className="ic spin" /> : <Printer />}
-            {laeuft ? 'Setze PDF …' : 'PDF'}
+            {laeuft ? 'Setze PDF …' : blanko ? 'Blanko drucken' : 'Drucken / PDF'}
           </button>
         </div>
+        {blanko ? (
+          <p className="vl-blanko-hint">
+            <Printer />
+            <span>
+              <b>Zum Ausdrucken und Ausfüllen von Hand.</b> {BLANKO_HINWEIS[art]}
+            </span>
+          </p>
+        ) : null}
         {pdf && <PdfHinweis pdf={pdf} schliessen={() => setPdf(null)} />}
         {ansicht === 'vorschau' && laedt ? (
           <div className="sk vl-sk-blatt" aria-busy="true" aria-label="Beleg wird geladen" />
@@ -1247,7 +1254,11 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
         ) : (
           <LatexAnsicht art={art} bausteine={bausteine} accent={accent} blanko={blanko} />
         )}
-        {blanko && <p className="hint vl-blanko-hinweis">{BLANKO_HINWEIS[art]}</p>}
+        {ansicht === 'latex' ? (
+          <button type="button" className="link vl-latex-link" onClick={() => setAnsicht('vorschau')}>
+            Zurück zur Vorschau
+          </button>
+        ) : null}
       </div>
     </div>
   );
@@ -1255,25 +1266,29 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
 
 /* ================= Einstellungen des gewählten Bausteins ================= */
 
+/** Liste: enthält die Zusammenfassung Platzhalter, nur diese zeigen („Firma · Inhaber · Straße …“) – feste Beschriftungen
+ *  wie „Inh.“ oder „Steuernr.“ dazwischen machten die Zeile unlesbar. Reiner Text bleibt, wie er ist. */
+function nurPlatzhalter(teile: Textteil[]): Textteil[] {
+  const ph = teile.filter((t) => t.art === 'platzhalter');
+  if (!ph.length) return teile;
+  return ph.flatMap((t, i) => (i ? [{ art: 'text' as const, text: ' · ' }, t] : [t]));
+}
+
 interface KarteProps {
   b: Baustein | undefined;
   index: number;
   anzahl: number;
+  /** enthält eine Pflichtangabe: nicht ausblenden, nicht entfernen */
+  pflicht: boolean;
   setze: (key: string, wert: Einstellung) => void;
   schieben: (richtung: -1 | 1) => void;
+  umschalten: () => void;
+  entfernen: () => void;
 }
 
-function BausteinKarte({ b, index, anzahl, setze, schieben }: KarteProps) {
+function BausteinKarte({ b, index, anzahl, pflicht, setze, schieben, umschalten: ausEin, entfernen: weg }: KarteProps) {
   const felder = useRef<Record<string, FormatEditorHandle | null>>({});
-  if (!b) {
-    return (
-      <section className="card reveal" style={reveal(2)}>
-        <EmptyState icon={SlidersHorizontal} title="Kein Baustein ausgewählt">
-          Einen Baustein in der Liste oder im Blatt anklicken, um ihn einzustellen.
-        </EmptyState>
-      </section>
-    );
-  }
+  if (!b) return null;
   const def = BAUSTEINE[b.typ];
   const r = aufloesen(b);
   const Icon = ICON[b.typ];
@@ -1282,26 +1297,47 @@ function BausteinKarte({ b, index, anzahl, setze, schieben }: KarteProps) {
   const platzhalter = (key: string, name: PlatzhalterName) => felder.current[key]?.platzhalter(name);
 
   return (
-    <section className="card reveal" style={reveal(2)}>
-      <div className="card-head">
-        <div>
-          <div className="card-title">
-            <Icon />
-            {def.name}
-          </div>
-          <div className="card-sub">
-            {def.beschreibung}
-            {b.aus ? ' · ausgeblendet' : ''}
-          </div>
-        </div>
-        <div className="row vl-move">
+    <div
+      className={`vl-karte ${def.felder.length === 1 && def.felder[0].typ === 'select' ? 'kompakt' : ''}`}
+      aria-label={`Einstellungen: ${def.name}`}
+      role="group"
+    >
+      <div className="vl-karte-kopf" hidden={zusammenfassung(b) === def.beschreibung && !b.aus}>
+        <p className="vl-karte-text">
+          <Icon />
+          {def.beschreibung}
+          {b.aus ? ' – im Blatt ausgeblendet' : ''}
+        </p>
+      </div>
+      <div className="vl-karte-aktionen">
+        <span className="vl-reihe" role="group" aria-label="Reihenfolge" title="Reihenfolge im Blatt">
           <button type="button" className="icon-btn sm" title="Nach oben" aria-label="Nach oben" disabled={index === 0} onClick={() => schieben(-1)}>
             <ArrowUp />
           </button>
           <button type="button" className="icon-btn sm" title="Nach unten" aria-label="Nach unten" disabled={index >= anzahl - 1} onClick={() => schieben(1)}>
             <ArrowDown />
           </button>
-        </div>
+        </span>
+        <span className="spacer" />
+        {pflicht ? (
+          <span className="vl-pflicht-hinweis" title="Der Baustein bleibt im Beleg; seine Texte und Einstellungen darfst du ändern">
+            <Asterisk />
+            Pflicht – bleibt im Beleg, Texte änderbar
+          </span>
+        ) : (
+          <>
+            {b.typ === 'abstand' || b.typ === 'trennlinie' ? null : (
+              <button type="button" className="btn subtle sm" onClick={ausEin}>
+                {b.aus ? <Eye /> : <EyeOff />}
+                {b.aus ? 'Einblenden' : 'Ausblenden'}
+              </button>
+            )}
+            <button type="button" className="btn subtle sm vl-del-btn" onClick={weg}>
+              <X />
+              Entfernen
+            </button>
+          </>
+        )}
       </div>
       {def.felder.length ? (
         <div className="form">
@@ -1350,20 +1386,23 @@ function BausteinKarte({ b, index, anzahl, setze, schieben }: KarteProps) {
                   className={f.typ === 'textarea' ? 'textarea' : 'input'}
                   leerText=""
                 />
-                <div className="vl-ph" role="group" aria-label={`Platzhalter in „${f.label}“ einfügen`}>
-                  {PLATZHALTER.map(([name, titel]) => (
-                    <button
-                      key={name}
-                      type="button"
-                      className="chip"
-                      title={titel}
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => platzhalter(f.key, name)}
-                    >
-                      {`{${name}}`}
-                    </button>
-                  ))}
-                </div>
+                <details className="vl-ph-wrap">
+                  <summary>Daten einfügen (Kunde, Betrag, Datum …)</summary>
+                  <div className="vl-ph" role="group" aria-label={`Daten in „${f.label}“ einfügen`}>
+                    {PLATZHALTER.map(([name, titel]) => (
+                      <button
+                        key={name}
+                        type="button"
+                        className="chip"
+                        title={`${titel} – wird im Beleg durch den echten Wert ersetzt`}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => platzhalter(f.key, name)}
+                      >
+                        {PLATZHALTER_KURZ[name]}
+                      </button>
+                    ))}
+                  </div>
+                </details>
               </div>
             );
           })}
@@ -1371,14 +1410,16 @@ function BausteinKarte({ b, index, anzahl, setze, schieben }: KarteProps) {
       ) : (
         <p className="hint">Dieser Baustein hat keine Einstellungen – er übernimmt die Daten aus dem Beleg und den Firmendaten.</p>
       )}
+      {def.felder.some((f) => f.typ === 'text' || f.typ === 'textarea') ? (
       <p className="hint vl-firma">
         <Building2 />
         <span>
-          Firmendaten wie Steuernummer und Anschrift trägst du einmal unter <Link to={bereichPfad('firma')}>Einstellungen › Firma</Link> ein – Platzhalter
-          wie <code>{'{steuernummer}'}</code> setzen sie in jeden Beleg ein.
+          Steuernummer, Anschrift und Bankverbindung trägst du einmal unter <Link to={bereichPfad('firma')}>Einstellungen › Firma</Link> ein; Marken wie{' '}
+          <span className="vl-ph-mini">Steuernummer</span> setzen sie in jeden Beleg ein.
         </span>
       </p>
-    </section>
+      ) : null}
+    </div>
   );
 }
 
@@ -1386,20 +1427,24 @@ function BausteinKarte({ b, index, anzahl, setze, schieben }: KarteProps) {
 
 function PflichtKarte({ art, liste, eigeneFirma, quelle }: { art: Belegart; liste: readonly Pflichtangabe[]; eigeneFirma: boolean; quelle: Vorschauquelle }) {
   const fehlt = liste.filter((p) => !p.ok).length;
-  const stand = fehlt ? `${fehlt} ${fehlt === 1 ? 'Angabe fehlt' : 'Angaben fehlen'}` : 'alles drin';
+  const stand = fehlt
+    ? `${fehlt} ${fehlt === 1 ? 'Angabe fehlt' : 'Angaben fehlen'}`
+    : quelle === 'blanko'
+      ? 'alle Felder vorgesehen'
+      : 'alles drin';
   return (
-    <section className="card reveal" style={reveal(3)}>
-      <div className="card-head">
+    <details className="card reveal vl-check-karte" style={reveal(3)} open={fehlt > 0}>
+      <summary className="card-head">
         <div>
           <div className={`card-title vl-check-titel${fehlt ? ' bad' : ''}`}>
             {fehlt ? <TriangleAlert /> : <CircleCheck />}
-            {art === 'eigenbeleg' ? 'Angaben im Eigenbeleg' : 'Pflichtangaben'}
+            {art === 'eigenbeleg' ? 'Angaben im Eigenbeleg' : 'Pflichtangaben'}: {liste.length ? stand : 'keine (Angebot)'}
           </div>
           <div className="card-sub">
-            {liste.length ? [GRUNDLAGE[art], stand].filter(Boolean).join(' · ') : 'Angebote sind keine Rechnungen – keine Pflichtangaben nach UStDV'}
+            {liste.length ? `${GRUNDLAGE[art] ? `${GRUNDLAGE[art]} – ` : ''}Einzelheiten aufklappen` : 'Angebote sind keine Rechnungen – keine Pflichtangaben nach UStDV'}
           </div>
         </div>
-      </div>
+      </summary>
       {liste.length > 0 && (
         <ul className="vl-check">
           {liste.map((p) => (
@@ -1421,7 +1466,7 @@ function PflichtKarte({ art, liste, eigeneFirma, quelle }: { art: Belegart; list
             : `Geprüft mit Beispieldaten und ${eigeneFirma ? 'deinen Firmendaten' : 'einer Beispielfirma'}`}{' '}
         – es zählt nur, was die Bausteine auch drucken.
       </p>
-    </section>
+    </details>
   );
 }
 

@@ -16,7 +16,8 @@ export const EIGENER_NAME: Readonly<Record<Belegart, string>> = {
   eigenbeleg: 'Mein Eigenbeleg',
 };
 
-export const STANDARD_NAME = 'Standardvorlage';
+// wie das erste mitgelieferte Design jeder Art – einheitlich „Klassisch“ (Quittung hat dazu „Formular“)
+export const STANDARD_NAME = 'Klassisch';
 
 /** Name der eigenen Kopie eines Designs: „Meine Quittung“ (klassisch), „Meine Quittung (Formular)“ (andere). */
 export const eigenerName = (art: Belegart, design: string = STANDARD_DESIGN): string =>
@@ -45,6 +46,7 @@ export function zusammenfassung(b: Baustein): string {
       [a.worte, 'in Worten'],
       [a.kunde, label('von', 'Erhalten von')],
       [a.zweck, label('fuer', 'Für')],
+      [a.buchungsnr, 'Buchungs-Nr.'],
     ];
     return teile.flatMap(([an, t]) => (an ? [t] : [])).join(' · ');
   }

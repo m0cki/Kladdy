@@ -17,10 +17,13 @@ import {
   kategorieAusText,
   kundeAufloesen,
   kundenLabel,
+  listenSummen,
   markiere,
   nameOhneNummer,
   privatProzent,
   pruefeFormular,
+  quittungNachholbar,
+  quittungZuBuchungPfad,
   sperre,
   type BuchungZeile,
   type Formular,
@@ -69,9 +72,11 @@ const KUNDEN: KundeKurz[] = [
 ];
 
 describe('Regeln', () => {
-  it('fehltBeleg: nur Zahlungen ohne Datei, nicht storniert, ohne eigenen Beleg', () => {
+  it('fehltBeleg: nur Zahlungen ohne Datei und ohne Belegnummer, nicht storniert, ohne eigenen Beleg', () => {
     expect(fehltBeleg(zeile({ id: 1 }))).toBe(true);
     expect(fehltBeleg(zeile({ id: 1, belege_anzahl: 1 }))).toBe(false);
+    expect(fehltBeleg(zeile({ id: 1, belegnummer: 'Quittungsblock 17' }))).toBe(false);
+    expect(fehltBeleg(zeile({ id: 1, belegnummer: '  ' }))).toBe(true);
     expect(fehltBeleg(zeile({ id: 1, storniert: 1 }))).toBe(false);
     expect(fehltBeleg(zeile({ id: 1, rechnung_id: 4 }))).toBe(false);
     expect(fehltBeleg(zeile({ id: 1, art: 'afa' }))).toBe(false);
@@ -315,5 +320,44 @@ describe('Filter aus der Adresse (Sprung aus der Auswertung)', () => {
     const v = listenVorgabe(new URLSearchParams(url.split('?')[1]));
     expect(v).toEqual({ filter: { ...LEERER_FILTER, typ: 'einnahme', ohneBeleg: true }, zeitraum: { modus: 'quartal', anker: '2026-07-01' } });
     expect(listenAdresse({ modus: 'jahr', anker: '2025-01-01' })).toBe('/ein-ausgaenge?modus=jahr&anker=2025-01-01');
+  });
+});
+
+describe('Quittung nachträglich zu einer Buchung', () => {
+  const einnahme = (z: Partial<BuchungZeile> = {}) =>
+    zeile({ id: 42, typ: 'einnahme', betrag_cent: 8000, beschreibung: 'Rasen mähen', kunde_id: 7, zahlungsart: 'bar', kategorie_id: 1, zahlungsdatum: '2026-11-03', ...z });
+
+  it('nur Einnahmen ohne eigenen Beleg, nicht storniert, nicht festgeschrieben', () => {
+    expect(quittungNachholbar(einnahme())).toBe(true);
+    expect(quittungNachholbar(zeile({ id: 1 }))).toBe(false);
+    expect(quittungNachholbar(einnahme({ rechnung_id: 3, rechnung_nummer: 'QU-2026-001' }))).toBe(false);
+    expect(quittungNachholbar(einnahme({ storniert: 1 }))).toBe(false);
+    expect(quittungNachholbar(einnahme({ storno_von_id: 5 }))).toBe(false);
+    expect(quittungNachholbar(einnahme({ festgeschrieben: 1 }))).toBe(false);
+    expect(quittungNachholbar(einnahme({ art: 'pauschale' }))).toBe(false);
+  });
+
+  it('öffnet die Beleg-Maske mit den Daten der Buchung und verknüpft sie', () => {
+    const url = new URL(quittungZuBuchungPfad(einnahme()), 'http://x');
+    expect(url.pathname).toBe('/belege/neu');
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      art: 'quittung', buchung: '42', betrag: '8000', datum: '2026-11-03', text: 'Rasen mähen', kunde: '7', zahlungsart: 'bar', kategorie: '1',
+    });
+    const ohne = new URL(quittungZuBuchungPfad(einnahme({ kunde_id: null, beschreibung: ' ' })), 'http://x').searchParams;
+    expect(ohne.has('kunde')).toBe(false);
+    expect(ohne.has('text')).toBe(false);
+  });
+});
+
+describe('Summenzeile', () => {
+  it('Einnahmen, Ausgaben und Saldo ohne Stornos', () => {
+    const z = [
+      zeile({ id: 1, typ: 'einnahme', betrag_cent: 10_000 }),
+      zeile({ id: 2, typ: 'ausgabe', betrag_cent: 2_500 }),
+      zeile({ id: 3, typ: 'ausgabe', betrag_cent: 999, storniert: 1 }),
+      zeile({ id: 4, typ: 'einnahme', betrag_cent: 999, storno_von_id: 3 }),
+    ];
+    expect(listenSummen(z)).toEqual({ einnahmen: 10_000, ausgaben: 2_500, saldo: 7_500 });
+    expect(listenSummen([])).toEqual({ einnahmen: 0, ausgaben: 0, saldo: 0 });
   });
 });

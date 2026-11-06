@@ -94,7 +94,7 @@ describe('ohne eigene Vorlage gilt das Design', () => {
   it('Datenbank leer', async () => {
     expect(await ladeAktiveBausteine('rechnung')).toEqual(standardVorlage('rechnung'));
     expect(await ladeVorlagenFuerArt('rechnung')).toEqual([
-      { schluessel: 'klassisch', id: null, design: 'klassisch', name: 'Standardvorlage', bausteine: standardVorlage('rechnung'), aktiv: true },
+      { schluessel: 'klassisch', id: null, design: 'klassisch', name: 'Klassisch', bausteine: standardVorlage('rechnung'), aktiv: true },
     ]);
   });
   it('ohne Datenbank (Browser) ganz ohne SQL', async () => {

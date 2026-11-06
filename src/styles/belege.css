@@ -23,7 +23,7 @@
   display: flex; align-items: flex-start; gap: 12px; margin-top: 16px; padding: 12px 8px 12px 14px; border-radius: 13px;
   background: color-mix(in oklab, var(--accent) 9%, var(--surface)); border: 1px solid var(--accent-line); animation: rise .45s var(--ease) both;
 }
-.bu-recog > .ic { color: var(--accent); margin-top: 1px; }
+.bu-recog > .ic { color: var(--accent-text); margin-top: 1px; }
 .bu-recog.none { background: var(--surface-2); border-color: var(--border); }
 .bu-recog.none > .ic { color: var(--muted); }
 .bu-recog.loading { border-style: dashed; }
@@ -48,7 +48,7 @@ button.bu-clip:focus-visible { outline: 2px solid var(--accent); outline-offset:
 .bl-menue-z { display: flex; align-items: center; gap: 2px; }
 .bl-menue-o { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 8px; font-size: .82rem; text-align: left; }
 .bl-menue-o:hover, .bl-menue-o:focus-visible { background: var(--hover); }
-.bl-menue-o .ic { width: 16px; height: 16px; color: var(--accent); }
+.bl-menue-o .ic { width: 16px; height: 16px; color: var(--accent-text); }
 .bl-menue-o span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
 .bl-menue-o small { color: var(--muted); font-size: .72rem; white-space: nowrap; }
 

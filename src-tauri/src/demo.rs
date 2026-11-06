@@ -34,6 +34,9 @@ use crate::datenbank::{self, MIGRATIONEN, MigrationsQuelle, db_fehler, url_zu};
 use crate::liquiditaet::{self, PlanpostenEingabe, WiederkehrendEingabe};
 use crate::nummern;
 
+/// Aufbewahrungshinweis wie im Frontend (lib/vorlagen/dokument.ts `HINWEIS_14B`) – Demo-Belege sehen aus wie neue.
+const HINWEIS_14B: &str = "Hinweis für Privatkunden bei Arbeiten an Haus oder Grundstück: Bitte bewahren Sie diesen Beleg zwei Jahre auf (§ 14b UStG).";
+
 /// Datei der Demo-Datenbank (im selben Ordner wie `DB_DATEI`).
 pub const DEMO_DB_DATEI: &str = "kladdy-dev-demo.db";
 /// Ablageordner für Belege im Demo-Modus (wie `belege::BELEGE_ORDNER`).
@@ -510,7 +513,13 @@ pub async fn fuellen(
         }
 
         let mut beleg_ids = Vec::with_capacity(d.belege.len());
-        for r in &d.belege {
+        for (ri, r) in d.belege.iter().enumerate() {
+            // Zahlungsweg wie beim Bezahlt-Markieren in rechnungen.rs: der der (ersten) Buchung zu diesem Beleg
+            let zahlungsart = if r.status == "bezahlt" {
+                d.buchungen.iter().find(|b| b.beleg == Some(ri) && b.storno_von.is_none()).map(|b| b.zahlungsart.as_str())
+            } else {
+                None
+            };
             // Ausgestellt: Nummer aus dem Kreis und Kundendaten als Schnappschuss (wie beim Finalisieren)
             let (name, adresse, kundennummer) = match &r.nummer {
                 Some(nr) => {
@@ -530,8 +539,9 @@ pub async fn fuellen(
             // Trigger festgeschrieben (Migration 0007), genau wie beim Ausstellen in rechnungen.rs.
             let id = sqlx::query(
                 "INSERT INTO rechnungen (art, nummer, status, kunde_id, kunde_name, kunde_adresse, kunde_nummer, datum,
-                   faellig_am, betreff, summe_cent, termin_id, bezahlt_am, erstellt_am, geaendert_am)
-                 VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                   leistung_von, faellig_am, betreff, schlusstext, summe_cent, termin_id, bezahlt_am, zahlungsart,
+                   erstellt_am, geaendert_am)
+                 VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             )
             .bind(&r.art)
             .bind(&r.status)
@@ -540,11 +550,16 @@ pub async fn fuellen(
             .bind(adresse)
             .bind(kundennummer)
             .bind(&r.datum)
+            // Leistungsdatum wie in der Maske: ohne eigene Angabe das Belegdatum (Angebote haben keins)
+            .bind((r.art != "angebot").then_some(&r.datum))
             .bind(&r.faellig_am)
             .bind(&r.betreff)
+            // Schlusstext wie bei neuen Belegen (lib/vorlagen/dokument.ts HINWEIS_14B): nur Rechnungen
+            .bind((r.art == "rechnung").then_some(HINWEIS_14B))
             .bind(summe(&r.positionen))
             .bind(r.termin.map(|t| termin_ids[t]))
             .bind(&r.bezahlt_am)
+            .bind(zahlungsart)
             .bind(erstellt)
             .bind(geaendert)
             .execute(&mut *tx)

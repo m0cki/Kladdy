@@ -3,17 +3,20 @@
  * Notiz-Symbol. Suche über Name, Straße, Ort, Telefon, Notiz und Leistung; Umschalter Alle · Stammkunden · mit Notiz.
  * Keine KPI-Kacheln, keine Summen (Statistik nur in der Auswertung). Klick öffnet die Kunden-Schublade.
  * Optik und Verhalten wie referenz/prototyp/js/pages/kunden.js; Logik in lib/kunden.ts, Daten in lib/queries/kunden.ts. */
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
-import { CalendarDays, Mail, Phone, Plus, Search, StickyNote, Users } from 'lucide-react';
-import { anzahlText, datumKurz, markiere } from '../lib/buchungen';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
+import { CalendarDays, Mail, MessageSquareText, Phone, Plus, Search, StickyNote, Users } from 'lucide-react';
+import { datumKurz, markiere } from '../lib/buchungen';
 import {
   SORT_START,
   STATUS_BADGE,
-  adresseKurz,
+  adresseVoll,
   hatNotiz,
   kundenIndex,
   kundenListe,
+  tageZwischen,
+  tagMonat,
   terminKurz,
+  wochentag,
   terminLang,
   vorText,
   zaehleFilter,
@@ -94,7 +97,7 @@ export default function Kunden() {
                 type="search"
                 className="input"
                 value={q}
-                placeholder="Name, Straße, Ort, Telefon, Notiz, Leistung …"
+                placeholder="Kunden durchsuchen …"
                 aria-label="Kunden durchsuchen"
                 autoComplete="off"
                 spellCheck={false}
@@ -186,6 +189,7 @@ function Liste({ index, h, o, setO, tbodyRef, suchFeld, sucheLeeren }: ListeProp
     <section className="card flush ku-liste reveal" style={reveal(1)}>
       <div className="ku-bar">
         <Seg
+          className="tabs"
           ariaLabel="Kunden filtern"
           value={o.filter}
           onChange={(filter) => setO((x) => ({ ...x, filter }))}
@@ -198,7 +202,7 @@ function Liste({ index, h, o, setO, tbodyRef, suchFeld, sucheLeeren }: ListeProp
             ),
           }))}
         />
-        <span className="ku-count">{zeilen.length === gesamt ? anzahlText(gesamt, 'Kunde', 'Kunden') : `${zeilen.length} von ${gesamt}`}</span>
+        {zeilen.length === gesamt ? null : <span className="ku-count">{`${zeilen.length} von ${gesamt}`}</span>}
       </div>
       <div className="table-wrap">
         <table className="fin-table ku-table">
@@ -207,17 +211,32 @@ function Liste({ index, h, o, setO, tbodyRef, suchFeld, sucheLeeren }: ListeProp
               {kopf('name', 'Kunde', 'l')}
               <th className="l ku-c-adr">Adresse</th>
               {kopf('besuche', 'Besuche', 'c ku-c-bes')}
-              {kopf('zuletzt', 'Zuletzt da', 'l ku-c-last')}
-              <th className="l ku-c-leist">Letzte Leistung</th>
-              <th className="ku-c-ums">Umsatz</th>
-              <th className="c ku-c-ntz">
-                <span className="sr-only">Notiz</span>
+              {kopf('zuletzt', 'Nächster Termin · zuletzt', 'l ku-c-last')}
+              <th className="l ku-c-leist">Leistung</th>
+              <th className="ku-c-ums" title="Summe der Einnahmen und ausgestellten Quittungen und Rechnungen – auch noch offene Rechnungen">Belegsumme</th>
+              <th className="c ku-c-ntz" title="Notiz vorhanden">
+                Notiz
               </th>
             </tr>
           </thead>
           <tbody ref={tbodyRef}>
             {zeilen.length ? (
-              zeilen.map((t) => <Zeile key={t.info.k.id} t={t} q={qt} h={h} gewaehlt={gewaehlt === t.info.k.id} suchFeld={suchFeld} />)
+              zeilen.map((t, i) => {
+                // Standardsortierung ohne Suche: Gruppen „mit Termin“ / „ohne Termin“, damit die Reihenfolge lesbar ist
+                const gruppiert = o.sort === 'zuletzt' && o.richtung < 0 && !qt;
+                const gruppe = mitTermin(t) ? 'termin' : 'rest';
+                const neu = gruppiert && (i === 0 || mitTermin(zeilen[i - 1]) !== mitTermin(t));
+                return (
+                  <Fragment key={t.info.k.id}>
+                    {neu ? (
+                      <tr className="ku-gruppe">
+                        <td colSpan={7}>{gruppe === 'termin' ? 'Mit Termin – nachtragen und nächster zuerst' : 'Ohne Termin – zuletzt da zuerst'}</td>
+                      </tr>
+                    ) : null}
+                    <Zeile t={t} q={qt} h={h} gewaehlt={gewaehlt === t.info.k.id} suchFeld={suchFeld} />
+                  </Fragment>
+                );
+              })
             ) : (
               <tr className="ku-leer">
                 <td colSpan={7}>
@@ -275,13 +294,31 @@ function Leer({ gesamt, q, filter, alleZeigen, sucheLeeren }: { gesamt: number; 
 
 /* ---------- eine Zeile ---------- */
 
+/** Hat der Kunde einen offenen Termin (nachzutragen oder kommend)? Bestimmt die Gruppe in der Liste. */
+const mitTermin = (t: KundenTreffer): boolean => t.info.nachtragen.length > 0 || !!t.info.naechster;
+
+/** Vergangener Tag wie die Termine: im laufenden Jahr „Fr 06.11.“, sonst „22.04.2025“ (das „vor …“ steht darunter). */
+function tagKurz(datum: string, heute: string): string {
+  if (datum === heute) return 'heute';
+  if (tageZwischen(datum, heute) === 1) return 'gestern';
+  return datum.slice(0, 4) !== heute.slice(0, 4) ? datumKurz(datum) : `${wochentag(datum)} ${tagMonat(datum)}`;
+}
+/** heute oder gestern – dann sagt die obere Zeile schon alles */
+const nahe = (datum: string, heute: string): boolean => datum === heute || tageZwischen(datum, heute) === 1;
+
 function LeistungZelle({ t, q }: { t: KundenTreffer; q: string }) {
   const x = t.info;
-  const e = t.eintrag ?? x.letzterBesuch ?? x.naechster ?? x.eintraege[0] ?? null;
-  if (!e) return <span className="ku-z muted">noch kein Besuch</span>;
-  // Badge: Status des Eintrags, bei bezahlten der Hinweis auf offene/überfällige Rechnungen des Kunden
+  // dieselbe Sache wie oben in der Spalte davor: Termin zum Nachtragen › nächster Termin › letzter Besuch;
+  // Suchtreffer zeigen den gefundenen Eintrag
+  const termin = t.eintrag ? null : (x.nachtragen[0] ?? x.naechster ?? null);
+  const e = t.eintrag ?? termin ?? x.letzterBesuch ?? null;
+  if (!e) return null;
+  // Badge: Status des Eintrags (nicht beim Termin – der steht schon daneben), bei bezahlten der Hinweis auf offene
+  // bzw. überfällige Rechnungen des Kunden
   const b =
-    e.status !== 'bezahlt'
+    e === termin
+      ? null
+      : e.status !== 'bezahlt'
       ? STATUS_BADGE[e.status]
       : x.offen.some((v) => v.status === 'ueberfaellig')
         ? STATUS_BADGE.ueberfaellig
@@ -322,7 +359,7 @@ function Zeile({ t, q, h, gewaehlt, suchFeld }: { t: KundenTreffer; q: string; h
   const ziffern = /^[\d\s+()/-]+$/.test(q) ? q.replace(/\D/g, '') : '';
   const telTreffer = !!q && !!k.telefon && (normalize(k.telefon).includes(nq) || (ziffern.length >= 3 && x.tel.includes(ziffern)));
   const mailTreffer = !!q && !!k.email && normalize(k.email).includes(nq);
-  const adresse = adresseKurz(k);
+  const adresse = adresseVoll(k);
   const n = x.naechster;
   const nt = x.nachtragen[0];
 
@@ -369,37 +406,39 @@ function Zeile({ t, q, h, gewaehlt, suchFeld }: { t: KundenTreffer; q: string; h
               <Hl text={k.email ?? ''} q={q} />
             </>
           ) : adresse ? (
-            <Hl text={adresse} q={q} />
-          ) : (
-            <span className="muted">–</span>
-          )}
+            <Hl text={adresse.replace(', ', '\n')} q={q} />
+          ) : null}
         </span>
       </td>
-      <td className="c num ku-c-bes">{x.besuche || <span className="muted">–</span>}</td>
+      <td className="c num ku-c-bes">{x.besuche || <span className="ku-leer" aria-label="keine">–</span>}</td>
       <td className="l ku-c-last">
-        {x.zuletzt ? <span className="ku-z num">{datumKurz(x.zuletzt)}</span> : <span className="ku-z muted">–</span>}
-        {n ? (
-          <small className="ku-z ku-next" title={`Nächster Termin: ${terminLang(n.z, h)} · ${n.titel}`}>
-            <CalendarDays />
-            nächster: {terminKurz(n.z, h)}
-          </small>
-        ) : nt && !x.zuletzt ? (
-          <small className="ku-z warn-t" title={`Termin nachtragen: ${terminLang(nt.z, h)} · ${nt.titel}`}>
+        {/* oben, was die Sortierung bestimmt: nachtragen › nächster Termin › letzter Besuch */}
+        {nt ? (
+          <span className="ku-z ku-top warn-t" title={`Termin nachtragen: ${terminLang(nt.z, h)} · ${nt.titel}`}>
             <CalendarDays />
             {terminKurz(nt.z, h)} nachtragen
-          </small>
+          </span>
+        ) : n ? (
+          <span className="ku-z ku-top ku-next" title={`Nächster Termin: ${terminLang(n.z, h)} · ${n.titel}`}>
+            <CalendarDays />
+            {terminKurz(n.z, h)}
+          </span>
         ) : x.zuletzt ? (
-          <small className="ku-z">{vorText(x.zuletzt, h)}</small>
-        ) : null}
+          <span className="ku-z num ku-war">zuletzt {tagKurz(x.zuletzt, h)}</span>
+        ) : (
+          <span className="ku-z muted">noch kein Besuch</span>
+        )}
+        {x.zuletzt && (nt || n) ? <small className="ku-z">zuletzt {tagKurz(x.zuletzt, h)}</small> : null}
+        {x.zuletzt && !nt && !n && !nahe(x.zuletzt, h) ? <small className="ku-z">{vorText(x.zuletzt, h)}</small> : null}
       </td>
       <td className="l ku-c-leist">
         <LeistungZelle t={t} q={q} />
       </td>
-      <td className="num ku-c-ums">{x.umsatz ? formatBetrag(x.umsatz) : <span className="muted">–</span>}</td>
+      <td className="num ku-c-ums">{x.umsatz ? formatBetrag(x.umsatz) : <span className="ku-leer" aria-label="keine">–</span>}</td>
       <td className="c ku-c-ntz">
         {notiz ? (
           <span className={`ku-ntz ${q && normalize(notiz).includes(nq) ? 'on' : ''}`} title={`Notiz: ${notiz}`} role="img" aria-label={`Notiz: ${notiz}`}>
-            <StickyNote />
+            <MessageSquareText />
           </span>
         ) : null}
       </td>

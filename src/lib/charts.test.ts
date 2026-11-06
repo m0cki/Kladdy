@@ -194,8 +194,10 @@ describe('Beschriftung & Hover', () => {
   it('xBeschriftungen: genug Platz ⇒ alle', () => {
     expect(xBeschriftungen(12, 80)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
   });
-  it('xBeschriftungen: wenig Platz ⇒ jede k-te, der letzte immer', () => {
-    expect(xBeschriftungen(12, 20)).toEqual([2, 5, 8, 11]);
+  it('xBeschriftungen: wenig Platz ⇒ jede k-te, erster und letzter immer', () => {
+    expect(xBeschriftungen(12, 20)).toEqual([0, 5, 8, 11]);
+    // jede zweite: der erste Monat (Dezember) bekommt eine Beschriftung, sein Nachbar weicht
+    expect(xBeschriftungen(12, 30)).toEqual([0, 3, 5, 7, 9, 11]);
     expect(xBeschriftungen(0, 20)).toEqual([]);
   });
   it('naechsterIndex und bandIndex begrenzt', () => {

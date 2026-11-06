@@ -18,7 +18,7 @@ import {
   Minus,
   Moon,
   Plus,
-  Receipt,
+  ReceiptEuro,
   ReceiptText,
   RefreshCw,
   Search,
@@ -74,14 +74,15 @@ const SEITEN: Ziel[] = [
 /** Ohne Eingabe: die fünf Menüpunkte. */
 const SPRINGEN: Ziel[] = NAV.map((n) => ({ id: `springen:${n.to}`, art: 'seite' as const, gruppe: 'Springen zu', label: n.label, icon: n.icon, run: go(n.to) }));
 
-const EINSTELLUNGS_ZIELE: Ziel[] = EINSTELLUNGEN.map((e) => {
+// nur fertige Bereiche (wie in der Seitenleiste der Einstellungen)
+const EINSTELLUNGS_ZIELE: Ziel[] = EINSTELLUNGEN.filter((e) => !bereich(e.bereich).phase).map((e) => {
   const b = bereich(e.bereich);
   return {
     id: `einstellung:${e.id}`,
     art: 'einstellung',
     gruppe: 'Einstellungen',
     label: e.label,
-    sub: `Einstellungen · ${b.label}${b.phase ? ` (kommt mit Phase ${b.phase})` : ''}`,
+    sub: `Einstellungen · ${b.label}`,
     keywords: e.keywords,
     icon: SlidersHorizontal,
     run: go(bereichPfad(e.bereich, e.id)),
@@ -104,7 +105,7 @@ const BEFEHLE: Ziel[] = [
   befehl('ausgabe', 'Ausgabe erfassen', 'Kosten eintragen · ⌘N', Minus, () => erfassen({ typ: 'ausgabe' }), ['Erfassen', 'Neu', 'Buchung']),
   befehl('einnahme', 'Einnahme erfassen', 'Geld von Kunden eintragen', Plus, () => erfassen({ typ: 'einnahme' }), ['Erfassen', 'Neu', 'Buchung', 'Umsatz']),
   // Quittung und Rechnung: dieselbe Erfassen-Schublade, Beleg vorgewählt (Beleg und Einnahme in einem Schritt)
-  befehl('quittung', 'Quittung schreiben', 'Einnahme mit Quittung erfassen · nächste Nummer', Receipt, () => erfassen({ typ: 'einnahme', beleg: 'quittung' }), ['Beleg', 'Neu']),
+  befehl('quittung', 'Quittung schreiben', 'Einnahme mit Quittung erfassen · nächste Nummer', ReceiptEuro, () => erfassen({ typ: 'einnahme', beleg: 'quittung' }), ['Beleg', 'Neu']),
   befehl('rechnung', 'Rechnung schreiben', 'Einnahme mit Rechnung – bezahlt oder offen', ReceiptText, () => erfassen({ typ: 'einnahme', beleg: 'rechnung' }), ['Beleg', 'Neu']),
   befehl('termin', 'Termin eintragen', 'Kundentermin, auf Wunsch mit vorbereiteter Quittung', CalendarPlus, go('/termine?neu=1'), ['Neu', 'Kalender']),
   befehl('angebot', 'Angebot schreiben', 'Angebot an einen Kunden – noch keine Einnahme', FileText, go('/belege/neu?art=angebot'), ['Beleg', 'Neu']),
@@ -125,7 +126,7 @@ const LIMITS: Readonly<Record<string, number>> = { ...DATEN_LIMITS, Seiten: 6, E
 const SYMBOL: Readonly<Record<Exclude<DatenSymbol, 'kunde'>, LucideIcon>> = {
   einnahme: Plus,
   ausgabe: Minus,
-  quittung: Receipt,
+  quittung: ReceiptEuro,
   rechnung: ReceiptText,
   angebot: FileText,
   eigenbeleg: Stamp,
@@ -222,7 +223,7 @@ export const Suche = forwardRef(function Suche(_props: object, ref: ForwardedRef
         type="search"
         autoComplete="off"
         spellCheck={false}
-        placeholder="Suchen oder Befehl …"
+        placeholder="Springen …"
         title="Einträge, Belege, Termine, Kunden, Kennzahlen, Seiten und Einstellungen durchsuchen – mit „>“ nur Befehle"
         aria-label="Suchen"
         role="combobox"

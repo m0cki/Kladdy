@@ -248,7 +248,7 @@ function quittungBlanko(b: Aufgeloest, x: Ctx): ReactNode {
               <Schreiben />
             </FormZeile>
           )}
-          <FormZeile label="Nr." schreib>
+          <FormZeile label="Buchungs-Nr." schreib>
             <Schreiben />
           </FormZeile>
         </div>
@@ -319,6 +319,9 @@ function quittungBlanko(b: Aufgeloest, x: Ctx): ReactNode {
           <Schreiben />
         </Feld>
       )}
+      <Feld label="Buchungs-Nr. (aus Kladdy)">
+        <Schreiben />
+      </Feld>
     </>
   );
 }
@@ -373,6 +376,7 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
       if (b.an('datum')) rows.push(['Datum', <Luecke />]);
       if (b.an('leistung') && doc.art !== 'angebot') rows.push(['Leistungsdatum', <Luecke />]);
       if (b.an('kundennr')) rows.push(['Kunden-Nr.', <Luecke />]);
+      if (b.an('steuernr') && doc.firma.steuernummer.trim()) rows.push(['Steuernummer', doc.firma.steuernummer]);
       if (b.an('faellig')) rows.push([doc.art === 'angebot' ? 'Gültig bis' : 'Fällig am', <Luecke />]);
       return (
         <>
@@ -389,6 +393,7 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
     if (b.an('datum')) rows.push(['Datum', datumText(doc.datum)]);
     if (b.an('leistung') && doc.art !== 'angebot' && doc.leistung_von) rows.push([leistungLabel(doc), leistungText(doc)]);
     if (b.an('kundennr') && e.nummer) rows.push(['Kunden-Nr.', e.nummer]);
+    if (b.an('steuernr') && doc.firma.steuernummer.trim()) rows.push(['Steuernummer', doc.firma.steuernummer]);
     if (b.an('faellig') && doc.faellig_am) rows.push([doc.art === 'angebot' ? 'Gültig bis' : 'Fällig am', datumText(doc.faellig_am)]);
     const adr = [e.anzeige, ...e.zeilen].filter(Boolean);
     return (
@@ -399,7 +404,8 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
     );
   },
   titel(b, x) {
-    const rechts = feld(b, x, 'rechts');
+    // Blanko: ohne Nummer gedruckt – die Nummernzeile im Titel entfällt (dafür hat das Formular „Buchungs-Nr.“)
+    const rechts = x.doc.blanko && b.text('rechts').includes('{nr}') ? null : feld(b, x, 'rechts');
     return (
       <>
         <div className={`blk-titel-row${b.text('stil') === 'akzent' ? ' akzent' : ''}${b.an('versal') ? ' versal' : ''}`}>
@@ -625,6 +631,11 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
               <span>in Worten:</span> {betragInWorten(x.summe)}
             </p>
           )}
+          {a.buchungsnr && doc.buchung_nr ? (
+            <p className="blk-buchnr">
+              <span>Buchungs-Nr.</span> {doc.buchung_nr}
+            </p>
+          ) : null}
         </div>
       );
     }
@@ -652,6 +663,11 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
         {a.worte && <Feld label="Betrag in Worten">{betragInWorten(x.summe)}</Feld>}
         {a.kunde && <Feld label={feld(b, x, 'von')}>{kunde}</Feld>}
         {a.zweck && <Feld label={feld(b, x, 'fuer')}>{fuer}</Feld>}
+        {a.buchungsnr && doc.buchung_nr ? (
+            <p className="blk-buchnr">
+              <span>Buchungs-Nr.</span> {doc.buchung_nr}
+            </p>
+          ) : null}
       </>
     );
   },

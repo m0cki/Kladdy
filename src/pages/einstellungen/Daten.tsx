@@ -46,6 +46,7 @@ import { BEISPIEL_FIRMA, firmaOderBeispiel, testbeleg } from '../../lib/vorlagen
 import { standardVorlage } from '../../lib/vorlagen/standard';
 import { heute } from '../../lib/zeitraum';
 import { useUi } from '../../store/ui';
+import { akzentPapier } from '../../lib/settings';
 import { Ladeansicht, fehlerText, useLaden } from './Laden';
 import { SetCard, SetRow } from './SetRow';
 
@@ -201,7 +202,7 @@ type Lauf =
 const ZAHL = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 1 });
 
 function Testbeleg({ gefunden }: { gefunden: boolean }) {
-  const accent = useUi((s) => s.settings.accent);
+  const accent = useUi((s) => akzentPapier(s.settings));
   const [art, setArt] = useState<TestArt>('rechnung');
   const [basis, setBasis] = useState<{ firma: Firma; ust: UstModus; eigen: boolean } | null>(null);
   const [lauf, setLauf] = useState<Lauf>(null);

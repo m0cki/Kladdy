@@ -161,10 +161,10 @@ describe('Beispielbeleg der Vorlagen-Seite', () => {
 
 describe('Kurzinfo der Quittungsangaben', () => {
   it('nennt die gezeigten Angaben, Nr. nur im Formular-Stil', () => {
-    expect(zusammenfassung({ typ: 'quittung_felder' })).toBe('Betrag · Datum · Zahlungsart · in Worten · Erhalten von · Für');
-    expect(zusammenfassung({ typ: 'quittung_felder', stil: 'formular', worte: false })).toBe('Betrag · Datum · Nr. · Zahlungsart · Erhalten von · Für');
+    expect(zusammenfassung({ typ: 'quittung_felder' })).toBe('Betrag · Datum · Zahlungsart · in Worten · Erhalten von · Für · Buchungs-Nr.');
+    expect(zusammenfassung({ typ: 'quittung_felder', stil: 'formular', worte: false })).toBe('Betrag · Datum · Nr. · Zahlungsart · Erhalten von · Für · Buchungs-Nr.');
     expect(zusammenfassung({ typ: 'quittung_felder', datum: false, zahlungsart: false, von: 'Kunde', fuer: '<b>Zweck</b>' })).toBe(
-      'Betrag · in Worten · Kunde · Zweck',
+      'Betrag · in Worten · Kunde · Zweck · Buchungs-Nr.',
     );
   });
 

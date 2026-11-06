@@ -66,10 +66,8 @@ export interface EinstellungsEintrag {
 export const EINSTELLUNGEN: readonly EinstellungsEintrag[] = [
   /* Darstellung */
   { id: 'modus', label: 'Hell/Dunkel', bereich: 'darstellung', keywords: ['Modus', 'Hell', 'Dunkel', 'System', 'Dark Mode', 'Light Mode', 'Erscheinungsbild'] },
-  { id: 'farbthema', label: 'Farbthema', bereich: 'darstellung', keywords: ['Theme', 'Themes', 'Preset', 'Vorlage', 'Indigo', 'Ozean', 'Smaragd', 'Terminal'] },
-  { id: 'akzentfarbe', label: 'Akzentfarbe', bereich: 'darstellung', keywords: ['Akzent', 'Farbe', 'Accent'] },
-  { id: 'farbton', label: 'Farbton Hintergrund', bereich: 'darstellung', keywords: ['Tönung', 'Hintergrundfarbe', 'Hue'] },
-  { id: 'saettigung', label: 'Sättigung Hintergrund', bereich: 'darstellung', keywords: ['Sättigung', 'Saturation'] },
+  { id: 'farbschema', label: 'Farbschema', bereich: 'darstellung', keywords: ['Theme', 'Farben', 'Petrol', 'Kladde', 'Pflaume', 'Bernstein', 'Graphit'] },
+  { id: 'akzentfarbe', label: 'Eigene Akzentfarbe', bereich: 'darstellung', keywords: ['Akzent', 'Farbe', 'Accent', 'Firmenfarbe'] },
   { id: 'radius', label: 'Eckenrundung', bereich: 'darstellung', keywords: ['Radius', 'Ecken', 'abgerundet'] },
   { id: 'schriftgroesse', label: 'Schriftgröße', bereich: 'darstellung', keywords: ['Schrift', 'Text', 'Zoom', 'größer', 'kleiner'] },
   { id: 'dichte', label: 'Dichte', bereich: 'darstellung', keywords: ['Kompakt', 'Luftig', 'Abstände'] },
@@ -77,7 +75,6 @@ export const EINSTELLUNGEN: readonly EinstellungsEintrag[] = [
   { id: 'zahlen', label: 'Monospace-Zahlen', bereich: 'darstellung', keywords: ['Zahlen', 'Monospace', 'Proportional', 'Ziffern', 'Schriftart'] },
   { id: 'animationen', label: 'Bewegung', bereich: 'darstellung', keywords: ['Animationen', 'reduziert', 'Effekte', 'Motion'] },
   { id: 'glas', label: 'Glas-Effekt', bereich: 'darstellung', keywords: ['Glas', 'Transparenz', 'Unschärfe', 'Blur'] },
-  { id: 'aurora', label: 'Aurora (Farbverlauf im Hintergrund)', bereich: 'darstellung', keywords: ['Aurora', 'Farbverlauf', 'Hintergrund', 'Verlauf'] },
   { id: 'darstellung-zuruecksetzen', label: 'Darstellung zurücksetzen', bereich: 'darstellung', keywords: ['Standard', 'Reset'] },
   /* Updates & Über Kladdy */
   { id: 'version', label: 'Version', bereich: 'updates', keywords: ['Über Kladdy', 'Versionsnummer', 'About'] },
@@ -138,6 +135,7 @@ export const EINSTELLUNGEN: readonly EinstellungsEintrag[] = [
     : []),
   /* Belege (§6.10) */
   { id: 'beleg-bei-einnahmen', label: 'Beleg bei Einnahmen', bereich: 'belege', keywords: ['Quittung', 'Rechnung', 'Vorauswahl'] },
+  { id: 'neue-einnahme', label: 'Neue Einnahme: Beleg ausstellen oder nur buchen', bereich: 'belege', keywords: ['Papierquittung', 'Quittungsblock', 'Blanko', 'nur buchen', 'ohne Beleg'] },
   { id: 'zahlungsziel', label: 'Zahlungsziel neuer Rechnungen', bereich: 'belege', keywords: ['Fälligkeit', 'fällig', 'Tage', 'Rechnung'] },
   { id: 'angebot-gueltig', label: 'Gültigkeit neuer Angebote', bereich: 'belege', keywords: ['Angebot', 'gültig bis', 'Tage'] },
   /* Noch nicht gebaut – springen in den Bereich */

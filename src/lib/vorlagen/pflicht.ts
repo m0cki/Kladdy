@@ -108,8 +108,20 @@ export function pflichtCheck(doc: BelegDokument, bausteine: readonly Baustein[],
       [e.name, e.zeilen[e.zeilen.length - 1]].filter(Boolean).join(', '));
   }
 
-  add('Steuernummer', hat('fusszeile', (b) => b.an('kontakt')) || druckt('steuernummer'), 'Fußzeile, Firmenkopf oder {steuernummer} fehlt',
-    !!F.steuernummer.trim(), 'in den Firmendaten ergänzen', F.steuernummer);
+  const steuerGedruckt = hat('fusszeile', (b) => b.an('kontakt')) || hat('anschrift_meta', (b) => b.an('steuernr')) || druckt('steuernummer');
+  if (quittung && !blanko && gesamt <= kleinbetrag) {
+    // § 33 UStDV: die Kleinbetragsrechnung braucht keine Steuernummer – erst darüber. Blanko bleibt streng: der Betrag
+    // wird von Hand eingetragen und kann über der Grenze liegen.
+    const grenze = formatBetrag(kleinbetrag);
+    const nr = F.steuernummer.trim();
+    out.push({
+      label: 'Steuernummer',
+      ok: true,
+      hint: steuerGedruckt && nr ? `${nr} · Pflicht erst über ${grenze}` : `nicht nötig – Kleinbetragsrechnung bis ${grenze}`,
+    });
+  } else {
+    add('Steuernummer', steuerGedruckt, 'Fußzeile, Firmenkopf oder {steuernummer} fehlt', !!F.steuernummer.trim(), 'in den Firmendaten ergänzen', F.steuernummer);
+  }
   wert('Ausstellungsdatum', hat('anschrift_meta', (b) => b.an('datum')) || qf('datum') || druckt('datum'), qHinweis('Datum', 'Datum wird nirgends gedruckt'),
     !!doc.datum, 'Datum fehlt', datumText(doc.datum));
   const n = doc.positionen.length;

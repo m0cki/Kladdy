@@ -2,7 +2,7 @@
 
 /* ============ Basis ============ */
 *, *::before, *::after { box-sizing: border-box; }
-html { font-size: calc(15px * var(--font-scale)); -webkit-text-size-adjust: 100%; overscroll-behavior: none; }
+html { font-size: calc(15px * var(--font-scale)); -webkit-text-size-adjust: 100%; overscroll-behavior: none; scrollbar-gutter: stable; }
 body {
   margin: 0; font-family: var(--font); background: var(--bg); color: var(--text);
   line-height: 1.45; -webkit-font-smoothing: antialiased; min-height: 100vh;
@@ -24,15 +24,6 @@ kbd { font: 600 .7rem var(--font); color: var(--muted); border: 1px solid var(--
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* ============ Aurora-Hintergrund ============ */
-.aurora { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; opacity: var(--aurora-opacity); transition: opacity .6s; }
-:root[data-aurora="off"] .aurora { opacity: 0; }
-.aurora span { position: absolute; width: 60vmax; height: 60vmax; border-radius: 50%; filter: blur(90px); }
-.aurora span:nth-child(1) { background: var(--accent); top: -30vmax; left: -10vmax; animation: drift1 38s ease-in-out infinite alternate; }
-.aurora span:nth-child(2) { background: var(--accent-2); bottom: -35vmax; right: -15vmax; animation: drift2 46s ease-in-out infinite alternate; }
-.aurora span:nth-child(3) { background: var(--series-1); top: 30%; left: 45%; width: 35vmax; height: 35vmax; opacity: .5; animation: drift3 52s ease-in-out infinite alternate; }
-@keyframes drift1 { to { transform: translate(18vw, 12vh) scale(1.15); } }
-@keyframes drift2 { to { transform: translate(-16vw, -10vh) scale(.9); } }
-@keyframes drift3 { to { transform: translate(-22vw, 14vh) scale(1.2); } }
 
 /* ============ Layout ============ */
 .app { position: relative; z-index: 1; display: grid; grid-template-columns: var(--sb-w) minmax(0, 1fr); min-height: 100vh; transition: grid-template-columns .38s var(--ease); }
@@ -42,11 +33,11 @@ kbd { font: 600 .7rem var(--font); color: var(--muted); border: 1px solid var(--
 .page { display: flex; flex-direction: column; gap: var(--gap); }
 .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px 24px; flex-wrap: wrap; padding: 4px 0 2px; }
 .page-head h1 { font-size: clamp(1.6rem, 2.6vw, 2.1rem); font-weight: 750; letter-spacing: -.035em; line-height: 1.1; display: flex; align-items: center; gap: 12px; }
-.page-head h1 .ic { width: 26px; height: 26px; color: var(--accent); }
+.page-head h1 .ic { width: 26px; height: 26px; color: var(--accent-text); }
 .page-sub { color: var(--text-2); font-size: .92rem; margin-top: 6px; }
 .page-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .section-title { display: flex; align-items: center; gap: 8px; font-size: 1.05rem; margin: 10px 0 0; }
-.section-title .ic { color: var(--accent); }
+.section-title .ic { color: var(--accent-text); }
 .kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--gap); }
 .kpis.k4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .kpis.k5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
@@ -64,7 +55,6 @@ kbd { font: 600 .7rem var(--font); color: var(--muted); border: 1px solid var(--
 @keyframes rise { from { opacity: 0; transform: translateY(14px); } }
 @keyframes fade { from { opacity: 0; } }
 :root[data-motion="reduced"] .reveal { animation-name: fade; animation-duration: .3s; }
-:root[data-motion="reduced"] .aurora span { animation: none; }
 :root[data-motion="off"] *, :root[data-motion="off"] *::before, :root[data-motion="off"] *::after { animation: none !important; transition: none !important; }
 .no-anim .reveal, .no-anim .c-draw, .no-anim .c-grow, .no-anim .c-fade { animation: none !important; }
 /* ohne Animation: Linien sofort vollständig zeigen (sonst bleibt dasharray 1/offset 1 unsichtbar) */
@@ -88,7 +78,7 @@ kbd { font: 600 .7rem var(--font); color: var(--muted); border: 1px solid var(--
 
 /* ============ Druck ============ */
 @media print {
-  .sidebar, .topbar, .aurora, .toasts, .overlay, .drop-overlay, .gtip, .no-print { display: none !important; }
+  .sidebar, .topbar, .toasts, .overlay, .drop-overlay, .gtip, .no-print { display: none !important; }
   .app { display: block; }
   body { background: #fff; color: #000; }
 }

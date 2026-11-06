@@ -48,22 +48,34 @@ export interface Ertrag {
   leistung: string;
   /** „Offene Rechnung zuordnen“: die gewählte Rechnung */
   offenId: number | null;
+  /** „Nur buchen“: eine Papierquittung liegt im Ordner (ohne eingetragene Nummer wird die Buchung als „Papier“ belegt);
+   *  null = noch nicht gewählt ⇒ folgt dem Zahlungsweg (bar ⇒ ja), siehe papierGewaehlt */
+  papier: boolean | null;
 }
 
-/** Start: vom Aufrufer vorgewählter Beleg ⇒ „Beleg erstellen“; mit mitgebrachter Datei (Drop) ⇒ „Ohne eigenen Beleg“.
+/** Papierquittung bei „Nur buchen“: gewählt oder – solange nicht gewählt – bei Barzahlung ja (dann gibt es meist einen Zettel). */
+export const papierGewaehlt = (e: Pick<Ertrag, 'papier'>, zahlungsart: Zahlungsart): boolean => e.papier ?? zahlungsart === 'bar';
+
+/** Belegnummer, die eine Buchung mit Papierquittung ohne eigene Nummer bekommt (gilt dann nicht als „ohne Beleg“). */
+export const PAPIER_BELEG = 'Papier';
+
+/** Start: vom Aufrufer vorgewählter Beleg ⇒ „Beleg erstellen“; mit mitgebrachter Datei (Drop) ⇒ „Nur buchen“; sonst
+ *  die Einstellung „Neue Einnahme“ (`standardWeg`).
  *  Zu einem Termin ist eine Rechnung standardmäßig „noch offen“ (nach dem Termin zahlt der Kunde meist später). */
 export function ertragStart(
   v: { beleg?: ErtragsArt; belege?: readonly unknown[]; termin?: number; entwurf?: number },
   belegArt: ErtragsArt,
+  standardWeg: 'beleg' | 'ohne' = 'beleg',
 ): Ertrag {
   return {
-    weg: v.beleg ? 'beleg' : v.belege?.length ? 'ohne' : 'beleg',
+    weg: v.beleg ? 'beleg' : v.belege?.length ? 'ohne' : v.termin != null || v.entwurf != null ? 'beleg' : standardWeg,
     art: v.beleg ?? belegArt,
     bezahlt: v.termin == null && v.entwurf == null,
     vorlage: null,
     adresse: '',
     leistung: '',
     offenId: null,
+    papier: null,
   };
 }
 
@@ -73,8 +85,9 @@ export const ertragSchluessel = (e: Ertrag): string => JSON.stringify([e.adresse
 /** Eine Rechnung, die erst beim Zahlungseingang zur Einnahme wird. */
 export const rechnungOffen = (e: Pick<Ertrag, 'weg' | 'art' | 'bezahlt'>): boolean => e.weg === 'beleg' && e.art === 'rechnung' && !e.bezahlt;
 
-/** Nummer, die der Beleg beim Ausstellen bekommt (Jahr des Belegdatums, nie rückwärts – wie Rust). */
-export function naechsteBelegNummer(kreise: readonly Nummernkreis[], art: Belegart, datum: string, heute: string): string | null {
+/** Nummer, die der Beleg beim Ausstellen bzw. die Buchung beim Speichern bekommt (Jahr des Datums, nie rückwärts – wie
+ *  Rust). Nur eine Vorschau: vergeben wird erst in Rust. */
+export function naechsteBelegNummer(kreise: readonly Nummernkreis[], art: Belegart | 'buchung', datum: string, heute: string): string | null {
   const kreis = kreise.find((k) => k.id === art);
   if (!kreis) return null;
   const jahr = Number((istDatum(datum) ? datum : heute).slice(0, 4));
@@ -110,7 +123,7 @@ export function offeneRechnungen(zeilen: readonly BelegZeile[]): BelegZeile[] {
     .sort((a, b) => schluessel(a).localeCompare(schluessel(b)) || a.id - b.id);
 }
 
-/** Zweite Zeile einer offenen Rechnung: „7 T. überfällig“, „heute fällig“, „in 3 Tagen“. */
+/** Zweite Zeile einer offenen Rechnung: „7 Tage überfällig“, „heute fällig“, „in 3 Tagen“. */
 export const offenFaellig = (z: BelegZeile, heute: string): { text: string; ueberfaellig: boolean } => {
   const f = faelligText(z, heute);
   return { text: f.text, ueberfaellig: f.klasse === 'neg' };

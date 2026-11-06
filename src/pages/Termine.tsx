@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { formatBetrag } from '../lib/money';
 import {
   ArrowLeftRight,
   CalendarDays,
@@ -18,9 +19,9 @@ import {
   MapPin,
   Pencil,
   Plus,
-  Receipt,
+  ReceiptEuro,
   RotateCcw,
-  StickyNote,
+  MessageSquareText,
   TriangleAlert,
   X,
   type LucideIcon,
@@ -259,6 +260,7 @@ function Agenda({
     <section className="card flush tm-liste reveal" style={reveal(1)}>
       <div className="tm-bar">
         <Seg<TerminFilter>
+          className="tabs"
           ariaLabel="Termine filtern"
           value={filter}
           onChange={(f) => {
@@ -267,9 +269,11 @@ function Agenda({
           }}
           options={FILTER.map((f) => ({
             value: f.value,
+            // heute Erledigte stehen in beiden Reitern – „Alle“ ohne Zahl, damit niemand nachrechnet
+            title: f.value === 'anstehend' ? 'Nachtragen, heute und kommend – heute erledigte bleiben bis Tagesende stehen' : undefined,
             label: (
               <>
-                {f.label} <span className="cnt">{zaehler[f.value]}</span>
+                {f.label} {f.value === 'alle' ? null : <span className="cnt">{zaehler[f.value]}</span>}
               </>
             ),
           }))}
@@ -277,6 +281,11 @@ function Agenda({
       </div>
       {wocheZeigen(termine, filter, h) ? (
         <div className="tm-woche">
+          <p className="tm-legende" aria-hidden="true">
+            <span><i /> geplant</span>
+            <span><i className="erledigt" /> erledigt</span>
+            <span><i className="nach" /> nachtragen</span>
+          </p>
           {wochen.map((w) => (
             <div key={w.label} className="tm-wo">
               <div className="tm-wo-h">
@@ -398,7 +407,7 @@ function Leer({ filter }: { filter: TerminFilter }) {
 
 /* ================= Zeile ================= */
 
-const ART_ICON: Readonly<Record<ErtragsArt, LucideIcon>> = { quittung: Receipt, rechnung: FileText };
+const ART_ICON: Readonly<Record<ErtragsArt, LucideIcon>> = { quittung: ReceiptEuro, rechnung: FileText };
 
 function Zeile({
   t,
@@ -458,6 +467,7 @@ function Zeile({
         ) : null}
         <b>{t.von ?? '–'}</b>
         <span>{t.bis ?? ''}</span>
+        {t.status === 'erledigt' ? <small className="tm-erl">erledigt</small> : null}
       </div>
       <Monogramm name={name} size="sm" />
       <div className="tm-main">
@@ -471,7 +481,7 @@ function Zeile({
           )}
           {notizText ? (
             <span className="tm-ntz" tabIndex={0} role="img" aria-label={`${notizTitel}: ${notizText}`} title={`${notizTitel}: ${notizText}`}>
-              <StickyNote />
+              <MessageSquareText />
             </span>
           ) : null}
         </div>
@@ -488,16 +498,15 @@ function Zeile({
       <div className="tm-info">
         {b ? (
           <span className={`tm-betrag ${b.ist ? 'ist' : ''}`} title={b.titel}>
-            {b.ist ? '' : 'ca. '}
-            {betragKurz(b.cent)}
+            {b.ist ? formatBetrag(b.cent) : `ca. ${betragKurz(b.cent)}`}
           </span>
         ) : null}
         <BelegChip t={t} />
       </div>
       <div className="tm-acts">
-        {k.frage ? <span className="tm-frage">War der Termin?</span> : null}
+        {k.frage ? <span className="tm-frage">Hat der Termin stattgefunden?</span> : null}
         {k.haupt === 'abhaken' ? (
-          <button type="button" className="btn-primary sm tm-kass" title="Termin abhaken – den Beleg stellst du danach aus" onClick={() => onAktion('abhaken', t)}>
+          <button type="button" className="btn ghost sm tm-kass" title="Termin abhaken – den Beleg stellst du danach aus" onClick={() => onAktion('abhaken', t)}>
             <Check />
             Erledigt
           </button>
@@ -604,9 +613,9 @@ function BelegChip({ t }: { t: Termin }) {
 
 const MENUE_ICON: Readonly<Record<TerminAktion, LucideIcon>> = {
   abhaken: Check,
-  ausstellen: Receipt,
+  ausstellen: ReceiptEuro,
   ohne: Check,
-  mitbeleg: Receipt,
+  mitbeleg: ReceiptEuro,
   nichterledigt: RotateCcw,
   absagen: X,
   wieder: RotateCcw,

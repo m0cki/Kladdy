@@ -16,7 +16,9 @@ const ZEILE_SQL = `
                   (SELECT p.beschreibung FROM rechnungspositionen p WHERE p.rechnung_id = r.id ORDER BY p.pos LIMIT 1)) AS betreff,
          r.summe_cent, r.termin_id, t.datum AS termin_datum, t.von AS termin_von, t.status AS termin_status,
          r.storno_von_id, (SELECT s.datum FROM rechnungen s WHERE s.storno_von_id = r.id) AS storniert_am,
-         r.pdf_beleg_id, r.scan_beleg_id
+         r.pdf_beleg_id, r.scan_beleg_id,
+         (SELECT b.nummer FROM buchungen b WHERE b.rechnung_id = r.id AND b.storno_von_id IS NULL
+            AND NOT EXISTS (SELECT 1 FROM buchungen s WHERE s.storno_von_id = b.id) ORDER BY b.id DESC LIMIT 1) AS buchung_nummer
     FROM rechnungen r
     LEFT JOIN kunden k ON k.id = r.kunde_id
     LEFT JOIN termine t ON t.id = r.termin_id`;

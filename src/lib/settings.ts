@@ -1,6 +1,9 @@
 /* Darstellungs-Einstellungen (ANLEITUNG §6.10 „Darstellung“, §9.1).
  * Werden im localStorage gespeichert und als data-Attribute bzw. CSS-Variablen an <html> gesetzt.
- * Reine Funktionen (sanitize, luminance, onAccent) sind mit Vitest getestet. */
+ * Farbe: ein Farbschema (FARBSCHEMATA, Standard Petrol) mit eigener Palette für Hell und Dunkel, optional eine eigene
+ * Akzentfarbe. Aus Akzent und Modus entstehen --accent (Flächen), --on-accent (Schrift darauf) und --accent-text
+ * (Akzent als Schrift, mindestens 4,5:1 auf den Flächen). Belege auf Papier nutzen immer die helle Akzentfarbe.
+ * Reine Funktionen (sanitize, luminance, kontrast, palette) sind mit Vitest getestet. */
 
 export type Mode = 'light' | 'dark' | 'system';
 export type Density = 'compact' | 'normal' | 'cozy';
@@ -10,55 +13,79 @@ export type NumFont = 'sans' | 'mono';
 
 export interface Settings {
   mode: Mode;
-  theme: string; // Theme-ID oder 'custom' („Eigenes Theme“)
-  accent: string; // #rrggbb
-  tintH: number; // 0–360
-  tintS: number; // 0–40 (%)
+  /** ID aus FARBSCHEMATA */
+  theme: string;
+  /** eigene Akzentfarbe (#rrggbb) statt der des Schemas; null = die des Schemas */
+  akzent: string | null;
   radius: number; // 0–24 (px)
   fontScale: number; // 85–120 (%)
   density: Density;
   motion: Motion;
   glass: boolean;
-  aurora: boolean;
   posneg: PosNeg;
   numFont: NumFont;
 }
 
-export interface Theme {
-  id: string;
-  name: string;
-  accent: string;
+/** Farben eines Modus: Akzent und Tönung der neutralen Flächen (Farbton, Sättigung in %). */
+export interface Palette {
+  akzent: string;
   tintH: number;
   tintS: number;
-  numFont?: NumFont;
 }
 
-export const THEMES: readonly Theme[] = [
-  { id: 'indigo', name: 'Indigo', accent: '#6366f1', tintH: 240, tintS: 14 },
-  { id: 'ocean', name: 'Ozean', accent: '#0ea5e9', tintH: 210, tintS: 20 },
-  { id: 'emerald', name: 'Smaragd', accent: '#10b981', tintH: 165, tintS: 14 },
-  { id: 'sunset', name: 'Sonnenuntergang', accent: '#f97316', tintH: 20, tintS: 12 },
-  { id: 'rose', name: 'Rosé', accent: '#ec4899', tintH: 330, tintS: 12 },
-  { id: 'gold', name: 'Gold', accent: '#eab308', tintH: 45, tintS: 10 },
-  { id: 'graphite', name: 'Graphit', accent: '#94a3b8', tintH: 220, tintS: 6 },
-  { id: 'terminal', name: 'Terminal', accent: '#22c55e', tintH: 140, tintS: 22, numFont: 'mono' },
+export interface Farbschema {
+  id: string;
+  name: string;
+  beschreibung: string;
+  hell: Palette;
+  dunkel: Palette;
+}
+
+export const FARBSCHEMATA: readonly Farbschema[] = [
+  {
+    id: 'petrol',
+    name: 'Petrol',
+    beschreibung: 'Schiefergrau mit Petrol, sachlich',
+    hell: { akzent: '#0b6a77', tintH: 195, tintS: 16 },
+    dunkel: { akzent: '#137a85', tintH: 195, tintS: 20 },
+  },
+  {
+    id: 'kladde',
+    name: 'Kladde',
+    beschreibung: 'Papierweiß mit Tintenblau, klassisch',
+    hell: { akzent: '#2b55b8', tintH: 42, tintS: 22 },
+    dunkel: { akzent: '#7ea2f2', tintH: 45, tintS: 10 },
+  },
+  {
+    id: 'pflaume',
+    name: 'Pflaume',
+    beschreibung: 'Warme Neutraltöne mit Pflaumenviolett',
+    hell: { akzent: '#7b3a86', tintH: 320, tintS: 14 },
+    dunkel: { akzent: '#d39adf', tintH: 320, tintS: 12 },
+  },
+  {
+    id: 'bernstein',
+    name: 'Graphit & Bernstein',
+    beschreibung: 'Neutrales Graphit mit kräftigem Bernstein',
+    hell: { akzent: '#d18b0f', tintH: 40, tintS: 4 },
+    dunkel: { akzent: '#f0a92b', tintH: 40, tintS: 4 },
+  },
 ];
+
+export const STANDARD_SCHEMA = 'petrol';
 
 export const SETTINGS_KEY = 'kladdy.settings.v1';
 
 export function defaultSettings(prefersReducedMotion = false): Settings {
   return {
-    mode: 'dark',
-    theme: 'indigo',
-    accent: '#6366f1',
-    tintH: 240,
-    tintS: 14,
+    mode: 'system',
+    theme: STANDARD_SCHEMA,
+    akzent: null,
     radius: 14,
     fontScale: 100,
     density: 'normal',
     motion: prefersReducedMotion ? 'reduced' : 'full',
     glass: true,
-    aurora: true,
     posneg: 'greenred',
     numFont: 'sans',
   };
@@ -74,39 +101,35 @@ const clampInt = (v: unknown, min: number, max: number, fallback: number): numbe
 
 const isHex = (v: unknown): v is string => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v);
 
-/** Gespeicherte (evtl. alte oder kaputte) Werte prüfen; Unbekanntes fällt auf den Standard zurück. */
+/** Gespeicherte (evtl. alte oder kaputte) Werte prüfen; Unbekanntes fällt auf den Standard zurück.
+ * Alte Stände (vor den Farbschemata): ein „Eigenes Theme“ behält seine Akzentfarbe, alte Theme-IDs werden Petrol. */
 export function sanitizeSettings(raw: unknown, defaults: Settings = defaultSettings()): Settings {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
-  const themeIds = [...THEMES.map((t) => t.id), 'custom'];
+  const altEigen = r.theme === 'custom' && isHex(r.accent) ? r.accent.toLowerCase() : null;
   return {
     mode: oneOf(r.mode, ['light', 'dark', 'system'] as const, defaults.mode),
-    theme: oneOf(r.theme, themeIds, defaults.theme),
-    accent: isHex(r.accent) ? r.accent.toLowerCase() : defaults.accent,
-    tintH: clampInt(r.tintH, 0, 360, defaults.tintH),
-    tintS: clampInt(r.tintS, 0, 40, defaults.tintS),
+    theme: oneOf(r.theme, FARBSCHEMATA.map((t) => t.id), defaults.theme),
+    akzent: isHex(r.akzent) ? r.akzent.toLowerCase() : (altEigen ?? defaults.akzent),
     radius: clampInt(r.radius, 0, 24, defaults.radius),
     fontScale: clampInt(r.fontScale, 85, 120, defaults.fontScale),
     density: oneOf(r.density, ['compact', 'normal', 'cozy'] as const, defaults.density),
     motion: oneOf(r.motion, ['full', 'reduced', 'off'] as const, defaults.motion),
     glass: typeof r.glass === 'boolean' ? r.glass : defaults.glass,
-    aurora: typeof r.aurora === 'boolean' ? r.aurora : defaults.aurora,
     posneg: oneOf(r.posneg, ['greenred', 'blueorange', 'tealpink'] as const, defaults.posneg),
     numFont: oneOf(r.numFont, ['sans', 'mono'] as const, defaults.numFont),
   };
 }
 
-/** Theme-Preset übernehmen (Akzent, Farbton, Sättigung, ggf. Monospace-Zahlen). */
+export const schemaVon = (s: Pick<Settings, 'theme'>): Farbschema =>
+  FARBSCHEMATA.find((t) => t.id === s.theme) ?? FARBSCHEMATA[0];
+
+/** Farbschema wählen; eine eigene Akzentfarbe bleibt bestehen (über „Farbe des Schemas“ zurücknehmen). */
 export function withTheme(s: Settings, id: string): Settings {
-  const th = THEMES.find((t) => t.id === id);
-  if (!th) return s;
-  return { ...s, theme: th.id, accent: th.accent, tintH: th.tintH, tintS: th.tintS, numFont: th.numFont ?? 'sans' };
+  return FARBSCHEMATA.some((t) => t.id === id) ? { ...s, theme: id } : s;
 }
 
-/** Einzelwert ändern; Akzent oder Farbton machen daraus „Eigenes Theme“ (§9.1). */
 export function withSetting<K extends keyof Settings>(s: Settings, key: K, value: Settings[K]): Settings {
-  const next = { ...s, [key]: value };
-  if (key === 'accent' || key === 'tintH' || key === 'tintS') next.theme = 'custom';
-  return next;
+  return { ...s, [key]: value };
 }
 
 /** Relative Luminanz nach WCAG für #rrggbb. */
@@ -119,8 +142,51 @@ export function luminance(hex: string): number {
   return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
 }
 
-/** Textfarbe auf dem Akzent (§9.1: Luminanz > 0.45 ⇒ dunkel). */
-export const onAccent = (accent: string): string => (luminance(accent) > 0.45 ? '#111114' : '#ffffff');
+/** Textfarbe auf dem Akzent: Weiß oder Fast-Schwarz, je nachdem, was mehr Kontrast hat (§9.1). */
+export const onAccent = (accent: string): string => (kontrast(accent, '#ffffff') >= kontrast(accent, '#111114') ? '#ffffff' : '#111114');
+
+/** Kontrast nach WCAG zwischen zwei #rrggbb. */
+export function kontrast(a: string, b: string): number {
+  const [x, y] = [luminance(a), luminance(b)];
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+}
+
+const hex2 = (n: number) => Math.round(Math.min(255, Math.max(0, n))).toString(16).padStart(2, '0');
+/** #rrggbb um `anteil` (0–1) zu Weiß bzw. Schwarz mischen. */
+export function mischen(hex: string, ziel: '#ffffff' | '#000000', anteil: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  const z = ziel === '#ffffff' ? 255 : 0;
+  const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => c + (z - c) * anteil);
+  return `#${ch.map(hex2).join('')}`;
+}
+
+/** Ungünstigste Fläche, auf der Akzent als Schrift steht (Seite bzw. Karte des Modus). */
+const TEXT_GRUND = { light: '#eef1f2', dark: '#1d2427' } as const;
+
+/** Akzent als Schrift: so weit abgedunkelt (hell, 4,6:1) bzw. aufgehellt (dunkel, 6,5:1), dass er gut lesbar ist. */
+export function textAkzent(akzent: string, modus: 'light' | 'dark'): string {
+  const ziel = modus === 'light' ? '#000000' : '#ffffff';
+  // im Dunkeln deutlich über dem Minimum: kleine Akzent-Schrift (Nummern-Chips, Platzhalter) soll klar lesbar sein
+  const min = modus === 'light' ? 4.6 : 6.5;
+  let f = akzent;
+  for (let i = 1; i <= 20 && kontrast(f, TEXT_GRUND[modus]) < min; i++) f = mischen(akzent, ziel, i * 0.05);
+  return f;
+}
+
+/** Palette für den Modus; eine eigene Akzentfarbe ersetzt den Akzent (im Dunkeln bei Bedarf aufgehellt). */
+export function palette(s: Pick<Settings, 'theme' | 'akzent'>, modus: 'light' | 'dark'): Palette {
+  const schema = schemaVon(s);
+  const p = modus === 'light' ? schema.hell : schema.dunkel;
+  if (!s.akzent) return p;
+  let akzent = s.akzent;
+  if (modus === 'dark') {
+    for (let i = 1; i <= 10 && kontrast(akzent, '#151b1d') < 4.5; i++) akzent = mischen(s.akzent, '#ffffff', i * 0.06);
+  }
+  return { ...p, akzent };
+}
+
+/** Akzentfarbe für Belege auf weißem Papier (Vorschau und PDF): immer die helle. */
+export const akzentPapier = (s: Pick<Settings, 'theme' | 'akzent'>): string => palette(s, 'light').akzent;
 
 export function effectiveMode(s: Settings, systemDark: boolean): 'light' | 'dark' {
   return s.mode === 'system' ? (systemDark ? 'dark' : 'light') : s.mode;
@@ -153,17 +219,21 @@ export function saveSettings(store: KeyValueStore | undefined, s: Settings): voi
 /* ---------- Anwenden ---------- */
 export function applySettings(s: Settings, root: HTMLElement, systemDark: boolean): void {
   const d = root.dataset;
-  d.mode = effectiveMode(s, systemDark);
+  const modus = effectiveMode(s, systemDark);
+  const p = palette(s, modus);
+  d.mode = modus;
   d.density = s.density;
   d.motion = s.motion;
   d.numfont = s.numFont;
   d.posneg = s.posneg;
   d.glass = s.glass ? 'on' : 'off';
-  d.aurora = s.aurora ? 'on' : 'off';
-  root.style.setProperty('--accent', s.accent);
-  root.style.setProperty('--on-accent', onAccent(s.accent));
-  root.style.setProperty('--tint-h', String(s.tintH));
-  root.style.setProperty('--tint-s', `${s.tintS}%`);
+  root.style.setProperty('--accent', p.akzent);
+  // Belege werden gedruckt: im Blatt immer die Papierfarbe (wie im PDF), auch im Dunkelmodus
+  root.style.setProperty('--accent-papier', akzentPapier(s));
+  root.style.setProperty('--on-accent', onAccent(p.akzent));
+  root.style.setProperty('--accent-text', textAkzent(p.akzent, modus));
+  root.style.setProperty('--tint-h', String(p.tintH));
+  root.style.setProperty('--tint-s', `${p.tintS}%`);
   root.style.setProperty('--radius', `${s.radius}px`);
   root.style.setProperty('--font-scale', String(s.fontScale / 100));
 }

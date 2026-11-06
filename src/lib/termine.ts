@@ -182,7 +182,7 @@ export const zeitText = (t: Pick<TerminZeile, 'von' | 'bis'>): string => (t.von 
 
 export type TerminFilter = 'anstehend' | 'erledigt' | 'alle';
 export const FILTER: readonly { value: TerminFilter; label: string }[] = [
-  { value: 'anstehend', label: 'Anstehend' },
+  { value: 'anstehend', label: 'Heute & kommend' },
   { value: 'erledigt', label: 'Erledigt' },
   { value: 'alle', label: 'Alle' },
 ];

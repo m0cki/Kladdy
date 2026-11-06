@@ -276,7 +276,7 @@ const SONSTIGES: readonly (readonly [string, string, number, number])[] = [
 type PosZeile = readonly [string, number, string, number];
 const JOBS: readonly { betreff: string; pos: readonly PosZeile[] }[] = [
   { betreff: 'Grünanlagenpflege', pos: [['Grünanlagenpflege Außenbereich', 12, 'Std.', 3800], ['Grünschnitt-Entsorgung', 1, 'pausch.', 6500]] },
-  { betreff: 'Heckenschnitt Außenanlage', pos: [['Heckenschnitt inkl. Entsorgung', 9, 'Std.', 3800]] },
+  { betreff: 'Heckenschnitt Außenanlage', pos: [['Heckenschnitt Außenanlage', 9, 'Std.', 3800]] },
   { betreff: 'Möbelmontage Büro', pos: [['Montage Schreibtische & Schränke', 7, 'Std.', 3800], ['Kleinmaterial', 1, 'pausch.', 2400]] },
   { betreff: 'Laubbeseitigung Herbst', pos: [['Laubbeseitigung Grundstück', 1, 'pausch.', 42000]] },
   { betreff: 'Winterdienst Saison', pos: [['Winterdienst Einsätze', 8, 'Einsatz', 4500]] },
@@ -428,6 +428,17 @@ export function demoDaten(heute: string, seed: number = DEMO_SEED): DemoDaten {
     return x;
   };
   const termin = (t: Omit<T, 'seq' | 'notiz' | 'status' | 'eingetragen'> & Partial<Pick<T, 'notiz' | 'status' | 'eingetragen'>>): T => {
+    // zu einem Termin fährt man hin: Kunden mit Termin haben eine Adresse (ohne Zufall, damit der Rest gleich bleibt)
+    if (!t.k.strasse) {
+      const [plz, ort] = ORTE[t.k.seq % ORTE.length];
+      Object.assign(t.k, { strasse: `${STRASSEN[t.k.seq % STRASSEN.length]} ${(t.k.seq % 58) + 1}`, plz, ort });
+    }
+    // eine Person, ein Termin zur Zeit: überschneidet er sich an diesem Tag ⇒ nächste freie Standardzeit
+    const belegt = (von: string, bis: string) => termine.some((o) => o.datum === t.datum && o.status !== 'abgesagt' && o.von < bis && von < o.bis);
+    if (belegt(t.von, t.bis)) {
+      const frei = ZEITEN.find(([v, b]) => !belegt(v, b));
+      if (frei) t = { ...t, von: frei[0], bis: frei[1] };
+    }
     const x: T = { notiz: null, status: 'geplant', eingetragen: plusTage(t.datum < heute ? t.datum : heute, -z.ganz(2, 9)), ...t, seq: ++seq };
     termine.push(x);
     return x;
@@ -469,8 +480,13 @@ export function demoDaten(heute: string, seed: number = DEMO_SEED): DemoDaten {
       const nBasis = s === 'sommer' ? z.ganz(10, 13) : s === 'herbst' ? z.ganz(8, 11) : z.ganz(4, 6);
       const nQ = Math.round(nBasis * wachstum);
       const passend = LEISTUNGEN.filter((l) => l[6] === 'immer' || l[6] === s || (s === 'herbst' && l[6] === 'sommer' && m === 9));
+      const laufend = y === Y && m === M;
+      const bisTag = laufend ? Math.max(1, +heute.slice(8, 10)) : 28;
       for (let i = 0; i < nQ; i++) {
-        const d = datumIn(y, m, z.ganz(1, 28));
+        // im laufenden Monat nur die Tage bis heute (sonst fehlen am Monatsanfang alle Einnahmen), etwa jede zweite
+        const tag = z.ganz(1, 28);
+        if (laufend && i % 2) continue;
+        const d = datumIn(y, m, laufend ? 1 + ((tag - 1) % bisTag) : tag);
         if (!imZeitraum(d)) continue;
         const [text, einheit, mMin, mMax, pMin, pMax] = z.pick(passend);
         const menge = z.ganz(mMin, mMax);
@@ -571,7 +587,7 @@ export function demoDaten(heute: string, seed: number = DEMO_SEED): DemoDaten {
 
   /* ---------- Feste aktuelle Belege: zwei offen (eine überfällig), eine bezahlt, ein Entwurf, ein Angebot ---------- */
   const fest: { kunde: string; datum: string; faellig?: string; status: DemoBelegStatus; bezahltAm?: string; betreff: string; pos: readonly PosZeile[] }[] = [
-    { kunde: 'Kita Sonnenschein e. V.', datum: plusTage(heute, -31), faellig: plusTage(heute, -17), status: 'offen', betreff: 'Heckenschnitt Außenanlage', pos: [['Heckenschnitt inkl. Entsorgung', 16, 'Std.', 3800], ['Grünschnitt-Entsorgung', 1, 'pausch.', 6800]] },
+    { kunde: 'Kita Sonnenschein e. V.', datum: plusTage(heute, -31), faellig: plusTage(heute, -17), status: 'offen', betreff: 'Heckenschnitt Außenanlage', pos: [['Heckenschnitt', 16, 'Std.', 3800], ['Grünschnitt-Entsorgung', 1, 'pausch.', 6800]] },
     { kunde: 'Hausverwaltung Kaiser', datum: plusTage(heute, -6), status: 'offen', betreff: 'Grünanlagenpflege Wohnanlage Seeufer', pos: [['Grünanlagenpflege Wohnanlage Seeufer', 22, 'Std.', 3800], ['Grünschnitt-Entsorgung', 1, 'pausch.', 9500]] },
     { kunde: 'Praxis Dr. Sommer', datum: plusTage(heute, -24), faellig: plusTage(heute, -10), status: 'bezahlt', bezahltAm: plusTage(heute, -12), betreff: 'Möbelmontage Praxisräume', pos: [['Montage Schränke & Regale', 8, 'Std.', 3800], ['Kleinmaterial', 1, 'pausch.', 2900]] },
     { kunde: 'Hausverwaltung Kaiser', datum: plusTage(heute, -1), status: 'entwurf', betreff: 'Laubbeseitigung Wohnanlage Seeufer', pos: [['Laubbeseitigung Wohnanlage Seeufer', 14, 'Std.', 3800]] },
@@ -601,6 +617,15 @@ export function demoDaten(heute: string, seed: number = DEMO_SEED): DemoDaten {
     bezahltAm: null,
     zahlungsart: 'bank',
   });
+
+  /* Nur gebucht, Papierquittung im Ordner (Erfassen › „Nur buchen“): Belegnummer „Papier“, kein Beleg aus Kladdy */
+  {
+    const d = werktag(plusTage(heute, -1), -1);
+    const k = privat[privat.length - 1];
+    if (imZeitraum(d) && k) {
+      buche({ typ: 'einnahme', datum: d, betrag: 4500, kat: DEMO_KATEGORIE.dienstleistung, k, zahlungsart: 'bar', text: 'Rasenmähen Vorgarten', belegnr: 'Papier' });
+    }
+  }
 
   /* ---------- Termine ---------- */
   // Erledigt: gut die Hälfte der Quittungen der letzten sechs Wochen hatte einen Termin

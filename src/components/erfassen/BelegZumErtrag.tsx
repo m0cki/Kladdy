@@ -6,7 +6,7 @@
  * - Offene Rechnung zuordnen: Liste der offenen Rechnungen; die Wahl übernimmt Betrag, Text und Kunde.
  * - Ohne eigenen Beleg: die Dateifläche darunter (zeichnet die Schublade selbst).
  * Logik in lib/ertrag.ts, gespeichert wird in ErfassenSchublade (beleg_ausstellen bzw. beleg_bezahlt). */
-import { Clock, FileText, Info, Paperclip, Receipt, TriangleAlert, Upload, User } from 'lucide-react';
+import { Clock, FileText, Info, NotebookPen, Paperclip, ReceiptEuro, TriangleAlert, User } from 'lucide-react';
 import type { Formular } from '../../lib/buchungen';
 import type { VorgemerkterBeleg } from '../../lib/belege';
 import {
@@ -16,6 +16,7 @@ import {
   karteiAnschrift,
   naechsteBelegNummer,
   offenFaellig,
+  papierGewaehlt,
   rechnungOffen,
   vorlageFuer,
   type Ertrag,
@@ -43,11 +44,13 @@ interface Props {
   fehler?: string;
   onWeg: (weg: Ertragsweg) => void;
   onOffen: (z: BelegZeile) => void;
+  /** „Nur buchen“: Nummer der Papierquittung (Formularfeld belegnummer) */
+  onNummer: (nummer: string) => void;
 }
 
-const ART_ICON = { quittung: Receipt, rechnung: FileText } as const;
+const ART_ICON = { quittung: ReceiptEuro, rechnung: FileText } as const;
 
-export function BelegZumErtrag({ form, ertrag, setErtrag, stamm, ladeFehler, belege, nimmtBelege, fehler, onWeg, onOffen }: Props) {
+export function BelegZumErtrag({ form, ertrag, setErtrag, stamm, ladeFehler, belege, nimmtBelege, fehler, onWeg, onOffen, onNummer }: Props) {
   const h = heute();
   const art = ertrag.art;
   const ArtIcon = ART_ICON[art];
@@ -56,12 +59,12 @@ export function BelegZumErtrag({ form, ertrag, setErtrag, stamm, ladeFehler, bel
   const wege: { weg: Ertragsweg; icon: typeof Clock; label: string; sub: string }[] = [
     { weg: 'beleg', icon: ArtIcon, label: 'Beleg erstellen', sub: naechste ?? (art === 'rechnung' ? 'Rechnung' : 'Quittung') },
     { weg: 'offen', icon: Clock, label: 'Offene Rechnung zuordnen', sub: offene.length ? `${offene.length} offen` : 'keine offen' },
-    { weg: 'ohne', icon: Upload, label: 'Ohne eigenen Beleg', sub: 'Datei anhängen' },
+    { weg: 'ohne', icon: NotebookPen, label: 'Nur buchen', sub: 'Papier oder Datei' },
   ];
 
   return (
     <>
-      <div className="bu-ew" role="radiogroup" aria-label="Beleg zum Ertrag">
+      <div className="bu-ew" role="radiogroup" aria-label="Beleg zur Einnahme">
         {wege.map(({ weg, icon: Icon, label, sub }) => {
           const an = ertrag.weg === weg;
           const gesperrt = !stamm && weg !== 'ohne';
@@ -86,14 +89,70 @@ export function BelegZumErtrag({ form, ertrag, setErtrag, stamm, ladeFehler, bel
       {ladeFehler ? (
         <p className="hint warn">
           <TriangleAlert />
-          Belege konnten nicht geladen werden: {ladeFehler} – „Ohne eigenen Beleg“ geht trotzdem.
+          Belege konnten nicht geladen werden: {ladeFehler} – „Nur buchen“ geht trotzdem.
         </p>
       ) : null}
       {stamm && ertrag.weg === 'beleg' ? (
         <BelegKasten form={form} ertrag={ertrag} setErtrag={setErtrag} stamm={stamm} naechste={naechste} belege={belege} nimmtBelege={nimmtBelege} fehler={fehler} />
       ) : null}
       {stamm && ertrag.weg === 'offen' ? <OffeneListe offene={offene} ertrag={ertrag} heute={h} fehler={fehler} onOffen={onOffen} /> : null}
+      {ertrag.weg === 'ohne' ? (
+        <NurBuchen
+          buchung={stamm ? naechsteBelegNummer(stamm.kreise, 'buchung', h, h) : null}
+          papier={papierGewaehlt(ertrag, form.zahlungsart)}
+          nummer={form.belegnummer}
+          onPapier={(papier) => {
+            setErtrag({ papier });
+            if (!papier) onNummer('');
+          }}
+          onNummer={onNummer}
+        />
+      ) : null}
     </>
+  );
+}
+
+/* ---------- Nur buchen ---------- */
+
+/** Papier-Weg: buchen ohne Beleg aus Kladdy. Gibt es eine Papierquittung, trägt sie entweder ihre eigene Nummer (hier
+ *  eintragen) oder die Buchungsnummer (Feld leer lassen) – so findet man Zettel und Buchung wieder. */
+function NurBuchen({
+  buchung,
+  papier,
+  nummer,
+  onPapier,
+  onNummer,
+}: {
+  buchung: string | null;
+  papier: boolean;
+  nummer: string;
+  onPapier: (papier: boolean) => void;
+  onNummer: (nummer: string) => void;
+}) {
+  return (
+    <div className="bu-nur">
+      {/* ein Haken statt zweier Optionen: abgeheftet oder nicht */}
+      <label className="bu-nur-opt">
+        <input type="checkbox" checked={papier} onChange={(e) => onPapier(e.target.checked)} />
+        <span>
+          <b>Papierquittung im Ordner</b>
+          <small>
+            Auf den Zettel ins Feld „Buchungs-Nr.“ kommt {buchung ? <span className="mono bu-nur-nr">{buchung}</span> : 'die Buchungsnummer'}.
+          </small>
+        </span>
+      </label>
+      {papier ? (
+        <input
+          className="input bu-nr-in bu-nur-in"
+          aria-label="Nummer der Papierquittung"
+          placeholder="Eigene Nr. der Quittung (optional)"
+          autoComplete="off"
+          spellCheck={false}
+          value={nummer}
+          onChange={(e) => onNummer(e.target.value)}
+        />
+      ) : null}
+    </div>
   );
 }
 
@@ -131,7 +190,7 @@ function BelegKasten({
               value: 'quittung',
               label: (
                 <>
-                  <Receipt />
+                  <ReceiptEuro />
                   Quittung
                 </>
               ),

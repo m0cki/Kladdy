@@ -11,38 +11,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { open as dateiDialog } from '@tauri-apps/plugin-dialog';
-import {
-  Banknote,
-  Blocks,
-  CalendarDays,
-  Check,
-  ChevronLeft,
-  CircleCheck,
-  Clock,
-  Copy,
-  FileText,
-  FolderSearch,
-  Info,
-  Landmark,
-  List,
-  Lock,
-  Mail,
-  Paperclip,
-  Pencil,
-  Plus,
-  Printer,
-  QrCode,
-  Receipt,
-  Search,
-  Stamp,
-  Store,
-  Trash2,
-  TriangleAlert,
-  Upload,
-  Users,
-  X,
-  type LucideIcon,
-} from 'lucide-react';
+import { Ban, Banknote, Blocks, CalendarDays, Check, ChevronLeft, ChevronRight, CircleCheck, Clock, Copy, FileText, FolderSearch, Info, Landmark, List, Lock, Mail, Paperclip, Pencil, Plus, Printer, QrCode, ReceiptEuro, Search, Stamp, Store, Trash2, TriangleAlert, type LucideIcon, Upload, Users, X } from 'lucide-react';
 import { pdfNachholen, pdfOeffnenFuer } from '../lib/belegaktionen';
 import { setzeDropZiel } from '../lib/belegablage';
 import { ausgestellterBeleg, entwurfOeffnen, mailText, type Schnappschuss } from '../lib/belegpdf';
@@ -97,6 +66,7 @@ import {
   formularZuDokument,
   neuesFormular,
   preisEingabe,
+  statusMenue,
   type BelegFormular,
   type BelegZeile,
   type FormularFehler,
@@ -111,6 +81,7 @@ import {
   bausteineFuer,
   datumText,
   istBelegart,
+  tageZwischen,
   type BelegDokument,
   type Belegart,
   type EigenbelegGrund,
@@ -120,8 +91,10 @@ import { waehlbar, wahlFinden, wahlName } from '../lib/vorlagen/eigene';
 import { standardVorlage } from '../lib/vorlagen/standard';
 import { heute as heuteIso } from '../lib/zeitraum';
 import { useUi } from '../store/ui';
+import { BlattGross } from '../components/belege/BlattGross';
+import { akzentPapier } from '../lib/settings';
 import { BlattVorschau } from '../components/belege/Blatt';
-import { StatusBadge, StatusKnopf, statusAktionAusfuehren } from '../components/belege/BelegStatus';
+import { StatusKnopf, statusAktionAusfuehren } from '../components/belege/BelegStatus';
 import { belegDialog } from '../components/belege/BelegDialog';
 import { PositionenEditor, type PositionsVorschlag } from '../components/belege/PositionenEditor';
 import { KategorieIcon, ZAHLUNGSWEG_ICON } from '../components/buchungen/Symbole';
@@ -305,7 +278,7 @@ const datumMitTag = (iso: string | null) => (iso ? DF_WOCHE.format(new Date(Numb
 function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schluessel: string }) {
   const navigate = useNavigate();
   const { stamm, beleg, ausgestellt } = g;
-  const akzent = useUi((s) => s.settings.accent);
+  const akzent = useUi((s) => akzentPapier(s.settings));
   const [form, setForm] = useState<BelegFormular>(g.form);
   const [start, setStart] = useState(() => (arbeit?.schluessel === schluessel ? arbeit.start : formularSchluessel(g.form)));
   const [fehler, setFehler] = useState<FormularFehler>({});
@@ -353,6 +326,13 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
     if (kunde.art === 'wahl') liste.unshift({ label: 'Kunde eindeutig', ok: false, hint: `Mehrere Kunden heißen „${kunde.name}“ – bitte wählen, wer gemeint ist` });
     return liste;
   }, [doc, gedruckt, kleinbetrag, naechste, kunde, editierbar]);
+  /** Was zum Ausstellen noch fehlt – sichtbar neben den Knöpfen (dieselbe Prüfung wie beim Ausstellen) */
+  const nochOffen = useMemo(() => {
+    if (ausgestellt) return [];
+    const l = pflicht.filter((p) => !p.ok).map((p) => p.label);
+    if (summe <= 0 && !l.some((x) => /Betrag|Entgelt/.test(x))) l.push('Betrag');
+    return [...new Set(l)];
+  }, [ausgestellt, pflicht, summe]);
   const zeile: BelegZeile | null = beleg
     ? {
         id: beleg.id,
@@ -631,7 +611,8 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
             <span>{titel}</span>
             {!beleg ? (
               <span className="badge entwurf">Neu</span>
-            ) : zeile ? (
+            ) : zeile && !(zeile.art === 'quittung' && zeile.status === 'bezahlt') ? (
+              // eine ausgestellte Quittung ist immer bezahlt – kein eigenes Badge
               <StatusKnopf z={zeile} heute={h} hier onAktion={(a) => statusAktionAusfuehren(a, zeile, navigate)} />
             ) : null}
             {editierbar && naechste ? (
@@ -675,6 +656,12 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
               Löschen
             </button>
           ) : null}
+          {!editierbar && zeile && statusMenue(zeile, h).punkte.some((p) => p.aktion === 'stornieren') ? (
+            <button type="button" className="btn ghost bl-storno-btn" title="Beleg ungültig machen – die Nummer bleibt vergeben, eine Einnahme wird zurückgenommen (GoBD)" onClick={() => statusAktionAusfuehren('stornieren', zeile, navigate)}>
+              <Ban />
+              Stornieren …
+            </button>
+          ) : null}
           {!editierbar && zeile ? (
             <button type="button" className="btn ghost" onClick={() => statusAktionAusfuehren('duplizieren', zeile, navigate)}>
               <Copy />
@@ -684,7 +671,7 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
         </div>
       </div>
 
-      <div className="bl-grid">
+      <div className={`bl-grid${editierbar ? '' : ' fest'}`}>
         <div className="bl-form" ref={formRef}>
           {editierbar && beleg?.termin_id != null ? (
             <div className="bl-termin reveal" style={reveal(1)}>
@@ -702,13 +689,29 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
             </div>
           ) : null}
           {beleg && !editierbar ? <SperrHinweis beleg={beleg} /> : null}
+          {editierbar ? (
+            <fieldset className="bl-fs">{karten[art]}</fieldset>
+          ) : (
+            // festgeschrieben: alles steht auf dem Blatt rechts – die Felder nur auf Wunsch
+            <details className="bl-angaben">
+              <summary>
+                <ChevronRight />
+                Alle Angaben als Liste
+              </summary>
+              <fieldset className="bl-fs" disabled>
+                {karten[art]}
+              </fieldset>
+            </details>
+          )}
           {beleg && !editierbar && beleg.art !== 'storno' ? <ScanKarte beleg={beleg} onDatei={(p) => void scanAnhaengen(p)} /> : null}
-          <fieldset className="bl-fs" disabled={!editierbar}>
-            {karten[art]}
-          </fieldset>
           <div className="bl-actions">
             {editierbar ? (
               <>
+                {nochOffen.length ? (
+                  <span className="bl-offen" title="Das braucht der Beleg noch, bevor er ausgestellt werden kann">
+                    Noch offen: {nochOffen.join(' · ')}
+                  </span>
+                ) : null}
                 <span className="bl-dirty">
                   {dirty ? (
                     <>
@@ -734,7 +737,7 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
                     disabled={laeuft}
                     onClick={() => void vorbereitetAusstellen()}
                   >
-                    {art === 'rechnung' ? <FileText /> : <Receipt />}
+                    {art === 'rechnung' ? <FileText /> : <ReceiptEuro />}
                     {art === 'rechnung' ? 'Rechnung schreiben' : 'Quittung ausstellen'}
                   </button>
                 ) : (
@@ -746,7 +749,7 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
                     onClick={() => void ausstellen()}
                   >
                     {art === 'eigenbeleg' ? <Stamp /> : <Lock />}
-                    {art === 'quittung' || (art === 'rechnung' && form.bezahltAm) ? 'Finalisieren & buchen' : art === 'eigenbeleg' ? 'Buchen' : 'Finalisieren'}
+                    {form.buchungId != null && art !== 'angebot' ? 'Ausstellen & verknüpfen' : art === 'quittung' || (art === 'rechnung' && form.bezahltAm) ? 'Finalisieren & buchen' : art === 'eigenbeleg' ? 'Buchen' : 'Finalisieren'}
                   </button>
                 )}
               </>
@@ -766,6 +769,7 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
                   <select
                     className="select sm"
                     aria-label="Vorlage"
+                    title="Vorlage für diesen Beleg"
                     value={gewaehlt?.schluessel ?? ''}
                     onChange={(e) => {
                       const v = vorlagen.find((x) => x.schluessel === e.target.value);
@@ -780,21 +784,25 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
                   </select>
                 </label>
               ) : (
-                <span className="bl-vl" title="Beim Ausstellen eingefroren – ein Nachdruck sieht aus wie das Original">
-                  <Blocks />
-                  Vorlage <b>eingefroren</b>
+                <span className="bl-vl" title="Die Vorlage ist beim Ausstellen mitgespeichert – ein Nachdruck sieht genauso aus wie das Original, auch wenn du die Vorlage später änderst">
+                  <Lock />
+                  So wurde der Beleg ausgestellt
                 </span>
               )}
               {editierbar ? (
-                <Link className="icon-btn sm" to={`/belege/vorlagen?art=${art}${gewaehlt && !gewaehlt.archiviert ? `&design=${encodeURIComponent(gewaehlt.schluessel)}` : ''}`} title="Vorlagen bearbeiten" aria-label="Vorlagen bearbeiten">
+                <Link className="btn ghost sm bl-vl-edit" to={`/belege/vorlagen?art=${art}${gewaehlt && !gewaehlt.archiviert ? `&design=${encodeURIComponent(gewaehlt.schluessel)}` : ''}`} title="Vorlage im Baukasten bearbeiten">
                   <Pencil />
+                  Bearbeiten
                 </Link>
               ) : null}
             </div>
-            <button type="button" className="btn ghost" title="Nur das Blatt drucken – in der Vorschau „Drucken“ oder „Als PDF sichern“ (⌘P)" onClick={() => void drucken()}>
-              <Printer />
-              Drucken / PDF
-            </button>
+            <BlattGross kompakt={editierbar} doc={doc} bausteine={gedruckt} titel={`${beleg?.nummer ?? 'Entwurf'} in Lesegröße`} />
+            {editierbar ? (
+              <button type="button" className="btn ghost" title="Nur das Blatt drucken – in der Vorschau „Drucken“ oder „Als PDF sichern“ (⌘P)" onClick={() => void drucken()}>
+                <Printer />
+                Drucken / PDF
+              </button>
+            ) : null}
           </div>
           <BlattVorschau doc={doc} bausteine={gedruckt} maxScale={1.2} />
           <div className="bl-pcap">{ARTEN[art].format === 'a4' ? 'A4 hoch' : 'A5 quer'} · gedruckt 1:1, ohne Skalierung</div>
@@ -866,19 +874,20 @@ function KundeKarte({ m, i }: { m: MaskeKontext; i: number }) {
   return (
     <Karte k="kunde" titel="Kunde" icon={Users} i={i}>
       <div className="bl-stack">
-        <label className="bl-search">
-          <Search />
-          <input
-            className={`input ${m.fehler.kunde ? 'invalid' : ''}`}
-            list="bl-kunden"
-            value={form.kunde}
-            placeholder="Name eingeben – vorhandene Kunden werden vorgeschlagen"
-            autoComplete="off"
-            aria-label="Kunde"
-            readOnly={!editierbar}
-            onChange={(e) => set('kunde', e.target.value)}
-          />
-        </label>
+        {editierbar ? (
+          <label className="bl-search">
+            <Search />
+            <input
+              className={`input ${m.fehler.kunde ? 'invalid' : ''}`}
+              list="bl-kunden"
+              value={form.kunde}
+              placeholder="Name eingeben – vorhandene Kunden werden vorgeschlagen"
+              autoComplete="off"
+              aria-label="Kunde"
+              onChange={(e) => set('kunde', e.target.value)}
+            />
+          </label>
+        ) : null}
         <KundeInfo m={m} mitAnschrift />
         <Fehler text={m.fehler.kunde} />
       </div>
@@ -1116,27 +1125,32 @@ function LeistungenKarte({ m, i }: { m: MaskeKontext; i: number }) {
 /* ---------- Zahlung (Rechnung) ---------- */
 
 function ZahlungsartWahl({ m, id }: { m: MaskeKontext; id: string }) {
+  // dieselben Kacheln wie in „Erfassen“ (Symbol, Name, Zusatz, Häkchen) – ein Auswahlmuster für den Zahlungsweg
   return (
-    <Seg
-      className="full bl-zaseg"
-      ariaLabel="Zahlungsweg"
-      value={m.form.zahlungsart}
-      onChange={(z) => {
-        if (m.editierbar) m.set('zahlungsart', z);
-      }}
-      options={ZAHLUNGSWEGE.map((z) => {
+    <div className="bu-zw bl-zw" role="radiogroup" aria-label="Zahlungsweg">
+      {ZAHLUNGSWEGE.map((z) => {
         const ZIcon = ZAHLUNGSWEG_ICON[z.id];
-        return {
-          value: z.id,
-          label: (
-            <span id={`${id}-${z.id}`} className="bl-za">
-              <ZIcon />
-              {z.name}
-            </span>
-          ),
-        };
+        const an = m.form.zahlungsart === z.id;
+        return (
+          <button
+            key={z.id}
+            id={`${id}-${z.id}`}
+            type="button"
+            className={`bu-zw-opt ${an ? 'on' : ''}`}
+            role="radio"
+            aria-checked={an}
+            disabled={!m.editierbar}
+            onClick={() => {
+              if (m.editierbar) m.set('zahlungsart', z.id);
+            }}
+          >
+            <ZIcon />
+            <b>{z.name}</b>
+            <small>{z.text}</small>
+          </button>
+        );
       })}
-    />
+    </div>
   );
 }
 
@@ -1358,25 +1372,29 @@ function QuittungAngabenKarte({ m, i }: { m: MaskeKontext; i: number }) {
   const { form, set, setForm, editierbar, kunde } = m;
   const gebunden = kunde.art === 'kunde';
   return (
-    <Karte k="angaben" titel="Angaben" icon={Receipt} i={i}>
+    <Karte k="angaben" titel="Angaben" icon={ReceiptEuro} i={i}>
       <div className="bl-stack">
         <div className="field">
           <label className="field-label" htmlFor="bl-von">
-            Erhalten von <span className="muted">(Kunde · optional bis {formatBetrag(m.kleinbetrag)})</span>
+            Erhalten von
           </label>
-          <div className="bl-search">
-            <Search />
-            <input
-              id="bl-von"
-              className={`input ${m.fehler.kunde ? 'invalid' : ''}`}
-              list="bl-kunden"
-              value={form.kunde}
-              placeholder="Barverkauf – oder Name, Kunden werden vorgeschlagen"
-              autoComplete="off"
-              readOnly={!editierbar}
-              onChange={(e) => set('kunde', e.target.value)}
-            />
-          </div>
+          {editierbar ? (
+            <>
+              <div className="bl-search">
+                <Search />
+                <input
+                  id="bl-von"
+                  className={`input ${m.fehler.kunde ? 'invalid' : ''}`}
+                  list="bl-kunden"
+                  value={form.kunde}
+                  placeholder="Barverkauf – oder Name, Kunden werden vorgeschlagen"
+                  autoComplete="off"
+                  onChange={(e) => set('kunde', e.target.value)}
+                />
+              </div>
+              <small className="muted">Bis {formatBetrag(m.kleinbetrag)} darf der Name fehlen (Kleinbetragsrechnung).</small>
+            </>
+          ) : null}
           {form.kunde.trim() || !editierbar ? <KundeInfo m={m} mitAnschrift={false} /> : null}
           <Fehler text={m.fehler.kunde} />
         </div>
@@ -1562,13 +1580,13 @@ function SperrHinweis({ beleg }: { beleg: BelegVoll }) {
     <div className="bl-lock reveal" style={reveal(1)}>
       <Lock />
       <div>
-        <b>{beleg.art === 'storno' ? `Stornobeleg zu ${beleg.storno_von_nummer ?? '—'}` : 'Ausgestellt – Änderungen nur per Storno (GoBD)'}</b>
+        <b>{beleg.art === 'storno' ? `Stornobeleg zu ${beleg.storno_von_nummer ?? '—'}` : storniert ? 'Storniert' : 'Ausgestellt und festgeschrieben (GoBD)'}</b>
         <span>
           {beleg.art === 'storno'
             ? 'Hebt das Original auf. Endgültig und unverändert archiviert.'
             : storniert
               ? `Storniert${beleg.storno_nummer ? ` durch ${beleg.storno_nummer}` : ''} – bleibt unverändert archiviert.`
-              : 'Nummer, Datum und Beträge sind festgeschrieben. Für Korrekturen stornieren und neu erstellen – oder duplizieren.'}
+              : 'Ändern geht nur über „Stornieren …“ und neu ausstellen.'}
         </span>
         {beleg.angebot_nummer ? <span>Aus Angebot {beleg.angebot_nummer}.</span> : null}
       </div>
@@ -1598,6 +1616,18 @@ function ScanKarte({ beleg, onDatei }: { beleg: BelegVoll; onDatei: (pfad: strin
     if (pfad) onDatei(pfad);
   };
   const sub = beleg.art === 'eigenbeleg' ? 'Ausdrucken, unterschreiben, einscannen – gehört zum Beleg.' : 'Optional: Scan oder Foto des unterschriebenen Belegs.';
+  // optional (nicht beim Eigenbeleg): eine Zeile, die Datei kann trotzdem aufs Fenster gezogen werden
+  if (beleg.scan_beleg_id == null && beleg.art !== 'eigenbeleg') {
+    return (
+      <button type="button" className="bl-scan-zeile reveal" style={reveal(1)} data-card="scan" onClick={() => void waehlen()}>
+        <Paperclip />
+        <span>
+          <b>{beleg.art === 'quittung' ? 'Unterschriebenes Exemplar anhängen' : 'Datei zum Beleg anhängen'}</b>
+          <small>optional · PDF oder Foto, auch aufs Fenster ziehen</small>
+        </span>
+      </button>
+    );
+  }
   return (
     <section className="card bl-card bl-scan reveal" style={reveal(1)} data-card="scan">
       <div className="card-head">
@@ -1636,24 +1666,24 @@ function ScanKarte({ beleg, onDatei }: { beleg: BelegVoll; onDatei: (pfad: strin
 
 function AusgestelltAktionen({ beleg, zeile, mailen }: { beleg: BelegVoll; zeile: BelegZeile; mailen: () => void }) {
   const navigate = useNavigate();
-  const h = heuteIso();
   const status = (() => {
     if (beleg.art === 'storno') return `Stornobeleg vom ${datumText(beleg.datum)}`;
     if (beleg.status === 'storniert') return `Storniert${beleg.storniert_am ? ` am ${datumText(beleg.storniert_am)}` : ''}`;
-    if (beleg.art === 'rechnung' && beleg.status === 'offen') return `Offen · fällig ${datumText(beleg.faellig_am)}`;
+    if (beleg.art === 'rechnung' && beleg.status === 'offen') {
+      // gleiche Sprache wie Kopf und Liste: überfällig ist überfällig
+      const ueber = beleg.faellig_am && beleg.faellig_am < heuteIso() ? tageZwischen(beleg.faellig_am, heuteIso()) : 0;
+      return ueber > 0 ? `Überfällig seit ${ueber} ${ueber === 1 ? 'Tag' : 'Tagen'} · fällig war ${datumText(beleg.faellig_am)}` : `Offen · fällig ${datumText(beleg.faellig_am)}`;
+    }
     if (beleg.art === 'angebot') return beleg.status === 'angenommen' ? 'In Rechnung umgewandelt' : beleg.status === 'abgelehnt' ? 'Vom Kunden abgelehnt' : `gültig bis ${datumText(beleg.faellig_am)}`;
     if (beleg.status === 'bezahlt') {
       const was = beleg.art === 'eigenbeleg' ? 'Ausgabe gebucht' : beleg.art === 'quittung' ? 'Bezahlt' : 'Bezahlt';
-      return `${was} am ${datumText(beleg.bezahlt_am ?? beleg.datum)}${beleg.buchung_nummer ? ` · ${beleg.buchung_nummer}` : ''}`;
+      return `${was} am ${datumText(beleg.bezahlt_am ?? beleg.datum)}${beleg.buchung_nummer ? ` · gebucht als ${beleg.buchung_nummer}` : ''}`;
     }
     return '';
   })();
   return (
     <>
-      <span className="bl-status">
-        <StatusBadge z={zeile} heute={h} />
-        {status}
-      </span>
+      <span className="bl-status">{status}</span>
       <span className="spacer" />
       {beleg.pdf_beleg_id != null ? (
         <>
@@ -1665,7 +1695,11 @@ function AusgestelltAktionen({ beleg, zeile, mailen }: { beleg: BelegVoll; zeile
           </button>
         </>
       ) : null}
-      <button type="button" className="btn ghost" onClick={() => void pdfOeffnenFuer(beleg.id)}>
+      <button
+        type="button"
+        className={(beleg.art === 'rechnung' && beleg.status === 'offen') || (beleg.art === 'angebot' && beleg.status !== 'angenommen') ? 'btn ghost' : 'btn-primary sm'}
+        onClick={() => void pdfOeffnenFuer(beleg.id)}
+      >
         <Printer />
         {beleg.pdf_beleg_id != null ? 'PDF öffnen' : 'PDF erzeugen'}
       </button>

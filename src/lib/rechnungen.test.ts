@@ -16,6 +16,7 @@ import {
   neuesFormular,
   parseMenge,
   passtReiter,
+  reiterAusAdresse,
   positionenAus,
   preisEingabe,
   statusMenue,
@@ -74,11 +75,17 @@ describe('Status', () => {
     expect(statusSchluessel(zeile({ status: 'storniert' }), HEUTE)).toBe('storniert');
   });
 
-  it('Reiter: Offen = offene Rechnungen + Vorbereitungen für geplante Termine, Bezahlt ohne Angebote', () => {
+  it('Reiter: Ausgestellt mit Nummer, Offen = offene Rechnungen, Entwürfe ohne Nummer, Bezahlt ohne Angebote', () => {
     expect(passtReiter(zeile({}), 'offen')).toBe(true);
+    expect(passtReiter(zeile({}), 'alle')).toBe(true);
+    expect(passtReiter(zeile({ art: 'angebot', nummer: 'AN-2026-001' }), 'angebote')).toBe(true);
     expect(passtReiter(zeile({ art: 'quittung', status: 'bezahlt' }), 'offen')).toBe(false);
-    expect(passtReiter(zeile({ status: 'entwurf', nummer: null, termin_id: 4, termin_status: 'geplant' }), 'offen')).toBe(true);
-    expect(passtReiter(zeile({ status: 'entwurf', nummer: null, termin_id: 4, termin_status: 'erledigt' }), 'offen')).toBe(false);
+    expect(passtReiter(zeile({ status: 'entwurf', nummer: null, termin_id: 4, termin_status: 'geplant' }), 'offen')).toBe(false);
+    expect(passtReiter(zeile({ status: 'entwurf', nummer: null, termin_id: 4, termin_status: 'geplant' }), 'entwuerfe')).toBe(true);
+    expect(passtReiter(zeile({ status: 'entwurf', nummer: null }), 'alle')).toBe(false);
+    expect(reiterAusAdresse('ausgestellt')).toBe('alle');
+    expect(reiterAusAdresse('offen')).toBe('offen');
+    expect(reiterAusAdresse('xyz')).toBeNull();
     expect(passtReiter(zeile({ art: 'quittung', status: 'bezahlt' }), 'bezahlt')).toBe(true);
     expect(passtReiter(zeile({ art: 'angebot', status: 'bezahlt' }), 'bezahlt')).toBe(false);
     expect(passtReiter(zeile({ art: 'storno', status: 'storniert' }), 'bezahlt')).toBe(false);
@@ -112,16 +119,20 @@ describe('Liste', () => {
   const oktober = { von: '2026-10-01', bis: '2026-10-31' };
   const nr = { feld: 'nr', richtung: -1 } as const;
 
-  it('Zeitraum nach Belegdatum, „Offen“ und Suche über alle Zeiträume', () => {
+  it('alle Zähler im Zeitraum, ältere offene als Hinweis, Suche über alle Zeiträume', () => {
     const r = filtere(alle, { reiter: 'alle', q: '', zeitraum: oktober, sortierung: nr, heute: HEUTE });
-    expect(r.zeilen.map((z) => z.id)).toEqual([3, 4, 2]);
-    expect(r.reiter).toEqual({ alle: 3, offen: 1, bezahlt: 1 });
+    expect(r.zeilen.map((z) => z.id)).toEqual([4, 2]);
+    expect(r.reiter).toEqual({ alle: 2, offen: 0, bezahlt: 1, angebote: 1, entwuerfe: 1 });
+    expect(r.offenFrueher).toBe(1);
+    const entwuerfe = filtere(alle, { reiter: 'entwuerfe', q: '', zeitraum: oktober, sortierung: nr, heute: HEUTE });
+    expect(entwuerfe.zeilen.map((z) => z.id)).toEqual([3]);
+    expect(entwuerfe.ohneZeitraum).toBe(false);
     expect(r.ueberfaellig).toBe(1);
     expect(r.ohneZeitraum).toBe(false);
-    const offen = filtere(alle, { reiter: 'offen', q: '', zeitraum: oktober, sortierung: nr, heute: HEUTE });
+    const offen = filtere(alle, { reiter: 'offen', q: '', zeitraum: null, sortierung: nr, heute: HEUTE });
     expect(offen.zeilen.map((z) => z.id)).toEqual([1]);
-    expect(offen.ohneZeitraum).toBe(true);
-    const suche = filtere(alle, { reiter: 'alle', q: 'kaiser', zeitraum: oktober, sortierung: nr, heute: HEUTE });
+    expect(offen.offenFrueher).toBe(0);
+    const suche = filtere(alle, { reiter: 'bezahlt', q: 'kaiser', zeitraum: oktober, sortierung: nr, heute: HEUTE });
     expect(suche.zeilen.map((z) => z.id)).toEqual([4, 1]);
     const betrag = filtere(alle, { reiter: 'alle', q: '65,00', zeitraum: null, sortierung: nr, heute: HEUTE });
     expect(betrag.zeilen.map((z) => z.id)).toEqual([2]);
@@ -131,17 +142,20 @@ describe('Liste', () => {
 
   it('Sortierung nach Betrag und Kunde', () => {
     const betrag = filtere(alle, { reiter: 'alle', q: '', zeitraum: null, sortierung: { feld: 'betrag', richtung: -1 }, heute: HEUTE });
-    expect(betrag.zeilen.map((z) => z.summe_cent)).toEqual([15_300, 15_300, 6_500, 0]);
+    expect(betrag.zeilen.map((z) => z.summe_cent)).toEqual([15_300, 15_300, 6_500]);
     const kunde = filtere(alle, { reiter: 'alle', q: '', zeitraum: null, sortierung: { feld: 'kunde', richtung: 1 }, heute: HEUTE });
-    expect(kunde.zeilen[0].id).toBe(3);
-    expect(kunde.zeilen[1].kunde_name).toBe('Anna Schmidt');
+    expect(kunde.zeilen[0].kunde_name).toBe('Anna Schmidt');
   });
 
   it('Spalte „Fällig / Zahlung“ und Betrag', () => {
-    expect(faelligText(zeile({}), HEUTE)).toMatchObject({ text: '7 T. überfällig', klasse: 'neg' });
+    expect(faelligText(zeile({}), HEUTE)).toMatchObject({ text: '7 Tage überfällig', klasse: 'neg' });
     expect(faelligText(zeile({ faellig_am: HEUTE }), HEUTE).text).toBe('heute fällig');
     expect(faelligText(zeile({ faellig_am: '2026-10-23' }), HEUTE).text).toBe('in 1 Tag');
     expect(faelligText(zeile({ art: 'quittung', status: 'bezahlt', zahlungsart: 'bar', bezahlt_am: '2026-10-05' }), HEUTE).text).toBe('bar · 05.10.');
+    // am Belegtag bezahlt: nur der Zahlungsweg (Datum steht in der Spalte davor)
+    expect(faelligText(zeile({ art: 'quittung', status: 'bezahlt', zahlungsart: 'paypal', datum: '2026-10-05', bezahlt_am: '2026-10-05' }), HEUTE).text).toBe('PayPal');
+    // ohne gespeicherten Zahlungsweg nicht einfach „bar“ behaupten
+    expect(faelligText(zeile({ art: 'quittung', status: 'bezahlt', zahlungsart: null, bezahlt_am: '2026-10-05' }), HEUTE).text).toBe('bezahlt · 05.10.');
     expect(faelligText(zeile({ status: 'entwurf', nummer: null, termin_id: 2, termin_datum: '2026-10-24', termin_von: '09:00' }), HEUTE).text).toBe(
       'Termin 24.10. · 09:00',
     );

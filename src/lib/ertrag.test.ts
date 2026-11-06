@@ -11,6 +11,7 @@ import {
   karteiAnschrift,
   maskenPfad,
   naechsteBelegNummer,
+  papierGewaehlt,
   offeneRechnungen,
   offenFaellig,
   rechnungOffen,
@@ -100,6 +101,24 @@ describe('Start und Hinweise', () => {
     expect(ertragStart({ beleg: 'rechnung', belege: [{}] }, 'quittung').weg).toBe('beleg');
   });
 
+  it('Einstellung „Nur buchen“: neue Einnahme ohne Beleg aus Kladdy, Termin und Entwurf behalten ihren Beleg', () => {
+    expect(ertragStart({}, 'quittung', 'ohne')).toMatchObject({ weg: 'ohne', art: 'quittung' });
+    expect(ertragStart({ beleg: 'quittung' }, 'quittung', 'ohne').weg).toBe('beleg');
+    expect(ertragStart({ termin: 4 }, 'quittung', 'ohne').weg).toBe('beleg');
+    expect(ertragStart({ entwurf: 9 }, 'rechnung', 'ohne').weg).toBe('beleg');
+    expect(ertragStart({}, 'quittung', 'ohne').papier).toBeNull();
+    expect(papierGewaehlt({ papier: null }, 'bar')).toBe(true);
+    expect(papierGewaehlt({ papier: null }, 'bank')).toBe(false);
+    expect(papierGewaehlt({ papier: false }, 'bar')).toBe(false);
+  });
+
+  it('Vorschau der nächsten Buchungsnummer wie der Belegnummern', () => {
+    const kreise = [{ id: 'buchung', muster: '{JJJJ}-{NNNN}', jahr: 2026, naechste: 240 }] as Parameters<typeof naechsteBelegNummer>[0];
+    expect(naechsteBelegNummer(kreise, 'buchung', '2026-11-05', '2026-11-05')).toBe('2026-0240');
+    expect(naechsteBelegNummer(kreise, 'buchung', '2027-01-02', '2027-01-02')).toBe('2027-0001');
+    expect(naechsteBelegNummer([], 'buchung', '2026-11-05', '2026-11-05')).toBeNull();
+  });
+
   it('Rechnung noch offen, § 35a nur bei barer Zahlung mit eigenem Beleg', () => {
     expect(rechnungOffen(ertrag({ art: 'rechnung', bezahlt: false }))).toBe(true);
     expect(rechnungOffen(ertrag({ art: 'rechnung', bezahlt: true }))).toBe(false);
@@ -138,7 +157,7 @@ describe('Nummer, offene Rechnungen, Prüfung', () => {
       zeile({ id: 6, art: 'angebot', status: 'offen' }),
     ]);
     expect(liste.map((z) => z.id)).toEqual([2, 1]);
-    expect(offenFaellig(liste[0], HEUTE)).toEqual({ text: '12 T. überfällig', ueberfaellig: true });
+    expect(offenFaellig(liste[0], HEUTE)).toEqual({ text: '12 Tage überfällig', ueberfaellig: true });
     expect(offenFaellig(liste[1], HEUTE)).toEqual({ text: 'in 8 Tagen', ueberfaellig: false });
   });
 
@@ -205,8 +224,11 @@ describe('Beleg aus der Schublade', () => {
     expect(mitAdresse.fehlt).toEqual([]);
     expect(mitAdresse.daten?.kunde_adresse).toBe('Am Hang 2\n12345 Musterstadt');
 
-    const ohneFirma = belegVorbereiten(formular(), ertrag(), 6_000, { ...ctx, firma: { ...BEISPIEL_FIRMA, steuernummer: '' } });
-    expect(ohneFirma.fehlt).toEqual(['Steuernummer']);
+    // ohne Steuernummer: Quittung bis 250 € geht (Kleinbetragsrechnung, § 33 UStDV), Rechnung nicht
+    const ohneNr = { ...ctx, firma: { ...BEISPIEL_FIRMA, steuernummer: '' } };
+    expect(belegVorbereiten(formular(), ertrag(), 6_000, ohneNr).fehlt).toEqual([]);
+    const reOhneNr = belegVorbereiten(formular({ wer: 'Clara Neu' }), ertrag({ art: 'rechnung', bezahlt: false, adresse: 'Am Hang 2\n12345 Musterstadt' }), 6_000, ohneNr);
+    expect(reOhneNr.fehlt).toEqual(['Steuernummer']);
     const wahl = belegVorbereiten(formular({ wer: 'Anna Schmidt' }), ertrag(), 6_000, { ...ctx, kunden: [...KUNDEN, { ...KUNDEN[0], id: 3, nummer: 'K-0003' }] });
     expect(wahl.daten).toBeNull();
     expect(wahl.fehlt.some((t) => /Mehrere Kunden/.test(t))).toBe(true);

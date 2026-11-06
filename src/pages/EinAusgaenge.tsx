@@ -4,18 +4,22 @@
  * Filter und Zeitraum lassen sich per Adresse vorgeben (Sprung aus der Auswertung, lib/buchungen.ts → listenVorgabe).
  * Büroklammer öffnet den Beleg (mehrere: Menü), „Beleg anhängen …“ im Zeilenmenü (nicht bei Gegenbuchungen).
  * Optik und Verhalten wie referenz/prototyp/js/pages/buchungen.js; Logik in lib/buchungen.ts, Daten in lib/queries/buchungen.ts. */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { PAPIER_BELEG } from '../lib/ertrag';
 import {
   ArrowLeftRight,
   Ban,
   CalendarDays,
   Eye,
+  FileText,
   FileUp,
   Funnel,
   Lock,
   Pencil,
   Plus,
+  ReceiptText,
   RotateCcw,
   Search,
   TriangleAlert,
@@ -33,8 +37,11 @@ import {
   filtere,
   gegenueber,
   kannStornieren,
+  listenSummen,
   listenVorgabe,
   markiere,
+  quittungNachholbar,
+  quittungZuBuchungPfad,
   sperre,
   zahlungswegName,
   type BuchungZeile,
@@ -47,6 +54,7 @@ import { bearbeiten, erfassen } from '../lib/erfassen';
 import { ladeBuchungen, ladeKategorienWahl } from '../lib/queries/buchungen';
 import { storniereMitNachfrage } from '../lib/storno';
 import { teile } from '../lib/suche';
+import { formatBetrag } from '../lib/money';
 import { zeitraum } from '../lib/zeitraum';
 import { useUi } from '../store/ui';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -114,9 +122,7 @@ export default function EinAusgaenge() {
           </h1>
           <p className="page-sub">Alle geschäftlichen Zahlungen · es zählt das Zahlungsdatum</p>
         </div>
-        <div className="bu-head-zeit">
-          <ZeitraumWahl modus={modus} anker={anker} onChange={setZeitraum} />
-        </div>
+        <div className="bu-head-suche" id="bu-suche-slot" />
         <div className="bu-head-neu">
           <button type="button" className="btn-primary head-add" title="Einnahme oder Ausgabe erfassen (⌘N)" onClick={() => erfassen()}>
             <Plus />
@@ -125,7 +131,13 @@ export default function EinAusgaenge() {
         </div>
       </div>
       {zustand.status === 'ok' ? (
-        <Liste key={listenKey} zeilen={zustand.daten.zeilen} kategorien={zustand.daten.kategorien} zeitraumLabel={z.label} />
+        <Liste
+          key={listenKey}
+          zeilen={zustand.daten.zeilen}
+          kategorien={zustand.daten.kategorien}
+          zeitraumLabel={z.label}
+          zeitraumWahl={<ZeitraumWahl modus={modus} anker={anker} onChange={setZeitraum} />}
+        />
       ) : (
         <Ladeansicht zustand={zustand} icon={ArrowLeftRight} was="Ein- und Ausgänge" erneut={erneut} />
       )}
@@ -137,14 +149,28 @@ export default function EinAusgaenge() {
 
 const TABS: { value: TypFilter; label: string }[] = [
   { value: 'alle', label: 'Alle' },
-  { value: 'einnahme', label: 'Eingänge' },
-  { value: 'ausgabe', label: 'Ausgänge' },
+  { value: 'einnahme', label: 'Einnahmen' },
+  { value: 'ausgabe', label: 'Ausgaben' },
 ];
 
 // Filter überleben den Seitenwechsel (wie im Prototyp: Modulvariable)
 let gemerkterFilter: Filter = LEERER_FILTER;
 
-function Liste({ zeilen, kategorien, zeitraumLabel }: { zeilen: BuchungZeile[]; kategorien: KategorieWahl[]; zeitraumLabel: string }) {
+function Liste({
+  zeilen,
+  kategorien,
+  zeitraumLabel,
+  zeitraumWahl,
+}: {
+  zeilen: BuchungZeile[];
+  kategorien: KategorieWahl[];
+  zeitraumLabel: string;
+  /** Zeitraum steht bei den Reitern (wie auf „Rechnungen & Quittungen“) */
+  zeitraumWahl: ReactNode;
+}) {
+  // Suche steht im Seitenkopf (wie auf „Rechnungen & Quittungen“ und „Kunden“), ihr Zustand bleibt hier
+  const [sucheSlot, setSucheSlot] = useState<HTMLElement | null>(null);
+  useLayoutEffect(() => setSucheSlot(document.getElementById('bu-suche-slot')), []);
   const [f, setF] = useState<Filter>(gemerkterFilter);
   const [q, setQ] = useState(f.q); // Eingabe sofort, Filter kurz entprellt
   const [pop, setPop] = useState(false);
@@ -262,26 +288,30 @@ function Liste({ zeilen, kategorien, zeitraumLabel }: { zeilen: BuchungZeile[]; 
               ),
             }))}
           />
+          {zeitraumWahl}
+          {sucheSlot ? createPortal(
           <label className="bu-search">
-            <Search />
-            <input
-              type="search"
-              className="input sm"
-              value={q}
-              placeholder="Suchen …"
-              aria-label="Einnahmen und Ausgaben durchsuchen (Text, Nr., Name, Betrag)"
-              autoComplete="off"
-              spellCheck={false}
-              onChange={(e) => setQ(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape' && q) {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  sucheLeeren();
-                }
-              }}
-            />
-          </label>
+              <Search />
+              <input
+                type="search"
+                className="input sm"
+                value={q}
+                placeholder="Suchen …"
+                aria-label="Einnahmen und Ausgaben durchsuchen (Text, Nr., Name, Betrag)"
+                autoComplete="off"
+                spellCheck={false}
+                onChange={(e) => setQ(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape' && q) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    sucheLeeren();
+                  }
+                }}
+              />
+            </label>,
+            sucheSlot,
+          ) : null}
           <span className="spacer" />
           {r.ohneBeleg || f.ohneBeleg ? (
             <button type="button" className={`bu-ob-link ${f.ohneBeleg ? 'on' : ''}`} onClick={() => setF((x) => ({ ...x, ohneBeleg: !x.ohneBeleg }))}>
@@ -340,7 +370,7 @@ function Liste({ zeilen, kategorien, zeitraumLabel }: { zeilen: BuchungZeile[]; 
                 <div className="bu-pop-sec">
                   <label className="toggle-row bu-pop-ob">
                     <span>
-                      Nur ohne Beleg
+                      Nur ohne Beleg (weder Datei noch Belegnummer)
                       <small>{anzahlText(r.ohneBeleg)}</small>
                     </span>
                     <span className="switch">
@@ -384,7 +414,7 @@ function Liste({ zeilen, kategorien, zeitraumLabel }: { zeilen: BuchungZeile[]; 
             <thead>
               <tr>
                 <th className="l bu-c-dat">Datum</th>
-                <th className="l bu-c-bnr">Beleg-Nr.</th>
+                <th className="l bu-c-bnr" title="Buchungsnummer, darunter der Beleg (Quittung oder Rechnung aus Kladdy, Nummer eines fremden Belegs oder Datei)">Buchung · Beleg</th>
                 <th className="l">Beschreibung</th>
                 <th className="l bu-c-kat">Kategorie</th>
                 <th className="l bu-c-zw">Zahlungsweg</th>
@@ -423,7 +453,19 @@ function Liste({ zeilen, kategorien, zeitraumLabel }: { zeilen: BuchungZeile[]; 
             </tbody>
           </table>
         </div>
-        {r.zeilen.length ? <p className="bu-foot">{anzahlText(r.zeilen.length)}</p> : null}
+        {r.zeilen.length ? (
+          <p className="bu-foot">
+            <span>
+              {anzahlText(r.zeilen.length)}
+              {r.zeilen.some((b) => sperre(b)) ? (
+                <span className="bu-foot-legende">
+                  <Lock /> an ausgestellten Beleg gebunden – ändern per Storno
+                </span>
+              ) : null}
+            </span>
+            <Summenzeile zeilen={r.zeilen} label={zeitraumLabel} />
+          </p>
+        ) : null}
       </div>
     </>
   );
@@ -434,6 +476,7 @@ function Liste({ zeilen, kategorien, zeitraumLabel }: { zeilen: BuchungZeile[]; 
 function Zeile({ b, q }: { b: BuchungZeile; q: string }) {
   const s = sperre(b);
   const storniert = s === 'storniert';
+  const navigate = useNavigate();
   const wer = gegenueber(b);
   const nr = b.belegnummer || b.rechnung_nummer || '';
   const za = b.zahlungsart;
@@ -463,13 +506,22 @@ function Zeile({ b, q }: { b: BuchungZeile; q: string }) {
       <td className="l bu-dat" title={`${datumLang(b.zahlungsdatum)} · Nr. ${b.nummer}`}>
         {datumTagMonat(b.zahlungsdatum)}
       </td>
-      <td className="l">
+      <td className="l bu-nrzelle">
+        <span className="bu-bunr" title={`Buchungsnummer ${b.nummer} – auf Papierbelege schreiben, dann findest du beides wieder`}>
+          <Hl text={b.nummer} q={q} />
+        </span>
         <span className="bu-bnr">
           {nr ? (
             b.rechnung_id != null && b.rechnung_nummer ? (
               <Link className="bu-nr-chip" to={`/belege/${b.rechnung_id}`} title="Beleg öffnen">
                 <Hl text={nr} q={q} />
               </Link>
+            ) : nr === PAPIER_BELEG ? (
+              // „Nur buchen“ mit Papierquittung: der Zettel trägt die Buchungsnummer
+              <span className="bu-papier" title="Papierquittung im Ordner – auf dem Zettel steht diese Buchungsnummer">
+                <FileText />
+                Papierquittung
+              </span>
             ) : (
               <span className="bu-nr" title={nr}>
                 <Hl text={nr} q={q} />
@@ -483,10 +535,10 @@ function Zeile({ b, q }: { b: BuchungZeile; q: string }) {
               className="badge warn bu-missing"
               title={`Für diesen Eintrag fehlt noch der Beleg. ${b.typ === 'einnahme' ? 'Datei anhängen oder Quittung bzw. Rechnung erstellen.' : 'Datei anhängen oder Eigenbeleg erstellen.'}`}
             >
-              fehlt
+              Beleg fehlt
             </span>
           ) : null}
-          {!nr && !b.belege_anzahl && !fehltBeleg(b) ? <span className="bu-dash">–</span> : null}
+          {!nr && !b.belege_anzahl && !fehltBeleg(b) ? <span className="bu-dash">ohne Beleg</span> : null}
         </span>
       </td>
       <td className="l">
@@ -543,6 +595,17 @@ function Zeile({ b, q }: { b: BuchungZeile; q: string }) {
                   <FileUp />
                 </button>
               ) : null}
+              {quittungNachholbar(b) ? (
+                <button
+                  type="button"
+                  className="icon-btn sm"
+                  title={`Quittung aus Kladdy zu ${b.nummer} ausstellen (verknüpft diese Einnahme, bucht nichts doppelt)`}
+                  aria-label="Quittung ausstellen"
+                  onClick={() => navigate(quittungZuBuchungPfad(b))}
+                >
+                  <ReceiptText />
+                </button>
+              ) : null}
               {kannStornieren(b) ? (
                 <button
                   type="button"
@@ -572,5 +635,23 @@ function Zeile({ b, q }: { b: BuchungZeile; q: string }) {
         </div>
       </td>
     </tr>
+  );
+}
+
+/** Schlanke Summenzeile unter der Liste (nur Text, keine Kacheln): Zahlungen im gezeigten Ausschnitt. */
+function Summenzeile({ zeilen, label }: { zeilen: readonly BuchungZeile[]; label: string }) {
+  const s = listenSummen(zeilen);
+  return (
+    <span className="bu-summen" aria-label={`Summen ${label}`}>
+      <span>
+        Einnahmen <b className={s.einnahmen ? 'ein' : undefined}>{formatBetrag(s.einnahmen, { vorzeichen: 'immer' })}</b>
+      </span>
+      <span>
+        Ausgaben <b className={s.ausgaben ? 'aus' : undefined}>{formatBetrag(-s.ausgaben, { vorzeichen: 'immer' })}</b>
+      </span>
+      <span>
+        Saldo <b>{formatBetrag(s.saldo, { vorzeichen: 'immer' })}</b>
+      </span>
+    </span>
   );
 }

@@ -2,7 +2,7 @@
  * und für vorbereitete Belege bei Terminen), Zahlungsziel neuer Rechnungen und Gültigkeit neuer Angebote.
  * Gespeichert in einstellungen['belege'] über lib/queries/einstellungen.ts (jede Änderung ins Protokoll). */
 import { useEffect, useState } from 'react';
-import { FileText, Receipt } from 'lucide-react';
+import { FileText, NotebookPen, ReceiptEuro } from 'lucide-react';
 import {
   BELEG_EINSTELLUNGEN_STANDARD,
   ladeBelegEinstellungen,
@@ -67,7 +67,7 @@ function Formular({ daten, neuLaden }: { daten: BelegEinstellungen; neuLaden: ()
               value: 'quittung',
               label: (
                 <>
-                  <Receipt />
+                  <ReceiptEuro />
                   Quittung
                 </>
               ),
@@ -87,6 +87,22 @@ function Formular({ daten, neuLaden }: { daten: BelegEinstellungen; neuLaden: ()
           Vorauswahl beim Erfassen einer Einnahme und für vorbereitete Belege bei Terminen. Die Quittung enthält zugleich alle
           Rechnungsangaben (§ 34a UStDV); eine Rechnung braucht man, wenn der Kunde später zahlt, eine Firma beauftragt oder die
           Arbeitskosten absetzen will (§ 35a EStG).
+        </p>
+      </SetRow>
+      <SetRow id="neue-einnahme" label="Neue Einnahme" value={daten.einnahme_weg === 'ohne' ? 'Nur buchen' : 'Beleg gleich ausstellen'}>
+        <Seg
+          ariaLabel="Neue Einnahme"
+          value={daten.einnahme_weg}
+          onChange={(v) => void speichern({ ...daten, einnahme_weg: v })}
+          options={[
+            { value: 'beleg', label: (<><ReceiptEuro />Beleg gleich ausstellen</>) },
+            { value: 'ohne', label: (<><NotebookPen />Nur buchen</>) },
+          ]}
+        />
+        <p className="hint">
+          Was beim Erfassen einer Einnahme vorausgewählt ist. „Nur buchen“ passt, wenn du Quittungen von Hand schreibst
+          (z. B. Blanko-Quittungen aus Kladdy oder ein Quittungsblock): Die Buchungsnummer kommt auf die Papierquittung, eine
+          Quittung aus Kladdy kannst du jederzeit nachholen. Zu Terminen wird der vorbereitete Beleg weiter vorgeschlagen.
         </p>
       </SetRow>
       <SetRow id="zahlungsziel" label="Zahlungsziel neuer Rechnungen" value={`${daten.zahlungsziel_tage} Tage`}>

@@ -8,7 +8,7 @@ import { ArrowLeft } from 'lucide-react';
 import { BEREICHE, bereichPfad, isEinstellungen } from '../../lib/einstellungen-index';
 import { datenbankVerfuegbar } from '../../lib/db';
 import { NAV, START } from '../../lib/navigation';
-import { ladeOhneBelegAnzahl } from '../../lib/queries/buchungen';
+import { } from '../../lib/queries/buchungen';
 import { ladeUeberfaelligAnzahl } from '../../lib/queries/rechnungen';
 import { ladeTerminZaehler } from '../../lib/queries/termine';
 import { heute } from '../../lib/zeitraum';
@@ -17,22 +17,8 @@ import { Marke } from '../ui/Firmenlogo';
 
 const isActive = (path: string, to: string) => path === to || path.startsWith(to + '/');
 
-/** Zähler an „Ein- & Ausgänge“: Zahlungen ohne Beleg (§6.1). Neu geladen nach jedem Schreiben (datenStand). */
-function useOhneBeleg(): number {
-  const stand = useUi((s) => s.datenStand);
-  const [n, setN] = useState(0);
-  useEffect(() => {
-    if (!datenbankVerfuegbar()) return;
-    let aktiv = true;
-    ladeOhneBelegAnzahl()
-      .then((x) => aktiv && setN(x))
-      .catch(() => undefined);
-    return () => {
-      aktiv = false;
-    };
-  }, [stand]);
-  return n;
-}
+/* Kein Zähler an „Ein- & Ausgänge“: Buchungen ohne Datei sind beim Arbeiten mit Papierquittungen normal (Filter „ohne Beleg“
+ * in der Liste bleibt). */
 
 /** Roter Zähler an „Rechnungen & Quittungen“: überfällige Rechnungen (§6.1). */
 function useUeberfaellig(): number {
@@ -69,7 +55,6 @@ function useTermineZaehler(): { heute: number; offen: number } {
 }
 
 function Hauptmenue({ pathname }: { pathname: string }) {
-  const ohneBeleg = useOhneBeleg();
   const ueberfaellig = useUeberfaellig();
   const termine = useTermineZaehler();
   return (
@@ -82,24 +67,18 @@ function Hauptmenue({ pathname }: { pathname: string }) {
               <li key={to} className={`sb-item sb-nav ${active ? 'active' : ''}`}>
                 <Link to={to} title={label} aria-current={active ? 'page' : undefined}>
                   <Icon />
-                  <span className="sb-label">{label}</span>
-                  {to === '/ein-ausgaenge' && ohneBeleg > 0 ? (
-                    <span className="sb-badge" title={`${ohneBeleg} ohne Beleg`}>
-                      {ohneBeleg}
-                    </span>
-                  ) : null}
-                  {to === '/termine' && termine.offen > 0 ? (
-                    <span className="sb-badge alarm" title={`${termine.offen} nachtragen bzw. ohne Beleg`}>
-                      {termine.offen}
-                    </span>
-                  ) : to === '/termine' && termine.heute > 0 ? (
+                  <span className="sb-label">
+                    {label}
+                    {to === '/termine' && termine.offen > 0 ? (
+                      <small className="sb-hint warn">{termine.offen === 1 ? '1 Termin nachtragen' : `${termine.offen} Termine nachtragen`}</small>
+                    ) : null}
+                    {to === '/belege' && ueberfaellig > 0 ? (
+                      <small className="sb-hint alarm">{ueberfaellig === 1 ? '1 Rechnung überfällig' : `${ueberfaellig} Rechnungen überfällig`}</small>
+                    ) : null}
+                  </span>
+                  {to === '/termine' && termine.offen === 0 && termine.heute > 0 ? (
                     <span className="sb-badge" title={`${termine.heute} heute`}>
                       {termine.heute}
-                    </span>
-                  ) : null}
-                  {to === '/belege' && ueberfaellig > 0 ? (
-                    <span className="sb-badge alarm" title={`${ueberfaellig} überfällig`}>
-                      {ueberfaellig}
                     </span>
                   ) : null}
                 </Link>
@@ -129,15 +108,16 @@ function EinstellungsMenue({ pathname }: { pathname: string }) {
       <div className="sb-section">
         <div className="sb-title">Einstellungen</div>
         <ul className="sb-list">
-          {BEREICHE.map(({ id, label, icon: Icon, phase }) => {
+          {/* noch nicht fertige Bereiche (phase) erscheinen erst, wenn es sie gibt – kein „kommt bald“ */}
+          {BEREICHE.filter((b) => !b.phase).map(({ id, label, icon: Icon, phase }) => {
             const to = bereichPfad(id);
             const active = isActive(pathname, to);
             return (
               <li key={id} className={`sb-item sb-nav ${active ? 'active' : ''}`}>
-                <Link to={to} title={phase ? `${label} (kommt mit Phase ${phase})` : label} aria-current={active ? 'page' : undefined}>
+                <Link to={to} title={phase ? `${label} – noch nicht fertig, kommt mit einem der nächsten Updates` : label} aria-current={active ? 'page' : undefined}>
                   <Icon />
                   <span className="sb-label">{label}</span>
-                  {phase ? <span className="sb-badge phase">Phase {phase}</span> : null}
+                  {phase ? <span className="sb-badge phase">kommt bald</span> : null}
                 </Link>
               </li>
             );

@@ -92,7 +92,7 @@ Das Menü hat genau fünf Punkte (alle im Prototyp zu sehen):
 |---|---|
 | **Ein- & Ausgänge** (Startseite) | ruhige Liste aller geschäftlichen Zahlungen (Datum · Beleg-Nr. · Beschreibung + Kunde/Geschäft · Kategorie · Zahlungsweg · Betrag), Filter, Suche. **Beleg-PDF aufs Fenster ziehen ⇒ Erfassen-Schublade öffnet sich vorausgefüllt** |
 | **Termine** | Kundentermine (Agenda), auf Wunsch mit **vorbereiteter Quittung**; nach dem Termin abhaken, dann „Quittung ausstellen“ über die Erfassen-Schublade; bei Absage wird die Vorbereitung verworfen |
-| **Rechnungen & Quittungen** | Liste aller Belege nach laufender Nummer (Filter Alle · Offen · Bezahlt, Zeitraum Monat · Jahr · Gesamt, Status per Klick aufs Badge), **Eingabemaske mit Live-Vorschau**, Pflichtangaben-Check, **GiroCode (QR)** auf der Rechnung, **Drucken / PDF**; Button **Vorlagen** führt zum **Baukasten** (Bausteine hinzufügen, entfernen, sortieren, einstellen; LaTeX nur als Experten-Ansicht) |
+| **Rechnungen & Quittungen** | Liste aller Belege nach laufender Nummer (Filter Alle · Offen · Bezahlt, Zeitraum Monat · Quartal · Jahr · Gesamt, Status per Klick aufs Badge), **Eingabemaske mit Live-Vorschau**, Pflichtangaben-Check, **GiroCode (QR)** auf der Rechnung, **Drucken / PDF**; Button **Vorlagen** führt zum **Baukasten** (Bausteine hinzufügen, entfernen, sortieren, einstellen; LaTeX nur als Experten-Ansicht) |
 | **Kunden** | jeder Kunde einer Quittung/Rechnung, mit **Verlauf**: wann man dort war, was gemacht wurde, Betrag, Beleg; Notiz („Hund im Garten“), Kontaktdaten. Keine Lieferanten |
 | **Auswertung** | **großer Umschalter** mit vier Reitern: **Überblick** (Status, Kennzahlen des Zeitraums, Diagramme, angeheftete Kennzahlen) · **Liquidität** (was in 30/60/90 Tagen rein- und rausgeht) · **Kennzahlen** (eigene Formeln, z. B. `TEILEN(GEWINN(); EINNAHMEN(); 0)`) · **Steuer & Export** (EÜR, Wareneingangsbuch, Kleinunternehmer-Check, CSV/PDF-Export) |
 | ⚙ **Einstellungen** (nur oben rechts) | Beleg bei Einnahmen (Quittung oder Rechnung), Firmendaten, Steuerstatus, Nummernkreise, Steuer-Kennwerte pro Jahr, Darstellung (Hell/Dunkel/System, Themes wie PowerAnalytic), Daten & Backup |
@@ -702,7 +702,7 @@ Steuer & Export → Auswertung). Keine Konten, keine Monatsbilanz, keine Liste o
 Bläschen oben rechts am Icon, Name als Tooltip.
 
 ### 6.2 Kopfzeile (68 px, Glas) und der eine Erfassen-Weg
-Links Seitenleisten-Knopf · Mitte **Suche/Befehlspalette** (⌘K): durchsucht Ein- & Ausgänge, Belege, Termine, Kunden,
+Links Seitenleisten-Knopf · Mitte **Suche/Befehlspalette** (⌘K; kompakter Knopf „Springen …“, breitet sich erst beim Benutzen aus – so steht neben der Suche der Seite kein zweites großes Suchfeld): durchsucht Ein- & Ausgänge, Belege, Termine, Kunden,
 Kennzahlen und Seiten (auch die Reiter der Auswertung). Mit `>` am Anfang nur Befehle: „Ausgabe erfassen“, „Einnahme
 erfassen“, „Quittung schreiben“, „Rechnung schreiben“ (beide öffnen die Erfassen-Schublade mit vorgewähltem Beleg),
 „Termin eintragen“, „Angebot schreiben“, „Eigenbeleg erstellen“, „Vorlagen bearbeiten“, „Kunde anlegen“, Hell/Dunkel (⇧⌘L),
@@ -716,7 +716,7 @@ Eine ruhige Liste aller geschäftlichen Zahlungen – kein Kontoauszug, keine Sa
   (Monat · Quartal · Jahr ‹ ›) · rechts der Primärknopf **„+ Erfassen“** (⌘N). Titel- und Knopfspalte wachsen gleich
   (`flex: 1 1 0`), so steht der Zeitraum in der Mitte. Wird der Kopf zu schmal (Container-Query < 960 px), rutscht der
   Zeitraum in eine eigene Zeile unter den Titel; „+ Erfassen“ bleibt rechts oben.
-- **Klebrige Filterleiste in einer Zeile:** Tabs Alle/Eingänge/Ausgänge (mit Zählern) · Suche · „Filter“-Knopf (Popover:
+- **Klebrige Filterleiste in einer Zeile:** Tabs Alle/Einnahmen/Ausgaben (mit Zählern, dieselben Wörter wie die Summenzeile) · Suche · „Filter“-Knopf (Popover:
   Kategorie, Zahlungsweg Bar/Überweisung/PayPal, nur ohne Beleg). Aktive Filter als entfernbare Chips darunter. Hinweis-Link
   „3 ohne Beleg“ (filtert genau diese).
 - **Tabelle** (`table-layout: fixed`, Zeilenhöhe ~46 px, neueste zuerst): Datum · **Beleg-Nr.** (mono; QU/RE als Link auf den
@@ -765,7 +765,7 @@ Zusammenfassung („Erkannt: 47,83 € · 12.09.2026 · Bauhaus · Material“).
 ### 6.5 Termine
 Kundentermine planen und dazu auf Wunsch schon die **Quittung (oder Rechnung) vorbereiten**.
 - **Kopf:** Titel, rechts der Primärknopf **„+ Termin eintragen“** (wie „+ Erfassen“ eingefärbt; öffnet die eine Termin-Schublade; dieselbe öffnen auch Kundenseite und
-  Befehlspalette, ggf. vorbelegt). Filter **Anstehend ·
+  Befehlspalette, ggf. vorbelegt). Filter **Heute & kommend ·
   Erledigt · Alle**; optional ein schmaler Wochenstreifen (diese/nächste Woche, Punkte je Termin).
 - **Agenda nach Tagen** (Heute, Morgen, …). Oben, falls vorhanden, **„Nachtragen“**: geplante Termine in der Vergangenheit
   („War der Termin?“). Je Termin: Uhrzeit, Kunde (Link), Leistung, Adresse (Karten-Link), geschätzter Betrag, Notiz, Beleg-Chip
@@ -802,7 +802,7 @@ Kundentermine planen und dazu auf Wunsch schon die **Quittung (oder Rechnung) vo
   dafür. „Offen“ = offene Rechnungen plus für geplante Termine vorbereitete Belege; „Bezahlt“ = bezahlte Rechnungen,
   Quittungen und gebuchte Eigenbelege; Entwürfe, Angebote und Stornos nur unter „Alle“. Spalten: Nr. · Art · Kunde · Betreff ·
   Datum · Fällig/Zahlung · Betrag · Status; Kunde als Text; unten nur die Anzahl.
-- **Zeitraum** rechts im Seitenkopf (neben „Vorlagen“ und „Neu“): **Monat · Jahr · Gesamt** mit ‹ › (Standard beim Start:
+- **Zeitraum** rechts im Seitenkopf (neben „Vorlagen“ und „Neu“): **Monat · Quartal · Jahr · Gesamt** mit ‹ › (wie Ein- & Ausgänge, dazu „Gesamt“) (Standard beim Start:
   aktueller Monat), gefiltert nach Belegdatum. Ausnahmen: „Offen“ zeigt immer **alle** offenen Rechnungen (Überfällige
   zuerst, rot); die Suche durchsucht alle Zeiträume.
 - Status-Badges: Entwurf (neutral) · Offen (Akzent) · Überfällig (`--neg`) · Bezahlt (`--pos`) · Storniert (durchgestrichen) ·
@@ -951,6 +951,27 @@ Vorlagen hinzufügbar). **„Zurücksetzen“** ⇒ wieder das App-Symbol; beide
 GoBD: Ausgestellte Belege behalten ihr Logo. In der App steckt es im archivierten PDF; zusätzlich merkt sich der Schnappschuss
 (`snapshot_json.dokument.logo`) den Dateinamen, alte Logo-Dateien werden nie gelöscht, solange ein Beleg darauf verweist. (Prototyp:
 `r.logoId` + `FIRMA.logoArchiv`, vor jedem Logowechsel werden alle ausgestellten Belege eingefroren.)
+
+### 6.11 Feinschliff aus dem Hill-Climb (Nov. 2026)
+Festgehaltene Entscheidungen aus den Bewertungsrunden (Ledger außerhalb des Repos); ergänzen bzw. präzisieren §6–§9:
+- **Belege und Buchung getrennt:** Quittungen müssen nicht an eine Buchung hängen. „Neu“-Menü in drei Gruppen: *Neuer Beleg*
+  (Quittung · Rechnung „Mit Zahlungsziel – Einnahme, sobald bezahlt“ · Angebot · Eigenbeleg, je mit nächster Nummer) ·
+  *Zum Ausdrucken* (Blanko-Quittung **ohne Nummer**, mit Feld „Buchungs-Nr. (aus Kladdy)“) · *Ohne Beleg aus Kladdy* („Nur buchen“).
+- **Erfassen › Nur buchen:** Haken „Papierquittung im Ordner“ (statt zwei Optionen) mit der kommenden Buchungsnummer für den
+  Zettel, optional „Eigene Nr. der Quittung“ (z. B. vom gekauften Block); Anhang einzeilig „Scan oder Datei anhängen (optional)“.
+  In Ein- & Ausgänge steht die Buchung dann als „Papierquittung“.
+- **Belegliste:** Spalte „Beleg-Nr. · Buchung“ (Ein- & Ausgänge spiegelbildlich „Buchung · Beleg“); bei Zahlung am Belegtag nur
+  der Zahlungsweg („PayPal“), sonst mit Datum; Überfälliges als eigene Gruppe oben.
+- **Beleg-Maske (ausgestellt):** schmale linke Spalte (Status mit Hauptaktion, GoBD-Hinweis, „Alle Angaben als Liste“, Anhang)
+  und großes Blatt; ausgestellte Quittung ohne eigenes „Bezahlt“-Badge (immer bezahlt); „Stornieren …“ rot beschriftet.
+- **Rechnung:** Baustein „Anschrift & Belegdaten“ hat den Schalter **Steuernummer** (Standard der mitgelieferten Rechnung: an);
+  der Pflichtangaben-Check zählt ihn. Quittung bis zur Kleinbetragsgrenze ohne Pflicht-Steuernummer (§ 33 UStDV), Blanko streng.
+- **Vorlagen:** Blatt groß (Bausteinspalte höchstens 340 px), kein ENTWURF-Wasserzeichen im Vorlagen-Editor (Muster, kein
+  Entwurf – Beleg-Maske und Storno behalten es); Feldbeschriftungen auf dem Blatt 8,5 pt in eigener Farbe `label`.
+- **Termine:** Filter „Heute & kommend“ (heute erledigte bleiben sichtbar), eine Aktionsspalte auch im Kasten „Nachtragen“.
+- **Kunden:** Gruppen „Mit Termin – nachtragen und nächster zuerst“ / „Ohne Termin – zuletzt da zuerst“.
+- **Farbe:** Standardschema Petrol; im Dunkeln gedeckter Petrol-Hauptknopf (weiße Schrift ≥ 4,5:1), Akzent als Schrift dort
+  ≥ 6,5:1, Konturen und Tönungen aus der Akzent-Schrift abgeleitet.
 
 ---
 
@@ -1740,7 +1761,7 @@ Easing: `--ease cubic-bezier(.2,.8,.2,1)`, federnd `--spring cubic-bezier(.34,1.
 ### 9.7 Icons
 `lucide-react`, 18 px, `strokeWidth={1.8}`. Vorschläge: Ein- & Ausgänge `ArrowLeftRight`, Termine `CalendarDays`, Rechnungen & Quittungen `FileText`,
 Vorlagen `Blocks`, Kunden `Users`, Auswertung `ChartColumn` (Reiter: Überblick `LayoutDashboard`, Liquidität `Waves`, Kennzahlen
-`Sigma`, Steuer & Export `BookOpen`), Beleg `Paperclip`, Bar `Banknote`, Überweisung `Landmark`, PayPal `CircleDollarSign`
+`Sigma`, Steuer & Export `BookOpen`), Beleg `Paperclip`, Bar `Banknote`, Überweisung `Landmark`, PayPal `Wallet`, Quittung `ReceiptEuro` (keine Dollar-Symbole)
 (oder eigenes „P“), Festgeschrieben `Lock`, Einstellungen `Settings`, Seitenleiste `PanelLeft`.
 Logo der App: abgerundetes Quadrat (Radius 10) mit Verlauf `linear-gradient(140deg, var(--accent), var(--accent-2))` und einem weißen
 Beleg-/Buch-Symbol. Der Schatten `drop-shadow(0 6px 14px color-mix(in oklab, var(--accent) 45%, transparent))` ist derselbe wie in PowerAnalytic.
@@ -1939,7 +1960,7 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
      (`beleg_bezahlt` mit `termin`) macht die bezahlte Rechnung über ihre Einnahme (`buchungen.termin_id`) zum Beleg des
      Termins; „Ohne eigenen Beleg“ (`buchung_anlegen` mit `termin_id`) schließt ihn „ohne Beleg“ ab – beide in derselben
      Transaktion, der Entwurf wird verworfen. Ein Termin hat höchstens einen gültigen Beleg bzw. eine Einnahme (Rust
-     prüft das auch beim Ausstellen). Frontend: Seite `src/pages/Termine.tsx` (Anstehend · Erledigt · Alle mit Zählern,
+     prüft das auch beim Ausstellen). Frontend: Seite `src/pages/Termine.tsx` (Heute & kommend · Erledigt · Alle mit Zählern,
      Wochenstreifen mit Sprung zum Tag, „Nachtragen“ mit „War der Termin?“ bzw. „Beleg fehlt“, Agenda nach Tagen, Beleg-Chip,
      „⋯“-Menü, `?t=<id>` und `?neu=1[&kunde=…&datum=…]`), Termin-Schublade `src/components/termine/TerminSchublade.tsx`
      (Kundenhinweis mit Notiz und Nachfrage bei gleichem Namen, Überschneidungen, Ø-Betrag je Leistung, Ansicht „Termin

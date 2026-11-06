@@ -8,7 +8,8 @@
 - Design: ausschließlich Tokens/Komponenten aus ANLEITUNG §9 (CSS-Variablen). Keine Inline-Farben, kein Tailwind.
   Jede Aktion genau einmal: Erfassen NUR über „+ Erfassen“ im Kopf von Ein- & Ausgänge
   (⌘N von überall) bzw. Datei-Drop – kein Erfassen-Knopf in der Kopfzeile; andere Stellen öffnen höchstens
-  dieselbe Schublade vorbelegt. Statistik (KPI-Kacheln, Summen, Diagramme) NUR in der Auswertung, nie in Listen.
+  dieselbe Schublade vorbelegt. Statistik (KPI-Kacheln, Diagramme) NUR in der Auswertung; in Listen höchstens eine schlanke Summenzeile im
+  Tabellenfuß (Ein- & Ausgänge: Einnahmen · Ausgaben · Saldo des Zeitraums, nur Text).
   Menü: genau fünf Punkte (Ein- & Ausgänge · Termine · Rechnungen & Quittungen · Kunden · Auswertung). Keine Konten/Kontostände,
   nur Zahlungsweg (bar/bank/paypal). Logo = Startseite; Einstellungen nur über ⚙.
 - Diagramme: eigene SVG-Komponenten nach §9.6. Plus/Minus nie nur über Farbe.

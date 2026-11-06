@@ -42,12 +42,15 @@ export const istBelegart = (v: unknown): v is Belegart => typeof v === 'string' 
 export const formatVon = (art: Belegart): Blattformat => ARTEN[art].format;
 
 export const HINWEIS_19 = 'Umsatzsteuerfrei aufgrund der Kleinunternehmerregelung gemäß § 19 UStG.';
-export const HINWEIS_14B = 'Hinweis für Privatkunden: Bitte bewahren Sie diesen Beleg zwei Jahre auf (§ 14b UStG).';
+/** Aufbewahrungshinweis (§ 14 Abs. 4 Satz 1 Nr. 9, § 14b UStG): Pflicht bei Leistungen im Zusammenhang mit einem Grundstück
+ *  an Privatkunden – der Text nennt den Anwendungsbereich, damit er auf anderen Belegen nicht falsch verstanden wird. */
+export const HINWEIS_14B = 'Hinweis für Privatkunden bei Arbeiten an Haus oder Grundstück: Bitte bewahren Sie diesen Beleg zwei Jahre auf (§ 14b UStG).';
 
 /** Standardtexte der Maske je Art (Prototyp TEXTE). */
 export const STANDARD_TEXTE: Readonly<Record<Belegart, { einleitung: string; schlusstext: string }>> = {
   rechnung: { einleitung: 'vielen Dank für Ihren Auftrag. Ich berechne Ihnen folgende Leistungen:', schlusstext: HINWEIS_14B },
-  quittung: { einleitung: '', schlusstext: HINWEIS_14B },
+  // Quittungen sind meist Kleinbetragsrechnungen (§ 33 UStDV) – dort ist der § 14b-Hinweis nicht vorgeschrieben
+  quittung: { einleitung: '', schlusstext: '' },
   angebot: { einleitung: 'vielen Dank für Ihre Anfrage. Gerne biete ich Ihnen an:', schlusstext: 'Ich freue mich auf Ihren Auftrag.' },
   eigenbeleg: { einleitung: '', schlusstext: '' },
 };
@@ -104,6 +107,8 @@ export interface BelegDokument {
   quittiert: { am: string; zahlungsweg: Zahlungsart } | null;
   /** nur Eigenbeleg */
   eigenbeleg: { grund: EigenbelegGrund; grund_text: string; gebucht: { nummer: string; kategorie: string } | null } | null;
+  /** Quittung: Nummer der Buchung (Ein- & Ausgänge), beim Ausstellen festgehalten; fehlt bei älteren Schnappschüssen */
+  buchung_nr?: string | null;
   /** Ausstellungstag (Unterschrift beim Eigenbeleg); null = `datum` */
   ausgestellt_am: string | null;
   /** Schnappschuss der Firmendaten beim Ausstellen */
@@ -264,6 +269,34 @@ export const PLATZHALTER = [
 ] as const;
 
 export type PlatzhalterName = (typeof PLATZHALTER)[number][0];
+
+/** Kurzer, lesbarer Name eines Platzhalters (Marke in der Bausteinliste statt „{kunde}“). */
+export const PLATZHALTER_KURZ: Readonly<Record<PlatzhalterName, string>> = {
+  kunde: 'Kunde',
+  nr: 'Nummer',
+  art: 'Belegart',
+  datum: 'Datum',
+  leistungsdatum: 'Leistungsdatum',
+  faellig: 'Fällig am',
+  summe: 'Betrag',
+  betrag_worte: 'Betrag in Worten',
+  betreff: 'Betreff',
+  einleitung: 'Einleitung',
+  schlusstext: 'Schlusstext',
+  zahlungsziel: 'Zahlungsziel',
+  firma: 'Firma',
+  inhaber: 'Inhaber',
+  strasse: 'Straße',
+  plz: 'PLZ',
+  ort: 'Ort',
+  steuernummer: 'Steuernummer',
+  telefon: 'Telefon',
+  email: 'E-Mail',
+  web: 'Website',
+  bank: 'Bank',
+  iban: 'IBAN',
+  bic: 'BIC',
+};
 const NAMEN = new Set<string>(PLATZHALTER.map(([n]) => n));
 export const istPlatzhalter = (n: string): n is PlatzhalterName => NAMEN.has(n);
 

@@ -21,8 +21,8 @@ export interface ZahlungswegInfo {
 /** Nur Zahlungsweg, keine Konten (§6 Grundsätze). Kartenzahlung läuft übers Konto ⇒ Überweisung. */
 export const ZAHLUNGSWEGE: readonly ZahlungswegInfo[] = [
   { id: 'bar', name: 'Bar', text: 'Bargeld' },
-  { id: 'bank', name: 'Überweisung', text: 'auch Karte' },
-  { id: 'paypal', name: 'PayPal', text: 'PayPal' },
+  { id: 'bank', name: 'Überweisung', text: 'aufs Konto' },
+  { id: 'paypal', name: 'PayPal', text: 'online' },
 ];
 
 export const zahlungswegName = (id: string | null): string => ZAHLUNGSWEGE.find((z) => z.id === id)?.name ?? '–';
@@ -65,8 +65,11 @@ export interface BuchungZeile {
 /* ================= Regeln ================= */
 
 /** Fehlt der Beleg? Nur echte Zahlungen, nicht storniert, ohne Datei und ohne eigenen Beleg (QU/RE). */
-export const fehltBeleg = (b: Pick<BuchungZeile, 'art' | 'storniert' | 'belege_anzahl' | 'rechnung_id'>): boolean =>
-  b.art === 'zahlung' && !b.storniert && !b.belege_anzahl && b.rechnung_id == null;
+/** Fehlt der Beleg? Nein, wenn eine Datei dranhängt, ein eigener Beleg (QU/RE) verknüpft ist oder eine Belegnummer
+ *  eingetragen ist (z. B. die Nummer einer Papierquittung oder eines Kassenbons – der Beleg liegt dann im Ordner). */
+export const fehltBeleg = (
+  b: Pick<BuchungZeile, 'art' | 'storniert' | 'belege_anzahl' | 'rechnung_id'> & { belegnummer?: string | null },
+): boolean => b.art === 'zahlung' && !b.storniert && !b.belege_anzahl && b.rechnung_id == null && !b.belegnummer?.trim();
 
 export type Sperre = 'storniert' | 'beleg' | 'festgeschrieben' | 'modul';
 
@@ -478,3 +481,40 @@ export const datumTagMonat = (iso: string): string => `${iso.slice(8, 10)}.${iso
 /** Formular-Vergleich für „ungespeichert“: gleiche Eingaben ⇒ gleicher Schlüssel. */
 export const formularSchluessel = (f: Formular): string =>
   JSON.stringify([f.typ, f.betrag.trim(), f.kategorieId, f.zahlungsdatum, f.belegnummer.trim(), f.beschreibung.trim(), f.wer.trim(), f.kundeBewusstNeu, f.privat.trim() || '0', f.zahlungsart]);
+
+/* ---------- Quittung nachträglich ausstellen ---------- */
+
+/** Lässt sich zu dieser Buchung nachträglich eine Quittung aus Kladdy ausstellen? Nur Einnahmen ohne eigenen Beleg, nicht
+ *  storniert, nicht festgeschrieben (Rust prüft beim Ausstellen dasselbe und verknüpft statt neu zu buchen). */
+export const quittungNachholbar = (b: BuchungZeile): boolean =>
+  b.typ === 'einnahme' && b.art === 'zahlung' && b.rechnung_id == null && b.storno_von_id == null && !b.storniert && b.betrag_cent > 0 && sperre(b) === null;
+
+/** Beleg-Maske für die Quittung zu einer Buchung: Betrag, Datum, Text, Kunde, Zahlungsweg und Kategorie aus der Buchung;
+ *  `buchung` verknüpft beim Ausstellen die vorhandene Einnahme, statt eine zweite zu buchen. */
+export function quittungZuBuchungPfad(b: BuchungZeile): string {
+  const p = new URLSearchParams({ art: 'quittung', buchung: String(b.id), betrag: String(b.betrag_cent), datum: b.zahlungsdatum });
+  if (b.beschreibung.trim()) p.set('text', b.beschreibung.trim());
+  if (b.kunde_id != null) p.set('kunde', String(b.kunde_id));
+  if (b.zahlungsart) p.set('zahlungsart', b.zahlungsart);
+  p.set('kategorie', String(b.kategorie_id));
+  return `/belege/neu?${p.toString()}`;
+}
+
+/* ---------- Summenzeile der Liste ---------- */
+
+/** Summen der gezeigten Zahlungen (ohne stornierte Buchungen und ihre Gegenbuchungen): Einnahmen, Ausgaben, Saldo in
+ *  Cent. Reine Zahlungssicht wie die Liste – die EÜR mit Privatanteilen, AfA usw. steht in der Auswertung. */
+export function listenSummen(zeilen: readonly Pick<BuchungZeile, 'typ' | 'betrag_cent' | 'storniert' | 'storno_von_id'>[]): {
+  einnahmen: number;
+  ausgaben: number;
+  saldo: number;
+} {
+  let einnahmen = 0;
+  let ausgaben = 0;
+  for (const b of zeilen) {
+    if (b.storniert || b.storno_von_id != null) continue;
+    if (b.typ === 'einnahme') einnahmen += b.betrag_cent;
+    else ausgaben += b.betrag_cent;
+  }
+  return { einnahmen, ausgaben, saldo: einnahmen - ausgaben };
+}

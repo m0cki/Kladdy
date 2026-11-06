@@ -33,7 +33,7 @@ export const STANDARD_VORLAGEN: Readonly<Record<Belegart, readonly VorlagenDesig
         { typ: 'kopf', logo: true, claim: '{inhaber}' },
         { typ: 'abstand', groesse: 'gross' },
         { typ: 'absenderzeile' },
-        { typ: 'anschrift_meta', nr: true, datum: true, leistung: true, kundennr: true, faellig: false },
+        { typ: 'anschrift_meta', nr: true, datum: true, leistung: true, kundennr: true, steuernr: true, faellig: false },
         { typ: 'abstand', groesse: 'mittel' },
         { typ: 'titel', text: '{art} {nr}' },
         { typ: 'betreff' },
@@ -81,7 +81,7 @@ export const STANDARD_VORLAGEN: Readonly<Record<Belegart, readonly VorlagenDesig
         { typ: 'steuerhinweis', groesse: 'klein' },
         { typ: 'text', text: '{schlusstext}', groesse: 'grau' },
         // § 33/§ 34a UStDV: vollständiger Name des leistenden Unternehmers ⇒ Inhaber mit ausgeben
-        { typ: 'absenderzeile', text: '{firma} · Inh. {inhaber} · {strasse} · {plz} {ort} · Steuernr. {steuernummer}', linie: false },
+        { typ: 'absenderzeile', text: 'Ausgestellt von {firma} · {strasse} · {plz} {ort}\nInh. {inhaber} · Steuernr. {steuernummer}', linie: false },
         { typ: 'unterschrift', links: 'Ort, Datum', rechts: 'Unterschrift {firma}' },
       ],
     },

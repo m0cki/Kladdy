@@ -60,6 +60,7 @@ import {
   type KategorieWahl,
   type KundeKurz,
   type Sperre,
+  type Zahlungsart,
 } from '../../lib/buchungen';
 import { anhaengen, vorgemerkteAnhaengen } from '../../lib/belegablage';
 import { pdfNachholen } from '../../lib/belegaktionen';
@@ -72,6 +73,9 @@ import {
   ertragSchluessel,
   ertragStart,
   maskenPfad,
+  naechsteBelegNummer,
+  PAPIER_BELEG,
+  papierGewaehlt,
   rechnungOffen,
   type Ertrag,
   type ErtragsArt,
@@ -96,6 +100,7 @@ import { storniere, storniereMitNachfrage } from '../../lib/storno';
 import { ART_LABEL, erfassenHinweis, ertragAusEntwurf, ertragBezug, vorbelegungMitBezug, type ErfassenBezug } from '../../lib/termine';
 import { heute, imZeitraum, istDatum, zeitraum } from '../../lib/zeitraum';
 import { useUi, type Toast, type ToastAction } from '../../store/ui';
+import { akzentPapier } from '../../lib/settings';
 import { Drawer } from '../ui/Drawer';
 import { EmptyState } from '../ui/EmptyState';
 import { Seg } from '../ui/Seg';
@@ -187,9 +192,12 @@ function leeresFormular(stamm: Stamm, v: Vorbelegung): Formular {
     wer: typ === 'einnahme' ? (kunde ? kundenLabel(kunde) : '') : (v.lieferant ?? ''),
     kundeBewusstNeu: null,
     privat: '',
-    zahlungsart: v.zahlungsart ?? 'bank',
+    zahlungsart: v.zahlungsart ?? standardZahlungsweg(typ),
   };
 }
+
+/** Vorgabe beim Erfassen: Einnahmen meist bar vor Ort, Ausgaben meist per Überweisung oder Karte. */
+const standardZahlungsweg = (typ: BuchungTyp): Zahlungsart => (typ === 'einnahme' ? 'bar' : 'bank');
 
 function formularAus(b: BuchungZeile): Formular {
   return {
@@ -269,7 +277,7 @@ export function ErfassenSchublade() {
       const f: Formular = z ? formularAus(z) : leeresFormular(s, v);
       if (!aktiv) return;
       const esOk = es && typeof es !== 'string' ? es : null;
-      const e0: Ertrag = { ...ertragStart(v, esOk?.belegArt ?? 'quittung'), ...(b?.entwurf ? ertragAusEntwurf(b.entwurf) : {}) };
+      const e0: Ertrag = { ...ertragStart(v, esOk?.belegArt ?? 'quittung', esOk?.einnahmeWeg ?? 'beleg'), ...(b?.entwurf ? ertragAusEntwurf(b.entwurf) : {}) };
       const e: Ertrag = esOk ? e0 : { ...e0, weg: 'ohne' };
       setStamm(s);
       setBezug(b);
@@ -480,7 +488,7 @@ export function ErfassenSchublade() {
         setSpeichert(true);
         try {
           const res = await belegAusstellen(entwurfId, v.daten, {
-            dokument: { ...v.dokument, akzent: ui.settings.accent },
+            dokument: { ...v.dokument, akzent: akzentPapier(ui.settings) },
             bausteine: v.gedruckt,
             kategorie_id: r.daten.kategorie_id,
             heute: h,
@@ -525,7 +533,10 @@ export function ErfassenSchublade() {
 
       // neue Einnahme ohne eigenen Beleg zum Termin: schließt ihn „ohne Beleg“ ab (Rust, dieselbe Transaktion)
       const terminId = !zeile && r.daten.typ === 'einnahme' ? (bezug?.termin?.id ?? null) : null;
-      const mitDateien = belege.length ? { ...r.daten, belege: belege.map((b) => b.pfad) } : r.daten;
+      // „Nur buchen“ mit Papierquittung ohne eigene Nummer: als „Papier“ belegt (Zettel trägt die Buchungsnummer)
+      const papier = !zeile && r.daten.typ === 'einnahme' && weg === 'ohne' && papierGewaehlt(ertrag, form.zahlungsart) && !r.daten.belegnummer && !belege.length;
+      const basis = papier ? { ...r.daten, belegnummer: PAPIER_BELEG } : r.daten;
+      const mitDateien = belege.length ? { ...basis, belege: belege.map((b) => b.pfad) } : basis;
       const daten = terminId != null ? { ...mitDateien, termin_id: terminId } : mitDateien;
       setSpeichert(true);
       try {
@@ -572,11 +583,14 @@ export function ErfassenSchublade() {
   /* ---------- Kopf und Fuß ---------- */
   const typ = form?.typ ?? 'ausgabe';
   const titel = bearbeitung ? (nurLesen ? 'Buchung ansehen' : 'Buchung bearbeiten') : `${typName(typ)} erfassen`;
+  const naechsteBuchung = !zeile && !bearbeitung && ertragStamm && form ? naechsteBelegNummer(ertragStamm.kreise, 'buchung', heute(), heute()) : null;
   const sub = zeile
     ? `Nr. ${zeile.nummer}${sp === 'storniert' ? ' · storniert' : sp === 'beleg' || sp === 'festgeschrieben' ? ' · festgeschrieben' : ''}`
     : bearbeitung
       ? undefined
-      : 'Nr. wird beim Speichern vergeben';
+      : naechsteBuchung
+        ? `wird Buchung ${naechsteBuchung}`
+        : 'Nr. wird beim Speichern vergeben';
   const icon = nurLesen ? Lock : bearbeitung ? Pencil : ArrowLeftRight;
 
   const stornoKnopf =
@@ -679,7 +693,7 @@ export function ErfassenSchublade() {
   );
 
   return (
-    <Drawer open={open} onClose={erfassenSchliessen} title={titel} sub={sub} icon={icon} width={520} foot={fuss} className="bu-drawer">
+    <Drawer open={open} onClose={erfassenSchliessen} title={titel} sub={sub} icon={icon} width={900} foot={fuss} className="bu-drawer">
       <>
         {laden.status === 'ohne-db' ? (
           <section>
@@ -727,6 +741,7 @@ export function ErfassenSchublade() {
                   fehler={ertragFehler}
                   onWeg={onWeg}
                   onOffen={onOffen}
+                  onNummer={(nr) => set('belegnummer', nr)}
                 />
               ) : null
             }
@@ -742,7 +757,9 @@ export function ErfassenSchublade() {
                 const kat = stamm.kategorien.find((k) => k.id === f.kategorieId);
                 // Ausgabe: das Geschäft ist Freitext – Kundennummer aus dem Feld nehmen
                 const wer = t === 'ausgabe' ? kundeAufloesen(f.wer, stamm.kunden).art === 'kunde' ? f.wer.replace(/\s*·\s*K-\d{3,}\s*$/i, '') : f.wer : f.wer;
-                return { ...f, typ: t, wer, kategorieId: kat?.typ === t ? f.kategorieId : standardKategorie(stamm.kategorien, t) };
+                // Zahlungsweg nur mitwechseln, solange er noch der Vorgabe der bisherigen Art entspricht
+                const zahlungsart = f.zahlungsart === standardZahlungsweg(f.typ) ? standardZahlungsweg(t) : f.zahlungsart;
+                return { ...f, typ: t, wer, zahlungsart, kategorieId: kat?.typ === t ? f.kategorieId : standardKategorie(stamm.kategorien, t) };
               });
               setKatVorschlag(false);
               setFehler({});
@@ -807,7 +824,7 @@ const Fehler = ({ text }: { text?: string }) =>
 
 const TIP_DATUM = 'Für die EÜR zählt der Tag, an dem das Geld geflossen ist (Zufluss-/Abflussprinzip, § 11 EStG) – nicht das Rechnungsdatum.';
 const TIP_RECHNUNGSDATUM = 'Datum der Rechnung. Die Einnahme wird erst erfasst, wenn das Geld eingeht – dann zählt der Zahlungstag (§ 11 EStG).';
-const TIP_NR = 'Bei Ausgaben die Rechnungs- oder Bonnummer des Geschäfts. Eigene Quittungen und Rechnungen (QU-/RE-…) bekommen ihre Nummer beim Ausstellen.';
+const TIP_NR = 'Bei Ausgaben die Rechnungs- oder Bonnummer des Geschäfts. Bei Einnahmen ohne Beleg aus Kladdy z. B. die Nummer einer handschriftlichen Quittung. Quittungen und Rechnungen aus Kladdy (QU-/RE-…) bekommen ihre Nummer beim Ausstellen.';
 
 function FormularInhalt(props: InhaltProps) {
   const { form, stamm, zeile, sp, belege, nimmtBelege, fehler, katVorschlag, erkannt, set, fehlerWeg, onTyp, onKategorie, vorschlagen } = props;
@@ -819,8 +836,8 @@ function FormularInhalt(props: InhaltProps) {
   const ausgabe = typ === 'ausgabe';
   // „Offene Rechnung zuordnen“: Betrag, Text und Kunde kommen aus der Rechnung
   const zuordnen = weg === 'offen';
-  // Beleg-Nr. nur ohne eigenen Beleg (sonst vergibt der Beleg die Nummer)
-  const mitNr = weg === 'ohne';
+  // Beleg-Nr. nur ohne eigenen Beleg (sonst vergibt der Beleg die Nummer); bei neuen Einnahmen steht sie bei „Nur buchen“
+  const mitNr = weg === 'ohne' && !(typ === 'einnahme' && ertragBereich != null);
   const kats = stamm.kategorien.filter((k) => k.typ === typ);
   const kat = stamm.kategorien.find((k) => k.id === form.kategorieId);
   const cent = parseBetrag(form.betrag);
@@ -890,6 +907,8 @@ function FormularInhalt(props: InhaltProps) {
         </div>
       ) : null}
 
+      <div className="bu-spalten">
+      <div className="bu-spalte">
       <section className="bu-sec-betrag">
         <Seg
           className={`full ${ro ? 'bu-locked' : ''}`}
@@ -1016,7 +1035,7 @@ function FormularInhalt(props: InhaltProps) {
           {mitNr ? (
             <div className="field">
               <label className="field-label" htmlFor="bf-belegnummer" title={TIP_NR}>
-                Beleg-Nr.
+                {ausgabe ? 'Beleg-Nr.' : 'Nr. auf der Papierquittung'}
                 <span className="q" aria-hidden="true">
                   ?
                 </span>
@@ -1027,7 +1046,7 @@ function FormularInhalt(props: InhaltProps) {
                 className="input bu-nr-in"
                 autoComplete="off"
                 spellCheck={false}
-                placeholder="z. B. Bon 4711"
+                placeholder={ausgabe ? 'z. B. Bon 4711' : 'optional'}
                 value={form.belegnummer}
                 readOnly={ro}
                 onChange={(e) => set('belegnummer', e.target.value)}
@@ -1141,7 +1160,9 @@ function FormularInhalt(props: InhaltProps) {
           </details>
         ) : null}
       </section>
+      </div>
 
+      <div className="bu-spalte">
       {offenRechnung ? null : (
         <section>
           <h3>Bezahlt per</h3>
@@ -1158,20 +1179,22 @@ function FormularInhalt(props: InhaltProps) {
               );
             })}
           </div>
-          {form.zahlungsart === 'bar' && !ro && weg !== 'beleg' ? (
+          {form.zahlungsart === 'bar' && !ro && ausgabe ? (
             <p className="hint">Bargeld einzeln und zeitnah festhalten (§ 146 AO) – Bon bzw. Quittung aufheben.</p>
           ) : null}
         </section>
       )}
 
       <section>
-        <h3>{ausgabe ? 'Beleg' : 'Beleg zum Ertrag'}</h3>
+        <h3>{ausgabe ? 'Beleg' : 'Beleg zur Einnahme'}</h3>
         {ausgabe ? null : ertragBereich}
         <VorhandeneBelege liste={abgelegt} />
         {nimmtBelege && weg !== 'beleg' ? <VorgemerkteBelege belege={belege} wann={wann} /> : null}
         {nimmtBelege && weg !== 'beleg' ? (
           hatDateien ? (
             <BelegDropzone kompakt titel="Weiteren Beleg hierher ziehen oder klicken" text="" />
+          ) : !ausgabe && ertragBereich != null ? (
+            <BelegDropzone kompakt titel="Scan oder Datei anhängen (optional)" text="" />
           ) : (
             <BelegDropzone
               titel={ausgabe ? 'Beleg hierher ziehen' : 'Abrechnung oder Zahlungsnachweis hierher ziehen'}
@@ -1181,10 +1204,13 @@ function FormularInhalt(props: InhaltProps) {
         ) : null}
         {ausgabe && !ro && !hatDateien ? (
           <div className="bu-nobeleg">
-            <p className="hint warn">
-              <TriangleAlert />
-              Ohne Beleg fehlt der Nachweis fürs Finanzamt. Rechnung oder Kassenbon hierher ziehen.
-            </p>
+            {/* die Warnung erst, wenn ein Betrag da ist – im leeren Formular nur der Weg zum Eigenbeleg */}
+            {(cent ?? 0) > 0 ? (
+              <p className="hint warn">
+                <TriangleAlert />
+                Ohne Beleg fehlt der Nachweis fürs Finanzamt. Rechnung oder Kassenbon hierher ziehen.
+              </p>
+            ) : null}
             <div className="bu-nobeleg-links">
               <button type="button" className="link" title="Eigenbeleg mit diesen Angaben in der Beleg-Maske erstellen – „Buchen“ bucht die Ausgabe mit" onClick={onEigenbeleg}>
                 <FilePlus />
@@ -1206,6 +1232,8 @@ function FormularInhalt(props: InhaltProps) {
           </p>
         ) : null}
       </section>
+      </div>
+      </div>
     </>
   );
 }

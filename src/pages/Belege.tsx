@@ -2,25 +2,10 @@
  * Zeitraum Monat · Jahr · Gesamt nach Belegdatum (Offen und Suche über alle Zeiträume), Status-Menü am Badge, „Vorlagen“
  * und kleinem „Neu“-Menü mit den nächsten Nummern. Keine KPI-Kacheln, unten nur die Anzahl.
  * Optik und Verhalten wie referenz/prototyp/js/pages/belege.js (renderListe); Logik in lib/rechnungen.ts. */
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import {
-  ArrowRight,
-  Blocks,
-  Check,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  FileText,
-  Handshake,
-  Info,
-  Paperclip,
-  Printer,
-  Receipt,
-  Search,
-  Stamp,
-  type LucideIcon,
-} from 'lucide-react';
+import { ArrowLeftRight, ArrowRight, Blocks, Check, ChevronDown, ChevronLeft, ChevronRight, Clock, FileText, Handshake, Info, Paperclip, Printer, ReceiptEuro, Search, Stamp, TriangleAlert, type LucideIcon } from 'lucide-react';
+import { speichereQuelle } from '../lib/vorlagen/vorschau';
 import { pdfOeffnenFuer } from '../lib/belegaktionen';
 import { anzahlText } from '../lib/buchungen';
 import { erfassen } from '../lib/erfassen';
@@ -31,6 +16,7 @@ import {
   ART_NAME,
   LISTEN_ZEITRAEUME,
   REITER,
+  reiterAusAdresse,
   SORT_START,
   faelligText,
   filtere,
@@ -55,7 +41,7 @@ import { Ladeansicht, useLaden } from './einstellungen/Laden';
 
 export const ART_SYMBOL: Readonly<Record<ListenArt, LucideIcon>> = {
   rechnung: FileText,
-  quittung: Receipt,
+  quittung: ReceiptEuro,
   angebot: Handshake,
   eigenbeleg: Stamp,
   storno: FileText,
@@ -64,11 +50,11 @@ export const ART_SYMBOL: Readonly<Record<ListenArt, LucideIcon>> = {
 const zahl = (n: number) => new Intl.NumberFormat('de-DE').format(n);
 
 /* Reiter, Zeitraum und Sortierung überleben den Seitenwechsel (Modulvariablen wie im Prototyp); der Zeitraum beginnt
- * bei jedem Start mit dem aktuellen Monat */
+ * bei jedem Start mit dem aktuellen Jahr – die Nummernkreise zählen je Jahr (QU-2026-…), so steht die Liste lückenlos */
 let gemerkt: { reiter: Reiter; sortierung: Sortierung; modus: ListenZeitraumModus; anker: string } = {
   reiter: 'alle',
-  sortierung: { feld: 'nr', richtung: -1 },
-  modus: 'monat',
+  sortierung: { feld: 'datum', richtung: -1 },
+  modus: 'jahr',
   anker: heuteIso(),
 };
 
@@ -98,7 +84,7 @@ export default function Belege() {
     <Liste zeilen={zustand.daten.zeilen} naechste={zustand.daten.naechste} />
   ) : (
     <div className="page bl-list">
-      <Kopf naechste={{}} zeitraum={null} />
+      <Kopf naechste={{}} />
       <Ladeansicht zustand={zustand} icon={FileText} was="Rechnungen und Quittungen" erneut={erneut} />
     </div>
   );
@@ -118,8 +104,8 @@ interface ZeitraumSteuerung {
 }
 
 const NEU: readonly { art: Belegart; sub: string }[] = [
-  { art: 'quittung', sub: 'Einnahme mit Quittung erfassen' },
-  { art: 'rechnung', sub: 'Einnahme erfassen – bezahlt oder offen' },
+  { art: 'quittung', sub: 'Ausstellen und die Einnahme gleich buchen' },
+  { art: 'rechnung', sub: 'Mit Zahlungsziel – Einnahme, sobald bezahlt' },
   { art: 'angebot', sub: 'Für einen Kunden – noch keine Einnahme' },
   { art: 'eigenbeleg', sub: 'Originalbeleg einer Ausgabe fehlt' },
 ];
@@ -158,6 +144,17 @@ function NeuMenue({ naechste }: { naechste: Partial<Record<Belegart, string>> })
     else navigate(`/belege/neu?art=${art}`);
   };
 
+  // Blanko-Quittung: Vorlagen-Seite mit der Vorschau „Blanko“ (dort Drucken / PDF)
+  const blankoDrucken = () => {
+    setOffen(false);
+    try {
+      speichereQuelle(localStorage, 'quittung', 'blanko');
+    } catch {
+      /* ohne Speicher zeigt die Seite das Beispiel; „Blanko“ ist dort ein Klick */
+    }
+    navigate('/belege/vorlagen?art=quittung');
+  };
+
   const tasten = (e: KeyboardEvent<HTMLDivElement>) => {
     const liste = [...(box.current?.querySelectorAll<HTMLButtonElement>('.bl-mi') ?? [])];
     const i = liste.indexOf(document.activeElement as HTMLButtonElement);
@@ -172,7 +169,7 @@ function NeuMenue({ naechste }: { naechste: Partial<Record<Belegart, string>> })
       <button
         ref={knopf}
         type="button"
-        className="btn ghost bl-neu-btn"
+        className="btn-primary bl-neu-btn"
         aria-haspopup="menu"
         aria-expanded={offen}
         title="Neuer Beleg mit der nächsten laufenden Nummer"
@@ -182,7 +179,7 @@ function NeuMenue({ naechste }: { naechste: Partial<Record<Belegart, string>> })
         <ChevronDown />
       </button>
       <div className="bl-menu" role="menu" aria-label="Neuer Beleg">
-        <div className="bl-menu-head">Nächste Nummer</div>
+        <div className="bl-menu-head">Neuer Beleg</div>
         {NEU.map(({ art, sub }, i) => {
           const Icon = ART_SYMBOL[art];
           return (
@@ -199,16 +196,41 @@ function NeuMenue({ naechste }: { naechste: Partial<Record<Belegart, string>> })
             </div>
           );
         })}
-        <p className="bl-menu-foot">
-          <Info />
-          <span>Einnahmen ohne eigenen Beleg erfasst du über „+ Erfassen“ bei Ein- &amp; Ausgänge (⌘N).</span>
-        </p>
+        <div className="bl-menu-sep" role="separator" />
+        <div className="bl-menu-head">Zum Ausdrucken</div>
+        <button type="button" className="bl-mi" role="menuitem" tabIndex={-1} onClick={blankoDrucken}>
+          <Printer />
+          <span>
+            <b>Blanko-Quittung</b>
+            <small>Von Hand ausfüllen – mit Feld für die Buchungsnummer</small>
+          </span>
+          <span />
+        </button>
+        <div className="bl-menu-sep" role="separator" />
+        <div className="bl-menu-head">Ohne Beleg aus Kladdy</div>
+        <button
+          type="button"
+          className="bl-mi"
+          role="menuitem"
+          tabIndex={-1}
+          onClick={() => {
+            setOffen(false);
+            erfassen({ typ: 'einnahme' });
+          }}
+        >
+          <ArrowLeftRight />
+          <span>
+            <b>Nur buchen</b>
+            <small>Einnahme mit Buchungsnummer – Papierquittung oder Datei dazu</small>
+          </span>
+          <span />
+        </button>
       </div>
     </div>
   );
 }
 
-function Kopf({ naechste, zeitraum }: { naechste: Partial<Record<Belegart, string>>; zeitraum: ZeitraumSteuerung | null }) {
+function Kopf({ naechste, suche }: { naechste: Partial<Record<Belegart, string>>; suche?: ReactNode }) {
   return (
     <div className="page-head reveal" style={reveal(0)}>
       <div>
@@ -216,25 +238,10 @@ function Kopf({ naechste, zeitraum }: { naechste: Partial<Record<Belegart, strin
           <FileText />
           Rechnungen &amp; Quittungen
         </h1>
-        <p className="page-sub">Alle Belege mit laufender Nummer · es zählt das Belegdatum</p>
+        <p className="page-sub">Alle Belege mit Nummer, auch Angebote · es zählt das Belegdatum</p>
       </div>
       <div className="page-actions">
-        {zeitraum ? (
-          <div className={`period bl-zr ${zeitraum.aus ? 'aus' : ''}`} title={zeitraum.aus ? zeitraum.hinweis : undefined}>
-            <Seg options={LISTEN_ZEITRAEUME} value={zeitraum.modus} onChange={zeitraum.setModus} ariaLabel="Zeitraum" />
-            {zeitraum.modus !== 'gesamt' ? (
-              <div className="period-nav">
-                <button type="button" className="icon-btn sm" title="Vorheriger Zeitraum" aria-label="Vorheriger Zeitraum" disabled={!zeitraum.zurueck} onClick={() => zeitraum.blaettern(-1)}>
-                  <ChevronLeft />
-                </button>
-                <b aria-live="polite">{zeitraum.label}</b>
-                <button type="button" className="icon-btn sm" title="Nächster Zeitraum" aria-label="Nächster Zeitraum" disabled={!zeitraum.vor} onClick={() => zeitraum.blaettern(1)}>
-                  <ChevronRight />
-                </button>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
+        {suche}
         <Link className="btn ghost" to="/belege/vorlagen" title="Quittung & Rechnung aus Bausteinen gestalten">
           <Blocks />
           Vorlagen
@@ -245,10 +252,30 @@ function Kopf({ naechste, zeitraum }: { naechste: Partial<Record<Belegart, strin
   );
 }
 
+/** Zeitraum der Liste – steht direkt bei den Reitern, deren Zähler davon abhängen */
+function ZeitraumLeiste({ zeitraum }: { zeitraum: ZeitraumSteuerung }) {
+  return (
+    <div className={`period bl-zr ${zeitraum.aus ? 'aus' : ''}`} title={zeitraum.aus ? zeitraum.hinweis : undefined}>
+      <Seg options={LISTEN_ZEITRAEUME} value={zeitraum.modus} onChange={zeitraum.setModus} ariaLabel="Zeitraum" />
+      {zeitraum.modus !== 'gesamt' ? (
+        <div className="period-nav">
+          <button type="button" className="icon-btn sm" title="Vorheriger Zeitraum" aria-label="Vorheriger Zeitraum" disabled={!zeitraum.zurueck} onClick={() => zeitraum.blaettern(-1)}>
+            <ChevronLeft />
+          </button>
+          <b aria-live="polite">{zeitraum.label}</b>
+          <button type="button" className="icon-btn sm" title="Nächster Zeitraum" aria-label="Nächster Zeitraum" disabled={!zeitraum.vor} onClick={() => zeitraum.blaettern(1)}>
+            <ChevronRight />
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /* ---------- Liste ---------- */
 
 const SPALTEN: readonly { feld: SortFeld | null; label: string; klasse: string }[] = [
-  { feld: 'nr', label: 'Nr.', klasse: 'l' },
+  { feld: 'nr', label: 'Beleg-Nr. · Buchung', klasse: 'l' },
   { feld: null, label: 'Art', klasse: 'l' },
   { feld: 'kunde', label: 'Kunde', klasse: 'l' },
   { feld: null, label: 'Betreff', klasse: 'l bl-c-betreff' },
@@ -271,13 +298,13 @@ function Liste({ zeilen, naechste }: { zeilen: BelegZeile[]; naechste: Partial<R
   const waehleReiter = (r: Reiter) => {
     setReiter(r);
     if (r === 'offen') setSortierung({ feld: 'faellig', richtung: 1 });
-    else setSortierung((s) => (s.feld === 'faellig' ? { feld: 'nr', richtung: -1 } : s));
+    else setSortierung((s) => (s.feld === 'faellig' ? { feld: 'datum', richtung: -1 } : s));
   };
 
   // Adresse ?reiter=offen (Sprung aus der Auswertung bzw. der Seitenleiste) – übernehmen und wieder leeren
   useEffect(() => {
-    const r = params.get('reiter');
-    if (r === 'alle' || r === 'offen' || r === 'bezahlt') {
+    const r = reiterAusAdresse(params.get('reiter'));
+    if (r) {
       waehleReiter(r);
       setParams({}, { replace: true });
     }
@@ -290,13 +317,16 @@ function Liste({ zeilen, naechste }: { zeilen: BelegZeile[]; naechste: Partial<R
 
   const zr = listenZeitraum(modus, anker);
   const r = useMemo(() => filtere(zeilen, { reiter, q, zeitraum: zr, sortierung, heute: h }), [zeilen, reiter, q, zr?.von, zr?.bis, sortierung, h]); // eslint-disable-line react-hooks/exhaustive-deps
+  // überfällige Rechnungen, die filtere() bei der Standard-Sortierung vorne einreiht (Gruppenzeilen erklären das)
+  const angeheftet =
+    !q.trim() && (sortierung.feld === 'nr' || sortierung.feld === 'datum') && sortierung.richtung < 0 && (reiter === 'alle' || reiter === 'offen') ? r.zeilen.filter((z) => statusSchluessel(z, h) === 'ueberfaellig').length : 0;
   const erster = zeilen.reduce((m, z) => (z.datum && z.datum < m ? z.datum : m), h);
   const letzter = zeilen.reduce((m, z) => (z.datum && z.datum > m ? z.datum : m), h);
   const zeitraum: ZeitraumSteuerung = {
     modus,
     label: zr?.label ?? 'Gesamt',
     aus: r.ohneZeitraum,
-    hinweis: q.trim() ? 'Suche über alle Zeiträume' : 'alle offenen, unabhängig vom Zeitraum',
+    hinweis: 'Suche über alle Belege und Zeiträume',
     zurueck: !!zr && zr.von > erster,
     vor: !!zr && modus !== 'gesamt' && verschiebe(modus, anker, 1) <= letzter,
     setModus: (m) => {
@@ -316,7 +346,13 @@ function Liste({ zeilen, naechste }: { zeilen: BelegZeile[]; naechste: Partial<R
     if (reiter === 'offen')
       return (
         <EmptyState icon={Check} title="Nichts offen">
-          Alle Rechnungen bezahlt, nichts für Termine vorbereitet.
+          Alle Rechnungen sind bezahlt.
+        </EmptyState>
+      );
+    if (reiter === 'entwuerfe')
+      return (
+        <EmptyState icon={Check} title="Keine Entwürfe">
+          Für Termine vorbereitete Belege erscheinen hier, bis sie ausgestellt sind.
         </EmptyState>
       );
     if (zr)
@@ -339,46 +375,23 @@ function Liste({ zeilen, naechste }: { zeilen: BelegZeile[]; naechste: Partial<R
   const fussText = q.trim()
     ? `${zahl(nOffen)} ${nOffen === 1 ? 'Treffer' : 'Treffer'} · alle Zeiträume`
     : reiter === 'offen'
-      ? `${anzahlText(nOffen, 'offener Beleg', 'offene Belege')}${r.ueberfaellig ? ` · ${zahl(r.ueberfaellig)} überfällig` : ''} · unabhängig vom Zeitraum`
-      : `${anzahlText(nOffen, 'Beleg', 'Belege')} · ${zr ? zr.label : 'alle Zeiträume'}`;
+      ? `${anzahlText(nOffen, 'offene Rechnung', 'offene Rechnungen')} · ${zr ? zr.label : 'alle Zeiträume'}`
+      : reiter === 'entwuerfe'
+        ? `${anzahlText(nOffen, 'Entwurf', 'Entwürfe')} · ${zr ? zr.label : 'alle Zeiträume'}`
+        : `${anzahlText(nOffen, 'Beleg', 'Belege')} · ${zr ? zr.label : 'alle Zeiträume'}`;
 
   return (
     <div className="page bl-list">
-      <Kopf naechste={naechste} zeitraum={zeitraum} />
-      <section className="card flush bl-tablecard reveal" style={reveal(1)}>
-        <div className="bl-tabs">
-          <div className="bl-tabsl">
-            <Seg
-              className="tabs"
-              ariaLabel="Belege filtern"
-              value={reiter}
-              onChange={waehleReiter}
-              options={REITER.map((t) => ({
-                value: t.value,
-                label: (
-                  <>
-                    {t.label}
-                    <span className={`cnt ${t.value === 'offen' && r.ueberfaellig ? 'alarm' : ''}`} title={t.value === 'offen' && r.ueberfaellig ? `${r.ueberfaellig} überfällig` : undefined}>
-                      {zahl(r.reiter[t.value])}
-                    </span>
-                  </>
-                ),
-              }))}
-            />
-            {r.ohneZeitraum ? (
-              <span className="bl-zrhint">
-                <Info />
-                {zeitraum.hinweis}
-              </span>
-            ) : null}
-          </div>
+      <Kopf
+        naechste={naechste}
+        suche={
           <label className="bl-filter">
             <Search />
             <input
               className="input sm"
               type="search"
               value={q}
-              placeholder="Nr., Kunde, Betreff, Betrag …"
+              placeholder="Belege durchsuchen …"
               aria-label="Belege filtern"
               autoComplete="off"
               spellCheck={false}
@@ -392,7 +405,62 @@ function Liste({ zeilen, naechste }: { zeilen: BelegZeile[]; naechste: Partial<R
               }}
             />
           </label>
+        }
+      />
+      <section className="card flush bl-tablecard reveal" style={reveal(1)}>
+        <div className="bl-tabs">
+          <div className="bl-tabsl">
+            <Seg
+              className="tabs"
+              ariaLabel="Belege filtern"
+              value={reiter}
+              onChange={waehleReiter}
+              options={REITER.filter((t) => t.value !== 'entwuerfe' && (t.value !== 'angebote' || r.reiter.angebote > 0 || reiter === 'angebote')).map((t) => ({
+                value: t.value,
+                title: t.titel,
+                label: (
+                  <>
+                    {t.label}
+                    <span className="cnt">{zahl(r.reiter[t.value])}</span>
+                  </>
+                ),
+              }))}
+            />
+            <button
+              type="button"
+              className={`bl-entwuerfe ${reiter === 'entwuerfe' ? 'on' : ''}`}
+              aria-pressed={reiter === 'entwuerfe'}
+              title="Entwürfe und für Termine vorbereitete Belege – noch ohne Nummer, nicht im Belegregister"
+              onClick={() => waehleReiter(reiter === 'entwuerfe' ? 'alle' : 'entwuerfe')}
+            >
+              Entwürfe <span className="cnt">{zahl(r.reiter.entwuerfe)}</span>
+            </button>
+            <ZeitraumLeiste zeitraum={zeitraum} />
+            {r.ohneZeitraum ? (
+              <span className="bl-zrhint">
+                <Info />
+                {zeitraum.hinweis}
+              </span>
+            ) : null}
+          </div>
         </div>
+        {!r.ohneZeitraum && r.offenFrueher > 0 ? (
+          <div className="bl-hinweiszeile">
+            <button
+              type="button"
+              className={`bl-frueher ${r.ueberfaellig ? 'alarm' : ''}`}
+              title="Alle offenen Rechnungen zeigen, egal aus welchem Monat"
+              onClick={() => {
+                zeitraum.setModus('gesamt');
+                waehleReiter('offen');
+              }}
+            >
+              {r.ueberfaellig ? <TriangleAlert /> : <Clock />}
+              Außerdem offen aus früheren Zeiträumen: {r.offenFrueher === 1 ? '1 Rechnung' : `${zahl(r.offenFrueher)} Rechnungen`}
+              {r.ueberfaellig ? ` (${zahl(r.ueberfaellig)} überfällig)` : ''} · anzeigen
+            </button>
+          </div>
+        ) : null}
         <div className="table-wrap">
           <table className="fin-table bl-table">
             <thead>
@@ -420,7 +488,18 @@ function Liste({ zeilen, naechste }: { zeilen: BelegZeile[]; naechste: Partial<R
             </thead>
             <tbody>
               {r.zeilen.length ? (
-                r.zeilen.map((z) => (
+                r.zeilen.map((z, i) => (
+                  <Fragment key={z.id}>
+                  {angeheftet > 0 && i === 0 ? (
+                    <tr className="bl-gruppe alarm">
+                      <td colSpan={9}>Überfällig – zuerst gezeigt</td>
+                    </tr>
+                  ) : null}
+                  {angeheftet > 0 && i === angeheftet ? (
+                    <tr className="bl-gruppe">
+                      <td colSpan={9}>Weitere Belege, neueste zuerst</td>
+                    </tr>
+                  ) : null}
                   <Zeile
                     key={z.id}
                     z={z}
@@ -428,6 +507,7 @@ function Liste({ zeilen, naechste }: { zeilen: BelegZeile[]; naechste: Partial<R
                     oeffnen={() => navigate(`/belege/${z.id}`)}
                     aktion={(a) => statusAktionAusfuehren(a, z, navigate)}
                   />
+                  </Fragment>
                 ))
               ) : (
                 <tr>
@@ -444,11 +524,10 @@ function Liste({ zeilen, naechste }: { zeilen: BelegZeile[]; naechste: Partial<R
       {/* der Erfassen-Weg bleibt der eine: Einnahmen ohne eigenen Beleg über „+ Erfassen“ */}
       <p className="hint bl-erfassen-hint reveal" style={reveal(2)}>
         <Info />
-        Zahlungen ohne eigenen Beleg (z. B. Plattform-Auszahlungen) über{' '}
+        Zahlungen ohne eigenen Beleg (z. B. Plattform-Auszahlungen) erfasst du über{' '}
         <button type="button" className="link" onClick={() => erfassen({ typ: 'einnahme' })}>
           + Erfassen
         </button>
-        .
       </p>
     </div>
   );
@@ -477,9 +556,17 @@ function Zeile({ z, heute, oeffnen, aktion }: { z: BelegZeile; heute: string; oe
       onKeyDown={onKey}
     >
       <td className="l bl-nr">
-        <Link to={`/belege/${z.id}`} className={z.nummer ? '' : 'bl-draftnr'}>
-          {z.nummer ?? (z.termin_id != null ? 'Vorbereitet' : 'Entwurf')}
+        <Link to={`/belege/${z.id}`} className={z.nummer ? '' : 'bl-draftnr'} title={z.nummer ? undefined : 'Die Nummer wird beim Ausstellen vergeben'}>
+          {z.nummer ?? 'ohne Nr.'}
         </Link>
+        {z.buchung_nummer ? (
+          <small
+            className="bl-buchnr"
+            title={`Belegnummer ${z.nummer ?? ''} bekommt der Kunde. Unter der Buchungsnummer ${z.buchung_nummer} steht die Einnahme in Ein- & Ausgänge.`}
+          >
+            Buchung {z.buchung_nummer}
+          </small>
+        ) : null}
         {z.scan_beleg_id != null ? (
           <span className="bl-clip" title="Unterschriebenes Exemplar angehängt">
             <Paperclip />
