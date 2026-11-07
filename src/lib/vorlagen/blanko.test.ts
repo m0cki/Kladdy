@@ -3,29 +3,30 @@
 import { describe, expect, it } from 'vitest';
 import type { KeyValueStore } from '../settings';
 import type { Baustein } from './bausteine';
-import { BEISPIEL_FIRMA, BLANKO_ARTEN, beispielbeleg, blankobeleg, hatBlanko } from './beispiel';
-import { BELEG_PLATZHALTER, istEntwurf, luecken, platzhalterWerte } from './dokument';
+import { BEISPIEL_FIRMA, beispielbeleg, blankobeleg } from './beispiel';
+import { BELEGARTEN, BELEG_PLATZHALTER, istEntwurf, luecken, platzhalterWerte, type Belegart } from './dokument';
 import { sichtbareZeilen } from './firmenblock';
 import { ersetzteZeilen } from './formatierung';
 import { pflichtCheck, pflichtOk } from './pflicht';
-import { standardVorlage } from './standard';
+import { STANDARD_VORLAGEN, standardVorlage } from './standard';
 import { VORSCHAU_KEY, ladeQuellen, speichereQuelle } from './vorschau';
 
-const blanko = (art: 'quittung' | 'eigenbeleg' = 'quittung') => blankobeleg(art, BEISPIEL_FIRMA, 'klein');
+const blanko = (art: Belegart = 'quittung') => blankobeleg(art, BEISPIEL_FIRMA, 'klein');
 
 describe('Blanko-Dokument', () => {
-  it('nur Quittung und Eigenbeleg, ohne Nummer, aber kein Entwurf (kein Wasserzeichen)', () => {
-    expect(BLANKO_ARTEN).toEqual(['quittung', 'eigenbeleg']);
-    expect(hatBlanko('rechnung')).toBe(false);
-    expect(hatBlanko('angebot')).toBe(false);
-    const d = blanko();
-    expect(d.nummer).toBeNull();
-    expect(d.blanko).toBe(true);
-    expect(istEntwurf(d)).toBe(false);
-    expect(istEntwurf({ ...d, blanko: false })).toBe(true);
-    expect(d.positionen).toEqual([]);
-    expect(d.kunde).toBeNull();
-    expect(d.zahlungsweg).toBeNull();
+  it('alle vier Arten, ohne Nummer, aber kein Entwurf (kein Wasserzeichen)', () => {
+    for (const art of BELEGARTEN) {
+      const d = blanko(art);
+      expect(d.art).toBe(art);
+      expect(d.nummer).toBeNull();
+      expect(d.blanko).toBe(true);
+      expect(istEntwurf(d)).toBe(false);
+      expect(istEntwurf({ ...d, blanko: false })).toBe(true);
+      expect(d.positionen).toEqual([]);
+      expect(d.kunde).toBeNull();
+      expect(d.zahlungsweg).toBeNull();
+      expect(d.faellig_am).toBeNull();
+    }
   });
 
   it('Platzhalter: Werte des Belegs leer (auch kein „Barverkauf“), Firmendaten bleiben', () => {
@@ -69,10 +70,10 @@ describe('Pflichtangaben-Check im Blanko-Formular', () => {
   const punkt = (l: ReturnType<typeof pflichtCheck>, label: string) => l.find((p) => p.label === label)!;
 
   it('Standardvorlagen: nichts rot, Werte offen „von Hand“', () => {
-    for (const art of BLANKO_ARTEN) {
-      for (const design of art === 'quittung' ? ['klassisch', 'formular'] : ['klassisch']) {
-        const l = pflichtCheck(blanko(art as 'quittung' | 'eigenbeleg'), standardVorlage(art, design));
-        expect(pflichtOk(l), `${art}/${design}`).toBe(true);
+    for (const art of BELEGARTEN) {
+      for (const { schluessel: id } of STANDARD_VORLAGEN[art]) {
+        const l = pflichtCheck(blanko(art), standardVorlage(art, id));
+        expect(pflichtOk(l), `${art}/${id}`).toBe(true);
       }
     }
     const l = pflichtCheck(blanko(), standardVorlage('quittung'));
@@ -85,6 +86,10 @@ describe('Pflichtangaben-Check im Blanko-Formular', () => {
     expect(punkt(l, 'Steuernummer')).toMatchObject({ ok: true, hint: BEISPIEL_FIRMA.steuernummer });
     const e = pflichtCheck(blanko('eigenbeleg'), standardVorlage('eigenbeleg'));
     expect(punkt(e, 'Grund für den Eigenbeleg')).toMatchObject({ ok: true, offen: true });
+    const r = pflichtCheck(blanko('rechnung'), standardVorlage('rechnung'));
+    for (const label of ['Name und Anschrift (Kunde)', 'Ausstellungsdatum', 'Menge und Art der Leistung', 'Fortlaufende Nummer', 'Leistungsdatum / -zeitraum'])
+      expect(punkt(r, label), label).toMatchObject({ ok: true, offen: true });
+    expect(pflichtCheck(blanko('angebot'), standardVorlage('angebot'))).toEqual([]);
   });
 
   it('prüft weiter, was die Vorlage druckt, und die Firmendaten', () => {
@@ -108,19 +113,10 @@ describe('Vorschau-Quelle „Blanko“', () => {
     return { data, getItem: (k) => data[k] ?? null, setItem: (k, v) => void (data[k] = v) };
   };
 
-  it('gemerkt für Quittung und Eigenbeleg', () => {
-    const s = speicher();
-    speichereQuelle(s, 'quittung', 'blanko');
-    speichereQuelle(s, 'eigenbeleg', 'blanko');
-    expect(ladeQuellen(s)).toEqual({ rechnung: 'beispiel', quittung: 'blanko', angebot: 'beispiel', eigenbeleg: 'blanko' });
-    speichereQuelle(s, 'quittung', 'beleg');
-    expect(ladeQuellen(s).quittung).toBe('beleg');
-  });
-
-  it('nicht für Rechnung und Angebot (weder gelesen noch gemerkt)', () => {
-    const s = speicher({ [VORSCHAU_KEY]: JSON.stringify({ quelle: { rechnung: 'blanko', angebot: 'blanko' } }) });
-    expect(ladeQuellen(s).rechnung).toBe('beispiel');
-    expect(ladeQuellen(s).angebot).toBe('beispiel');
-    expect(speichereQuelle(s, 'rechnung', 'blanko').rechnung).toBe('beispiel');
+  it('Standard und gemerkt für alle Arten', () => {
+    const s = speicher({ [VORSCHAU_KEY]: JSON.stringify({ quelle: { rechnung: 'blanko', angebot: 'beleg' } }) });
+    expect(ladeQuellen(s)).toEqual({ rechnung: 'blanko', quittung: 'blanko', angebot: 'beleg', eigenbeleg: 'blanko' });
+    expect(speichereQuelle(s, 'angebot', 'blanko').angebot).toBe('blanko');
+    expect(JSON.parse(s.data[VORSCHAU_KEY]).quelle.angebot).toBe('blanko');
   });
 });

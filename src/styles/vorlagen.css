@@ -224,8 +224,8 @@
 .vl-pflicht { display: inline-flex; align-items: center; gap: 3px; margin-left: 8px; padding: 0 7px; border-radius: 99px; font-size: .72rem; font-weight: 650;
   background: var(--surface-3); color: var(--text-2); vertical-align: 1px; }
 .vl-pflicht .ic { width: 11px; height: 11px; }
-.vl-pflicht-hinweis { display: inline-flex; align-items: center; gap: 5px; font-size: .78rem; color: var(--text-2); font-weight: 600; }
-.vl-pflicht-hinweis .ic { width: 13px; height: 13px; }
+.vl-pflicht-hinweis { display: flex; align-items: flex-start; gap: 6px; margin: 0; font-size: .78rem; line-height: 1.4; color: var(--text-2); }
+.vl-pflicht-hinweis .ic { flex: none; width: 13px; height: 13px; margin-top: 2px; }
 /* beschriftete Aktionen des gewählten Bausteins */
 .vl-karte-aktionen { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
 .vl-karte-aktionen .btn.sm { height: 32px; padding: 0 10px; font-size: .8rem; gap: 5px; }

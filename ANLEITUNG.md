@@ -19,7 +19,7 @@
 > | `js/qr.js` | GiroCode/EPC-Payload + QR-Encoder (gegen zwei unabhängige Decoder getestet) |
 > | `js/formula.js` | Formel-Sprache: Grammatik, Funktionen, Fehlermeldungen (mit 4.600 Testfällen geprüft) |
 > | `js/beleg.js` | Regeln der Belegerkennung (Betrag, Datum, Geschäft, Nummer, Kategorie) |
-> | `js/pages/*.js` | jede Ansicht: `buchungen.js` (Ein- & Ausgänge + Erfassen-Schublade), `termine.js` (Termine + Termin-Schublade), `belege.js` (Rechnungen & Quittungen + Maske, enthält die Bausteine `App.sheet.BLOCKS`), `vorlagen.js`, `kunden.js`, Auswertung: `ueberblick.js`, `liquiditaet.js`, `kennzahlen.js`, `steuer.js` |
+> | `js/pages/*.js` | jede Ansicht: `buchungen.js` (Ein- & Ausgänge + Erfassen-Schublade), `termine.js` (Termine + Termin-Schublade), `belege.js` (Belege + Maske, enthält die Bausteine `App.sheet.BLOCKS`), `vorlagen.js`, `kunden.js`, Auswertung: `ueberblick.js`, `liquiditaet.js`, `kennzahlen.js`, `steuer.js` |
 > | `../beispiel-belege/*.pdf` | Test-PDFs zum Ausprobieren von Drag & Drop |
 > | `../download-seite/` | fertige Download-Webseite (GitHub Pages) mit Installationsanleitung, Impressum- und Datenschutz-Muster (§3.2) |
 >
@@ -92,7 +92,7 @@ Das Menü hat genau fünf Punkte (alle im Prototyp zu sehen):
 |---|---|
 | **Ein- & Ausgänge** (Startseite) | ruhige Liste aller geschäftlichen Zahlungen (Datum · Beleg-Nr. · Beschreibung + Kunde/Geschäft · Kategorie · Zahlungsweg · Betrag), Filter, Suche. **Beleg-PDF aufs Fenster ziehen ⇒ Erfassen-Schublade öffnet sich vorausgefüllt** |
 | **Termine** | Kundentermine (Agenda), auf Wunsch mit **vorbereiteter Quittung**; nach dem Termin abhaken, dann „Quittung ausstellen“ über die Erfassen-Schublade; bei Absage wird die Vorbereitung verworfen |
-| **Rechnungen & Quittungen** | Liste aller Belege nach laufender Nummer (Filter Alle · Offen · Bezahlt, Zeitraum Monat · Quartal · Jahr · Gesamt, Status per Klick aufs Badge), **Eingabemaske mit Live-Vorschau**, Pflichtangaben-Check, **GiroCode (QR)** auf der Rechnung, **Drucken / PDF**; Button **Vorlagen** führt zum **Baukasten** (Bausteine hinzufügen, entfernen, sortieren, einstellen; LaTeX nur als Experten-Ansicht) |
+| **Belege** | Liste aller Belege nach laufender Nummer (Filter Alle · Offen · Bezahlt, Zeitraum Monat · Quartal · Jahr · Gesamt, Status per Klick aufs Badge), **Eingabemaske mit Live-Vorschau**, Pflichtangaben-Check, **GiroCode (QR)** auf der Rechnung, **Drucken / PDF**; Button **Vorlagen** führt zum **Baukasten** (Bausteine hinzufügen, entfernen, sortieren, einstellen; LaTeX nur als Experten-Ansicht) |
 | **Kunden** | jeder Kunde einer Quittung/Rechnung, mit **Verlauf**: wann man dort war, was gemacht wurde, Betrag, Beleg; Notiz („Hund im Garten“), Kontaktdaten. Keine Lieferanten |
 | **Auswertung** | **großer Umschalter** mit vier Reitern: **Überblick** (Status, Kennzahlen des Zeitraums, Diagramme, angeheftete Kennzahlen) · **Liquidität** (was in 30/60/90 Tagen rein- und rausgeht) · **Kennzahlen** (eigene Formeln, z. B. `TEILEN(GEWINN(); EINNAHMEN(); 0)`) · **Steuer & Export** (EÜR, Wareneingangsbuch, Kleinunternehmer-Check, CSV/PDF-Export) |
 | ⚙ **Einstellungen** (nur oben rechts) | Beleg bei Einnahmen (Quittung oder Rechnung), Firmendaten, Steuerstatus, Nummernkreise, Steuer-Kennwerte pro Jahr, Darstellung (Hell/Dunkel/System, Themes wie PowerAnalytic), Daten & Backup |
@@ -492,7 +492,7 @@ kladdy/
 │  │  │      Switch · Drawer · Toast · Skeleton · Dropzone · Progress · Tooltip · EmptyState
 │  │  ├─ charts/ BarChart · AreaChart · Donut · Sparkline · ChartTip · Legend
 │  │  └─ ErfassenDrawer.tsx     ← der EINE Erfassen-Weg (Knopf bei Ein- & Ausgänge, ⌘N, Datei-Drop)
-│  ├─ pages/ EinAusgaenge (Start) · Termine · Belege (Rechnungen & Quittungen) · BelegEditor · Vorlagen ·
+│  ├─ pages/ EinAusgaenge (Start) · Termine · Belege · BelegEditor · Vorlagen ·
 │  │         Kunden · auswertung/ Ueberblick · Liquiditaet · Kennzahlen · Steuer
 │  ├─ lib/
 │  │  ├─ db.ts · queries/*.ts
@@ -687,7 +687,7 @@ Regeln:
   überall) bzw. per Datei-Drop erfasst. Keine zweiten Erfassen-Knöpfe – auch nicht in der Kopfzeile, wo er z. B. bei Terminen
   fehl am Platz wäre –, keine Schnellerfassungs-Zeilen in Listen. Andere Stellen dürfen die Erfassen-Schublade
   nur *vorbelegt öffnen* (z. B. „Neuen Auftrag erfassen“ beim Kunden), aber keinen eigenen Erfassen-Weg haben.
-- **Statistik nur in der Auswertung.** Listen (Ein- & Ausgänge, Rechnungen & Quittungen, Kunden) zeigen keine KPI-Kacheln oder
+- **Statistik nur in der Auswertung.** Listen (Ein- & Ausgänge, Belege, Kunden) zeigen keine KPI-Kacheln oder
   Summenzeilen, höchstens die Anzahl der Einträge.
 - **Keine Konten.** Statt Kontoständen gibt es je Zahlung den Zahlungsweg (Bar · Überweisung/Karte · PayPal), siehe §2.8.
 - **Laufende Nummern** für alles, was man selbst ausstellt (Quittung QU-JJJJ-NNN, Rechnung RE-JJJJ-NNN, Angebot AN-…, Eigenbeleg EB-…).
@@ -695,8 +695,8 @@ Regeln:
 
 ### 6.1 Seitenleiste (272 px, einklappbar auf 76 px)
 Nur Navigation, genau **fünf Einträge** (Icon + Name, aktiver Eintrag `accent-soft` + 2-px-Akzentkante links):
-**Ein- & Ausgänge** (Zähler „3“ = ohne Beleg) · **Termine** (Zähler = heute, rot = nachzutragen bzw. Beleg fehlt) · **Rechnungen & Quittungen** (roter Zähler = überfällig) · **Kunden** · **Auswertung**.
-Unterseiten markieren ihren Menüpunkt mit (Beleg-Maske und Vorlagen → Rechnungen & Quittungen; Liquidität, Kennzahlen,
+**Ein- & Ausgänge** (Zähler „3“ = ohne Beleg) · **Termine** (Zähler = heute, rot = nachzutragen bzw. Beleg fehlt) · **Belege** (roter Zähler = überfällig) · **Kunden** · **Auswertung**.
+Unterseiten markieren ihren Menüpunkt mit (Beleg-Maske und Vorlagen → Belege; Liquidität, Kennzahlen,
 Steuer & Export → Auswertung). Keine Konten, keine Monatsbilanz, keine Liste offener Posten in der Seitenleiste.
 **Eingeklappt** nur die Icons, **mittig** (Beschriftung nimmt dann keinen Platz mehr ein: `flex: 0 0 0`), Zähler als kleines
 Bläschen oben rechts am Icon, Name als Tooltip.
@@ -747,7 +747,7 @@ Nummer ausgestellt statt ein neuer angelegt – im Prototyp heißt der Kunden-Pa
      („erhält Nr. QU-2026-105“). Ein dezenter Hinweis bei Quittung + Bar: „Will der Kunde die Arbeitskosten absetzen
      (§ 35a)? Dann Rechnung – absetzbar nur bei Überweisung.“ Speichern legt Beleg **und** Einnahme in einer Transaktion an
      und verknüpft beide (Toast „Einnahme gespeichert · QU-2026-105 erstellt“ mit „Beleg öffnen“). Eine „noch offene“
-     Rechnung erscheint unter Rechnungen & Quittungen → Offen; die Einnahme entsteht erst beim Zahlungseingang.
+     Rechnung erscheint unter Belege → Offen; die Einnahme entsteht erst beim Zahlungseingang.
    - **Schritt 2 (optional):** „Unterschriebenes Exemplar anhängen“ – Scan/Foto ergänzt den Beleg (`scan_beleg_id`), ersetzt ihn nicht.
 7. Speichern (⌘↩), „Speichern & neu“ (⇧⌘↩). Toast mit Rückgängig.
 
@@ -772,7 +772,7 @@ Kundentermine planen und dazu auf Wunsch schon die **Quittung (oder Rechnung) vo
   („Quittung vorbereitet“ bzw. nach dem Termin „QU-2026-096 ✓“).
 - **Termin-Schublade:** Kunde (Vorschläge; neuer Name legt einen Kunden an), Datum, von–bis, Adresse, Leistung, geschätzter
   Betrag, Notiz, **„Beleg vorbereiten: Quittung | Rechnung | Keinen“** (Vorauswahl: Einstellung „Beleg bei Einnahmen“).
-- **Vorbereiteter Beleg = Entwurf ohne Nummer** (`rechnungen.termin_id`). Er steht unter Rechnungen & Quittungen → **Offen**
+- **Vorbereiteter Beleg = Entwurf ohne Nummer** (`rechnungen.termin_id`). Er steht unter Belege → **Offen**
   als „Vorbereitet · Termin 14.10.“ Die **Nummer wird erst beim Ausstellen** vergeben (GoBD: keine Lücken).
 - **Abhaken und Beleg sind zwei Schritte** (erledigt ≠ bezahlt; abends mehrere Termine schnell abhaken):
   1. **„✓ Erledigt“** (nur für heute und Vergangenes) markiert nur den Termin – keine Navigation, Toast mit „Quittung
@@ -793,7 +793,7 @@ Kundentermine planen und dazu auf Wunsch schon die **Quittung (oder Rechnung) vo
 - **In der Mac-App zusätzlich:** Termin in den **Apple Kalender** übernehmen (EventKit; im Prototyp als `.ics`-Download) und
   eine Mitteilung am Morgen des Termins (Phase 7).
 
-### 6.6 Rechnungen & Quittungen
+### 6.6 Belege
 - **Kopf:** Titel, rechts der Zeitraum, **„Vorlagen“** (⇒ Baukasten §7) und ein kleines **„Neu“-Menü**, das die nächsten Nummern zeigt:
   Quittung · QU-2026-105 und Rechnung · RE-2026-015 (beide öffnen die **Erfassen-Schublade** mit vorgewähltem Beleg – es gibt
   keinen zweiten Weg), Angebot · AN-… und Eigenbeleg · EB-… (öffnen direkt die Maske). Keine KPI-Kacheln.
@@ -812,7 +812,7 @@ Kundentermine planen und dazu auf Wunsch schon die **Quittung (oder Rechnung) vo
   Einnahme wieder heraus – in der App per Storno-Buchung, mit Protokoll), Quittung ist immer bezahlt (nur Stornieren;
   „als Rechnung neu ausstellen“ für Verwechslungen), Angebot Offen · Angenommen · Abgelehnt, Eigenbeleg nur Stornieren.
   Ein versehentlicher Haken ist so jederzeit umkehrbar. Nummer, Datum und Beträge bleiben unverändert; Storniert ist endgültig (GoBD).
-- **Eine Maske für alles** (`#/beleg/…`): Art-Umschalter (Rechnung · Quittung · Angebot · Eigenbeleg), Vorlagen-Auswahl, links
+- **Eine Maske für alles** (`#/beleg/…`): Art-Umschalter (Quittung · Rechnung · Angebot · Eigenbeleg), Vorlagen-Auswahl, links
   das Formular (Kunde mit Vorschlägen aus den Kunden, Datum, Leistungszeitraum, Zahlungsziel ⇒ Fälligkeit, Betreff, Einleitung,
   **Positionen** mit Ziehen zum Umsortieren, Schlusstext), rechts die **Live-Papiervorschau** (skaliert auf die Spaltenbreite).
   „Drucken / PDF“ druckt **nur** das Blatt in Originalgröße (A4 hochkant bzw. A5 quer); in der Mac-App erzeugt Tectonic das
@@ -833,7 +833,7 @@ Kundentermine planen und dazu auf Wunsch schon die **Quittung (oder Rechnung) vo
   (Prototyp: `prototyp/js/qr.js`, gegen zwei unabhängige Decoder getestet).
 
 ### 6.7 Vorlagen (Baukasten) → siehe §7
-Erreichbar über den Button „Vorlagen“ auf Rechnungen & Quittungen (kein eigener Menüpunkt), mit Rücklink.
+Erreichbar über den Button „Vorlagen“ auf Belege (kein eigener Menüpunkt), mit Rücklink.
 
 ### 6.8 Kunden
 Wofür: sehen, **wie oft und wann** man bei einem Kunden war und **was gemacht wurde**. Keine Lieferanten (Geschäfte bei Ausgaben
@@ -1068,33 +1068,40 @@ kursiv oder unterstrichen setzen (`src/lib/vorlagen/formatierung.ts`).
   Schreibmarke ein.
 
 **Seite „Vorlagen“** (siehe Prototyp `#/vorlagen`):
-- Art-Umschalter Rechnung · Quittung · Angebot · Eigenbeleg.
+- Art-Umschalter Quittung · Rechnung · Angebot · Eigenbeleg; ohne `?art=` startet die Seite mit der Quittung (danach
+  die zuletzt gewählte Art).
 - **Links:** Bausteinliste mit Griff zum Ziehen, Augen-Symbol (ausblenden), × (entfernen) und „+ Baustein hinzufügen“
   (Palette mit allen passenden Bausteinen). Darunter die Einstellungen des gewählten Bausteins mit Platzhalter-Chips zum
   Einfügen und Formatierung (siehe oben).
+  Bausteine, ohne die eine Pflichtangabe fehlen würde, tragen den Hinweis **„Pflichtangabe“** (Tooltip bzw. in der
+  Einstellungskarte: welche Angabe sie drucken). Das ist nur ein Hinweis – jeder Baustein lässt sich ausblenden und
+  entfernen; was dann fehlt, zeigt der Pflichtangaben-Check.
   Darunter der **Pflichtangaben-Check** (§ 34a UStDV): Entfernt man z. B. den § 19-Hinweis, wird das sofort rot markiert.
 - **Rechts:** Live-Vorschau auf Papier. Klick auf einen Bereich im Blatt wählt den Baustein aus, Klick auf einen Text
-  bearbeitet ihn direkt (siehe Formatierung). Vorschau mit Beispieldaten
-  oder einem echten Beleg, bei Quittung und Eigenbeleg auch „Blanko“ (siehe unten). Knopf „PDF“.
-- **Blanko-Formular zum Ausfüllen von Hand** (Quittung und Eigenbeleg): Umschalter „Beispiel · Letzter Beleg · Blanko“
-  über der Vorschau (immer da, „Letzter Beleg“ nur, wenn es einen gibt; je Art gemerkt, `kladdy.vorlagen.v1`). Gedacht
-  zum Ausdrucken und Ausfüllen mit dem Stift; Rechnung und Angebot (Positionen, Zahlungsaufforderung) bieten es nicht an.
+  bearbeitet ihn direkt (siehe Formatierung). Vorschau als Blanko-Formular (Standard), mit Beispieldaten oder mit einem
+  echten Beleg (siehe unten). Knopf „PDF“.
+- **Blanko-Formular zum Ausfüllen von Hand** (alle vier Arten): Umschalter „Blanko · Beispiel · Letzter Beleg“
+  über der Vorschau (immer da, „Letzter Beleg“ nur, wenn es einen gibt). Die Seite startet immer mit **Blanko**;
+  „Beispiel“ (Musterdaten zum Anschauen) wird nicht gemerkt, „Letzter Beleg“ je Art schon (`kladdy.vorlagen.v1`).
+  Gedacht zum Ausdrucken und Ausfüllen mit dem Stift.
   - **Gedruckt wie immer:** alles aus den Firmendaten (Firmenkopf, Kopf mit Logo, Absenderzeile, Fußzeile, Steuernummer,
     Inhaber, Anschrift), Titel, Steuerhinweis (§ 19), Freitexte und die Standardtexte der Art (`{schlusstext}` =
-    § 14b-Hinweis). `{art}` bleibt „Quittung“ bzw. „Eigenbeleg“.
+    § 14b-Hinweis). `{art}` bleibt „Quittung“, „Rechnung“ usw.
   - **Schreiblinien statt Werten:** Quittungsangaben „Kacheln“ = Bezeichnung, darunter eine Linie über die Breite der
     Kachel bzw. Zeile (7 mm hoch, Betrag mit „€“ dahinter); „Formular“ = „Datum: ___ | Nr.: ___“, „Erhalten von: ___“
     usw., Linie bis zum Zeilenende. Zahlungsart: alle Kästchen leer (Kacheln: kleiner, darf umbrechen). Die Schalter der
     Quittungsangaben gelten weiter. Eigenbeleg-Angaben ebenso (Grund als Linie, ohne „Gebucht als“). Anschrift &
     Belegdaten: drei Linien für den Empfänger, rechts kurze Linien; Positionen: vier leere Zeilen; Gesamtbetrag und
-    Betrag in Worten: Linie. Platzhalter mit Werten des Belegs (`{kunde}`, `{nr}`, `{datum}`, `{leistungsdatum}`,
+    Betrag in Worten: Linie; Zahlung (Rechnung): Bankverbindung gedruckt, Betrag und Verwendungszweck als kurze Linie,
+    kein GiroCode. Platzhalter mit Werten des Belegs (`{kunde}`, `{nr}`, `{datum}`, `{leistungsdatum}`,
     `{faellig}`, `{summe}`, `{betrag_worte}`, `{betreff}`, `{zahlungsziel}`) werden eine kurze Linie (30 mm), z. B.
     „Nr. ___“ im Titel; eine Firmenkopf-Zeile mit so einem Platzhalter bleibt stehen.
   - **Unterschrift:** „Ort, Datum“ bleibt leer (auch mit „vorausfüllen“), die Linien bleiben.
   - **Kein Beleg:** kein Wasserzeichen, kein „Entwurf“, keine Nummer, nichts gespeichert oder abgelegt (GoBD: Nummern
-    erst beim Ausstellen). PDF heißt `Kladdy-Blanko-Quittung.pdf`. Unter der Vorschau ein Hinweis: von Hand
+    erst beim Ausstellen). PDF heißt `Kladdy-Blanko-<Art>.pdf`. Unter der Vorschau ein Hinweis: von Hand
     ausgefüllte Quittungen trotzdem buchen (Durchschlag oder Kopie aufbewahren, Einnahme über „+ Erfassen“), beim
-    Eigenbeleg die Ausgabe.
+    Eigenbeleg die Ausgabe; eine Rechnung von Hand bekommt eine eigene fortlaufende Nummer, die beim Buchen der Einnahme
+    als Beleg-Nr. eingetragen wird.
   - **Pflichtangaben-Check:** prüft weiter, ob die Vorlage jede Angabe druckt, und die Firmendaten; Werte des Belegs
     gelten als offen („wird von Hand eingetragen“, Nummer „von Hand fortlaufend eintragen“, Kunde „Anschrift Pflicht
     über 250 €“). Fußzeile „Geprüft für die Blanko-Vorlage (Werte werden von Hand eingetragen)“.
@@ -1759,7 +1766,7 @@ Easing: `--ease cubic-bezier(.2,.8,.2,1)`, federnd `--spring cubic-bezier(.34,1.
 9. Plus/Minus nie nur über Farbe, immer auch ▲/▼ und Vorzeichen.
 
 ### 9.7 Icons
-`lucide-react`, 18 px, `strokeWidth={1.8}`. Vorschläge: Ein- & Ausgänge `ArrowLeftRight`, Termine `CalendarDays`, Rechnungen & Quittungen `FileText`,
+`lucide-react`, 18 px, `strokeWidth={1.8}`. Vorschläge: Ein- & Ausgänge `ArrowLeftRight`, Termine `CalendarDays`, Belege `FileText`,
 Vorlagen `Blocks`, Kunden `Users`, Auswertung `ChartColumn` (Reiter: Überblick `LayoutDashboard`, Liquidität `Waves`, Kennzahlen
 `Sigma`, Steuer & Export `BookOpen`), Beleg `Paperclip`, Bar `Banknote`, Überweisung `Landmark`, PayPal `Wallet`, Quittung `ReceiptEuro` (keine Dollar-Symbole)
 (oder eigenes „P“), Festgeschrieben `Lock`, Einstellungen `Settings`, Seitenleiste `PanelLeft`.
@@ -1832,7 +1839,7 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
      `src/lib/queries/auswertung.ts` (alle Buchungen in einer Abfrage). Ein- & Ausgänge übernimmt Filter und Zeitraum
      aus der Adresse (`listenVorgabe` in `lib/buchungen.ts`). „Meine Kennzahlen“ folgen mit Phase 4; die Pillen
      Kleinunternehmer und offene Rechnungen zeigen bis Phase 5 bzw. 3 auf die Platzhalter von Steuer & Export bzw.
-     Rechnungen & Quittungen
+     Belege
   3. Auswertung › Liquidität (§6.9.2) – **erledigt (PR #16)**: Modell `src/lib/liquiditaet.ts`
      (Port von `prognose()` aus dem Prototyp, Start heute bei 0 €: offene Rechnungen zur Fälligkeit + Ø Zahlungsverzug
      aus bezahlten Rechnungen, überfällige frühestens heute + 3; wiederkehrende Kosten ab `naechstes_datum` alle
@@ -1898,7 +1905,7 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
      mit Teil 6), Bausteine bearbeiten (erledigt mit Teil 5), Beleg-Maske (erledigt mit Teil 2); ein echter Tectonic-Lauf war beim Bauen nicht möglich
      (Tectonic nicht installiert) – beim ersten Testbeleg prüfen, ob PDF und HTML-Vorschau übereinstimmen.
      Keine Migration nötig
-  2. Rechnungen & Quittungen (§6.6) – **erledigt (Branch `phase-3-rechnungen`, auf Teil 5)**: Rust
+  2. Belege (§6.6) – **erledigt (Branch `phase-3-rechnungen`, auf Teil 5)**: Rust
      `src-tauri/src/rechnungen.rs` mit zehn Commands (`beleg_entwurf_speichern`/`_loeschen`, `beleg_ausstellen`,
      `beleg_bezahlt`, `beleg_offen`, `beleg_angebot_status`, `beleg_umwandeln`, `beleg_stornieren`, `beleg_pdf_ablegen`,
      `beleg_scan_anhaengen`), je eine Transaktion samt Protokoll. Ausstellen = Nummer aus dem Kreis der Art (Jahr des
@@ -1972,7 +1979,7 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
      und Termine im Verlauf führen zum Termin; eine zugeordnete Rechnung deckt im Verlauf ihren Termin ab. Befehlspalette
      „Termin eintragen“ ohne Phasen-Hinweis. Apple Kalender und Mitteilung am Morgen folgen mit Phase 7. Keine Migration.
      **Auf dem Mac prüfen:** Termin für einen neuen Namen mit Adresse und „Quittung“ eintragen ⇒ Kunde mit Adresse angelegt,
-     unter Rechnungen & Quittungen → Offen „Vorbereitet · Termin …“, keine Nummer verbraucht; Termin verschieben bzw.
+     unter Belege → Offen „Vorbereitet · Termin …“, keine Nummer verbraucht; Termin verschieben bzw.
      Leistung/Betrag ändern ⇒ Entwurf folgt, „Rechnung“ ⇒ Entwurf wird Rechnung, „Keinen“ ⇒ verworfen. Termin von heute
      „✓ Erledigt“ ⇒ Toast mit „Quittung ausstellen“ und Rückgängig (künftige Termine ohne Erledigt-Knopf); „Quittung
      ausstellen“ ⇒ Erfassen-Schublade vorbefüllt mit Hinweiszeile, Speichern ⇒ QU-Nummer am vorbereiteten Entwurf,
@@ -2145,6 +2152,15 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
   „PDF“ ⇒ `Kladdy-Blanko-Quittung.pdf` sieht aus wie die Vorschau, Linien lang genug zum Schreiben; Quittungsangabe
   „Datum“ aus ⇒ fehlt auch im Blanko, Pflichtangaben rot; Pflichtangaben sonst ohne Rot, Uhr-Symbol bei den
   Werten; Eigenbeleg ebenso; Rechnung und Angebot ohne „Blanko“; Auswahl bleibt nach Neustart je Art.
+- **Blanko für alle Arten, Quittung zuerst, Menüpunkt „Belege“** (§6.1, §7.0) – **erledigt (Branch
+  `vorlagen-blanko-standard`)**: Blanko auch für Rechnung und Angebot (leere Positionszeilen, Bankverbindung mit Linie
+  für Betrag und Verwendungszweck, kein GiroCode); die Vorschau startet immer mit „Blanko“, Reihenfolge „Blanko ·
+  Beispiel · Letzter Beleg“. Art-Reihenfolge überall Quittung · Rechnung · Angebot · Eigenbeleg, Vorlagen startet mit
+  der Quittung. Menüpunkt „Rechnungen & Quittungen“ heißt jetzt „Belege“ (Suche findet ihn weiter über „Rechnung“,
+  „Quittung“). Pflicht-Bausteine sind nur noch ein Hinweis („Pflichtangabe“, mit der Angabe), keiner ist gesperrt.
+  **Auf dem Mac prüfen:** Menü zeigt „Belege“; Vorlagen öffnet die Quittung in „Blanko“; Rechnung › Blanko mit vier
+  leeren Positionszeilen, „PDF“ ⇒ `Kladdy-Blanko-Rechnung.pdf` ohne GiroCode; „Beispiel“ wählen, Seite verlassen ⇒
+  wieder Blanko; Baustein mit „Pflichtangabe“ lässt sich ausblenden/entfernen, Pflichtangaben-Check wird rot.
 - **Offen aus Phase 1 (Teil 1+2):** Regelbesteuerung wirkt noch nicht auf Buchungen/Belege.
 - **Aus Phase 1 nachgeholt:** Kategorien bearbeiten, optionale Kategorien und EÜR-Zuordnung pro Jahr – **erledigt (Branch
   `kategorien-euer`, auf dem Ende der Phase-3-Kette)**: Migration `0008_kategorien` (Katalog Abschreibungen (AfA), Bewirtung 70 %, Geschenke, Homeoffice,
@@ -2215,7 +2231,7 @@ und Planposten überein · keine Statistik außerhalb der Auswertung.
 > Zahl-in-Worten mit Tests; Bausteine nach §7.0 mit je HTML-Darstellung (Vorschau) und LaTeX-Schnipsel (PDF), Standardvorlagen
 > für Rechnung/Quittung/Angebot/Eigenbeleg (Aussehen wie §7.5/§7.6 und Prototyp) – erzeugte Vorlagen **kompilieren und reparieren**;
 > Seite „Termine“ nach §6.5 (Agenda, Termin-Schublade, vorbereiteter Beleg als Entwurf ohne Nummer, Abhaken und danach „Quittung ausstellen“ über die Erfassen-Schublade mit `entwurf`,
-> Absagen ohne Storno, Seitenleisten-Zähler); Seite „Rechnungen & Quittungen“ nach §6.6 (Liste nach Nummern, Filter Alle · Offen ·
+> Absagen ohne Storno, Seitenleisten-Zähler); Seite „Belege“ nach §6.6 (Liste nach Nummern, Filter Alle · Offen ·
 > Bezahlt, Zeitraum Monat · Jahr · Gesamt, Status-Menü am Badge, „Neu“-Menü, Button „Vorlagen“);
 > Vorlagen-Seite als Baukasten (§7.0, Prototyp #/vorlagen); Beleg-Maske nach §6.6 (eine Maske für alle Arten, Live-Vorschau,
 > Pflichtangaben-Check, Finalisieren als Transaktion in Rust, Stornorechnung, „bezahlt“ ⇒ Einnahme, Quittung, Eigenbeleg mit
@@ -2301,7 +2317,7 @@ Installationsbefehl aus dem `README.md` installiert die neue Version.
   Jede Aktion genau einmal: Erfassen NUR über „+ Erfassen“ im Kopf von Ein- & Ausgänge
   (⌘N von überall) bzw. Datei-Drop – kein Erfassen-Knopf in der Kopfzeile; andere Stellen öffnen höchstens
   dieselbe Schublade vorbelegt. Statistik (KPI-Kacheln, Summen, Diagramme) NUR in der Auswertung, nie in Listen.
-  Menü: genau fünf Punkte (Ein- & Ausgänge · Termine · Rechnungen & Quittungen · Kunden · Auswertung). Keine Konten/Kontostände,
+  Menü: genau fünf Punkte (Ein- & Ausgänge · Termine · Belege · Kunden · Auswertung). Keine Konten/Kontostände,
   nur Zahlungsweg (bar/bank/paypal). Logo = Startseite; Einstellungen nur über ⚙.
 - Diagramme: eigene SVG-Komponenten nach §9.6. Plus/Minus nie nur über Farbe.
 - Formeln: eigener Parser, niemals eval/new Function.

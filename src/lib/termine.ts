@@ -687,7 +687,7 @@ export function vorbereitenHinweis(wahl: BelegWahl, entwurfArt: string | null, z
   const neu = ART_LABEL[wahl];
   const ziel = wahl === 'rechnung' ? ` Zahlungsziel ${zielTage} Tage ab Termin.` : '';
   if (!alt) {
-    return `Wird als Entwurf ohne Nummer angelegt und erscheint unter Rechnungen & Quittungen → Offen als „vorbereitet“. Die Nummer kommt erst beim Ausstellen.${ziel}`;
+    return `Wird als Entwurf ohne Nummer angelegt und erscheint unter Belege → Offen als „vorbereitet“. Die Nummer kommt erst beim Ausstellen.${ziel}`;
   }
   const was = alt !== neu ? `Die vorbereitete ${alt} wird zur ${neu}.` : `${neu} ist vorbereitet (noch ohne Nummer).`;
   return `${was} Datum, Leistung und Betrag werden beim Speichern übernommen.${ziel}`;

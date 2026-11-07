@@ -1,4 +1,4 @@
-/* Rechnungen & Quittungen (§6.6): Liste nach laufender Nummer mit genau drei Reitern (Alle · Offen · Bezahlt), Suche,
+/* Belege (§6.6): Liste nach laufender Nummer mit genau drei Reitern (Alle · Offen · Bezahlt), Suche,
  * Zeitraum Monat · Jahr · Gesamt nach Belegdatum (Offen und Suche über alle Zeiträume), Status-Menü am Badge, „Vorlagen“
  * und kleinem „Neu“-Menü mit den nächsten Nummern. Keine KPI-Kacheln, unten nur die Anzahl.
  * Optik und Verhalten wie referenz/prototyp/js/pages/belege.js (renderListe); Logik in lib/rechnungen.ts. */
@@ -85,7 +85,7 @@ export default function Belege() {
   ) : (
     <div className="page bl-list">
       <Kopf naechste={{}} />
-      <Ladeansicht zustand={zustand} icon={FileText} was="Rechnungen und Quittungen" erneut={erneut} />
+      <Ladeansicht zustand={zustand} icon={FileText} was="Belege" erneut={erneut} />
     </div>
   );
 }
@@ -150,7 +150,7 @@ function NeuMenue({ naechste }: { naechste: Partial<Record<Belegart, string>> })
     try {
       speichereQuelle(localStorage, 'quittung', 'blanko');
     } catch {
-      /* ohne Speicher zeigt die Seite das Beispiel; „Blanko“ ist dort ein Klick */
+      /* ohne Speicher startet die Quittung ohnehin mit „Blanko“ (Standard, vorschau.ts) */
     }
     navigate('/belege/vorlagen?art=quittung');
   };
@@ -236,7 +236,7 @@ function Kopf({ naechste, suche }: { naechste: Partial<Record<Belegart, string>>
       <div>
         <h1>
           <FileText />
-          Rechnungen &amp; Quittungen
+          Belege
         </h1>
         <p className="page-sub">Alle Belege mit Nummer, auch Angebote · es zählt das Belegdatum</p>
       </div>

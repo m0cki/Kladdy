@@ -436,8 +436,11 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => Schnipsel>>
         L`\textcolor{grau}{Empfänger} & \Firma\\`,
         L`\textcolor{grau}{IBAN} & \IBAN\\`,
         L`\textcolor{grau}{BIC} & \BIC\ifdefempty{\Bank}{}{ · \Bank}\\`,
-        L`\textcolor{grau}{Betrag} & \textbf{\Gesamt}\\`,
-        L`\textcolor{grau}{Verwendungszweck} & \ifdefempty{\Nummer}{\textcolor{leer}{\itshape Rechnungsnummer}}{\Nummer}\\`,
+        // Blanko: Betrag und Rechnungsnummer schreibt man von Hand (wie die Vorschau)
+        x.blanko ? L`\textcolor{grau}{Betrag} & \KLuecke\ €\\` : L`\textcolor{grau}{Betrag} & \textbf{\Gesamt}\\`,
+        x.blanko
+          ? L`\textcolor{grau}{Verwendungszweck} & \KLuecke\\`
+          : L`\textcolor{grau}{Verwendungszweck} & \ifdefempty{\Nummer}{\textcolor{leer}{\itshape Rechnungsnummer}}{\Nummer}\\`,
         L`\end{tabular}\end{minipage}%`,
       );
     // GiroCode wie .blk-qr: Code (girocode.png) mit 2 mm weißem Rand, darunter die Bildunterschrift. Nur auf Rechnungen

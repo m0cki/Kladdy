@@ -112,7 +112,7 @@ export function hinweis35a(e: Ertrag, zahlungsart: Zahlungsart): string | null {
 /** Was beim Speichern passiert (unter dem Beleg-Kasten). */
 export const belegHinweis = (e: Ertrag): string =>
   rechnungOffen(e)
-    ? 'Die Rechnung wird ausgestellt und erscheint unter „Rechnungen & Quittungen“ als offen. Die Einnahme entsteht erst, wenn das Geld eingeht.'
+    ? 'Die Rechnung wird ausgestellt und erscheint unter „Belege“ als offen. Die Einnahme entsteht erst, wenn das Geld eingeht.'
     : 'Wird beim Speichern mit dieser Nummer ausgestellt und mit der Einnahme verknüpft – Betrag und Datum wie oben.';
 
 /** Offene Rechnungen zum Zuordnen: ausgestellt und offen, die am längsten fälligen zuerst. */

@@ -1,4 +1,4 @@
-/* Rechnungen & Quittungen (§6.6): Lesen per SQL, Schreiben NUR über die Rust-Commands in src-tauri/src/rechnungen.rs
+/* Belege (§6.6): Lesen per SQL, Schreiben NUR über die Rust-Commands in src-tauri/src/rechnungen.rs
  * (eine Transaktion je Vorgang: Nummer, Kunde, Schnappschuss, Buchung, Protokoll, GoBD-Prüfungen).
  * - ladeBelege: alle Belege in einer Abfrage (die Liste filtert selbst, Prototyp genauso); ladeOffeneRechnungen.
  * - ladeBeleg: ein Beleg für die Maske, samt Positionen, Termin, Zahlung, Storno und Herkunft.

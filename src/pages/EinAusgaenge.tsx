@@ -165,10 +165,10 @@ function Liste({
   zeilen: BuchungZeile[];
   kategorien: KategorieWahl[];
   zeitraumLabel: string;
-  /** Zeitraum steht bei den Reitern (wie auf „Rechnungen & Quittungen“) */
+  /** Zeitraum steht bei den Reitern (wie auf „Belege“) */
   zeitraumWahl: ReactNode;
 }) {
-  // Suche steht im Seitenkopf (wie auf „Rechnungen & Quittungen“ und „Kunden“), ihr Zustand bleibt hier
+  // Suche steht im Seitenkopf (wie auf „Belege“ und „Kunden“), ihr Zustand bleibt hier
   const [sucheSlot, setSucheSlot] = useState<HTMLElement | null>(null);
   useLayoutEffect(() => setSucheSlot(document.getElementById('bu-suche-slot')), []);
   const [f, setF] = useState<Filter>(gemerkterFilter);
