@@ -189,8 +189,8 @@ function TectonicKarte({ stand, neuLaden }: { stand: TectonicStand; neuLaden: ()
 
 type TestArt = 'rechnung' | 'quittung';
 const TEST_ARTEN = [
-  { value: 'rechnung', label: 'Rechnung (A4)' },
   { value: 'quittung', label: 'Quittung (A5 quer)' },
+  { value: 'rechnung', label: 'Rechnung (A4)' },
 ] as const;
 
 type Lauf =
@@ -203,7 +203,7 @@ const ZAHL = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 1 });
 
 function Testbeleg({ gefunden }: { gefunden: boolean }) {
   const accent = useUi((s) => akzentPapier(s.settings));
-  const [art, setArt] = useState<TestArt>('rechnung');
+  const [art, setArt] = useState<TestArt>('quittung');
   const [basis, setBasis] = useState<{ firma: Firma; ust: UstModus; eigen: boolean } | null>(null);
   const [lauf, setLauf] = useState<Lauf>(null);
   const [vorschau, setVorschau] = useState(false);

@@ -233,7 +233,7 @@ function Maske({ belegId, params, schluessel }: { belegId: number | null; params
         <div className="bl-htitle">
           <Link className="bl-back" to="/belege">
             <ChevronLeft />
-            Rechnungen &amp; Quittungen
+            Belege
           </Link>
           <h1>
             <FileText />
@@ -252,7 +252,7 @@ function Maske({ belegId, params, schluessel }: { belegId: number | null; params
           <EmptyState icon={Info} title="Beleg nicht gefunden">
             Vielleicht wurde der Entwurf gelöscht.{' '}
             <Link className="link" to="/belege">
-              Zu Rechnungen &amp; Quittungen
+              Zu Belege
             </Link>
           </EmptyState>
         ) : (
@@ -604,7 +604,7 @@ function Inhalt({ g, schluessel }: { g: Extract<Geladen, { status: 'ok' }>; schl
         <div className="bl-htitle">
           <Link className="bl-back" to="/belege">
             <ChevronLeft />
-            Rechnungen &amp; Quittungen
+            Belege
           </Link>
           <h1>
             <Icon />

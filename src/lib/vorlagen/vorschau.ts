@@ -7,10 +7,10 @@
  *   gelesen, nichts zurückgeschrieben, kein PDF abgelegt. Damit der Nachbau nicht mit dem echten Beleg verwechselt wird,
  *   fällt die Nummer weg: Blatt und PDF tragen das Wasserzeichen ENTWURF, {nr} druckt „Entwurf“ (wie der Testbeleg).
  *   Logo und Akzentfarbe sind die aktuellen – gezeigt wird, wie die Vorlage heute aussieht.
- * - Auswahl „Beispiel · Letzter Beleg · Blanko“ je Art im localStorage (wie Darstellung und Updates), Standard:
- *   Blanko, wo es das gibt (Formular zum Ausfüllen von Hand, beispiel.ts `blankobeleg`: nur Quittung und Eigenbeleg),
- *   sonst Beispiel. „Beispiel“ ist zum Anschauen mit Musterdaten und wird nicht gemerkt – die Seite startet wieder im
- *   Standard; gemerkt werden „Letzter Beleg“ und „Blanko“.
+ * - Auswahl „Blanko · Beispiel · Letzter Beleg“ je Art im localStorage (wie Darstellung und Updates), Standard:
+ *   Blanko (Formular zum Ausfüllen von Hand, beispiel.ts `blankobeleg`, für alle vier Arten). „Beispiel“ ist zum
+ *   Anschauen mit Musterdaten und wird nicht gemerkt – die Seite startet wieder mit Blanko; gemerkt wird nur
+ *   „Letzter Beleg“.
  *   Im selben Eintrag: die zuletzt gezeigte Vorlage je Art (Design oder 'eigen:<id>'), Standard: die aktive.
  * Tests: vorschau.test.ts */
 import { ausgestellterBeleg } from '../belegpdf';
@@ -20,7 +20,6 @@ import { ladeBeleg, ladeKundenAnschrift, type BelegVoll } from '../queries/rechn
 import { formularAusEntwurf, formularZuDokument, type BelegZeile, type KundeAnschrift, type PositionZeile } from '../rechnungen';
 import type { KeyValueStore } from '../settings';
 import { BELEGARTEN, type BelegDokument, type Belegart } from './dokument';
-import { hatBlanko } from './beispiel';
 import { eigeneId } from './eigene';
 import { istDesign } from './standard';
 
@@ -77,14 +76,8 @@ export async function ladeVorschauBeleg(id: number, ctx: Omit<VorschauKontext, '
 /* Ein Eintrag im localStorage: { quelle: { art: 'beispiel'|'beleg'|'blanko' }, design: { art: schluessel } }. Jede Funktion
  * schreibt nur ihren Teil und lässt den anderen stehen. */
 
-/** Standard je Art: Blanko, wo es das gibt (Quittung, Eigenbeleg), sonst Beispiel */
-const standardQuelle = (art: Belegart): Vorschauquelle => (hatBlanko(art) ? 'blanko' : 'beispiel');
-const standardQuellen = (): Quellen => ({
-  rechnung: standardQuelle('rechnung'),
-  quittung: standardQuelle('quittung'),
-  angebot: standardQuelle('angebot'),
-  eigenbeleg: standardQuelle('eigenbeleg'),
-});
+/** Standard je Art: Blanko */
+const standardQuellen = (): Quellen => ({ rechnung: 'blanko', quittung: 'blanko', angebot: 'blanko', eigenbeleg: 'blanko' });
 
 const istObjekt = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 
@@ -110,15 +103,13 @@ export function ladeQuellen(store: KeyValueStore | undefined): Quellen {
   const q = standardQuellen();
   const quelle = gemerkt(store).quelle;
   if (istObjekt(quelle))
-    for (const a of BELEGARTEN) {
-      if (quelle[a] === 'beleg') q[a] = 'beleg';
-      else if (quelle[a] === 'blanko' && hatBlanko(a)) q[a] = 'blanko';
-    }
+    for (const a of BELEGARTEN) if (quelle[a] === 'beleg') q[a] = 'beleg';
   return q;
 }
 
 export function speichereQuelle(store: KeyValueStore | undefined, art: Belegart, quelle: Vorschauquelle): Quellen {
-  const q = { ...ladeQuellen(store), [art]: quelle === 'blanko' && !hatBlanko(art) ? 'beispiel' : quelle };
+  // „Beispiel“ wird nicht gemerkt: gespeichert wird dann der Standard (Blanko)
+  const q = { ...ladeQuellen(store), [art]: quelle === 'beleg' ? 'beleg' : 'blanko' };
   merken(store, 'quelle', q);
   return q;
 }

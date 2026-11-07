@@ -10,7 +10,7 @@
   (⌘N von überall) bzw. Datei-Drop – kein Erfassen-Knopf in der Kopfzeile; andere Stellen öffnen höchstens
   dieselbe Schublade vorbelegt. Statistik (KPI-Kacheln, Diagramme) NUR in der Auswertung; in Listen höchstens eine schlanke Summenzeile im
   Tabellenfuß (Ein- & Ausgänge: Einnahmen · Ausgaben · Saldo des Zeitraums, nur Text).
-  Menü: genau fünf Punkte (Ein- & Ausgänge · Termine · Rechnungen & Quittungen · Kunden · Auswertung). Keine Konten/Kontostände,
+  Menü: genau fünf Punkte (Ein- & Ausgänge · Termine · Belege · Kunden · Auswertung). Keine Konten/Kontostände,
   nur Zahlungsweg (bar/bank/paypal). Logo = Startseite; Einstellungen nur über ⚙.
 - Diagramme: eigene SVG-Komponenten nach §9.6. Plus/Minus nie nur über Farbe.
 - Formeln: eigener Parser, niemals eval/new Function.

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Baustein } from '../vorlagen/bausteine';
 import { BEISPIEL_FIRMA, blankobeleg, testbeleg } from '../vorlagen/beispiel';
-import { BELEGARTEN, type BelegDokument } from '../vorlagen/dokument';
-import { standardVorlage } from '../vorlagen/standard';
+import { BELEGARTEN, type BelegDokument, type Belegart } from '../vorlagen/dokument';
+import { STANDARD_VORLAGEN, standardVorlage } from '../vorlagen/standard';
 import { MAKRO_NAMEN, datenTex, makroWerte, positionenTex } from './daten';
 import { KompilierFehler, belegAssets, belegTex, fehlerZeilen } from './kompilieren';
 import { RAHMEN_MM, abstandMm, bereichZuZeile, formatTex, mainTex, rahmenTex, striche, textTex } from './vorlage';
@@ -528,7 +528,7 @@ describe('Quittungsangaben: einzelne Angaben abschaltbar', () => {
 });
 
 describe('Blanko-Formular zum Ausfüllen von Hand', () => {
-  const blanko = (art: 'quittung' | 'eigenbeleg' = 'quittung') => blankobeleg(art, BEISPIEL_FIRMA, 'klein');
+  const blanko = (art: Belegart = 'quittung') => blankobeleg(art, BEISPIEL_FIRMA, 'klein');
   /** main.tex ohne Präambel (dort stehen die Hilfsbefehle immer) */
   const rumpf = (t: string) => t.slice(t.indexOf(String.raw`\begin{document}`));
   const mit = (design: string, werte: Record<string, unknown>): Baustein[] =>
@@ -624,6 +624,24 @@ describe('Blanko-Formular zum Ausfüllen von Hand', () => {
     expect(t).toContain(String.raw`\KFeld{Zahlungsempfänger}{\KSchreib}`);
     expect(t).toContain(String.raw`\KKaestchen{0}`);
     expect(t).not.toMatch(/\\(Gesamt|Datum|EigenbelegGrund|GebuchtAls|KundeName|Betreff)(?![A-Za-z])/);
+  });
+
+  it('Rechnung und Angebot (alle Designs): leere Positionszeilen, Betrag und Verwendungszweck von Hand, kein GiroCode', () => {
+    for (const art of ['rechnung', 'angebot'] as const) {
+      for (const { schluessel } of STANDARD_VORLAGEN[art]) {
+        const v = standardVorlage(art, schluessel);
+        const { main, daten, assets } = belegTex(blanko(art), v, '#6366f1');
+        const t = rumpf(main.tex);
+        const was = `${art}/${schluessel}`;
+        expect(klammernOk(main.tex), was).toBe(true);
+        expect(t, was).not.toContain('KWasserzeichen');
+        expect(t, was).not.toMatch(/\\(Gesamt|Nummer|Datum|Faellig|KundeAnzeige|Positionen|BetragInWorten)(?![A-Za-z])/);
+        if (v.some((b) => b.typ === 'positionen')) expect(t, was).toContain(String.raw`\Position{}{}{}{}{}{}`);
+        if (v.some((b) => b.typ === 'zahlung' && !b.aus)) expect(t, was).toContain(String.raw`{Verwendungszweck} & \KLuecke`);
+        expect(makro(daten, 'GiroCode'), was).toBe('');
+        expect(assets.map((a) => a.name), was).not.toContain('girocode.png');
+      }
+    }
   });
 
   it('ohne Blanko unverändert: Wasserzeichen und Werte', () => {
