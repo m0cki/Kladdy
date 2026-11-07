@@ -540,10 +540,17 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
           </dd>
           <dt>Betrag</dt>
           <dd>
-            <b>{formatBetrag(x.summe)}</b>
+            {/* Blanko: Betrag und Rechnungsnummer schreibt man von Hand */}
+            {doc.blanko ? (
+              <>
+                <Luecke /> €
+              </>
+            ) : (
+              <b>{formatBetrag(x.summe)}</b>
+            )}
           </dd>
           <dt>Verwendungszweck</dt>
-          <dd>{doc.nummer || <span className="blk-leer">Rechnungsnummer</span>}</dd>
+          <dd>{doc.blanko ? <Luecke /> : doc.nummer || <span className="blk-leer">Rechnungsnummer</span>}</dd>
         </dl>
       </div>
     ) : null;

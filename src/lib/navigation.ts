@@ -18,6 +18,8 @@ export interface NavItem {
   to: string;
   label: string;
   icon: LucideIcon;
+  /** weitere Suchbegriffe für die Suche (⌘K) */
+  keywords?: readonly string[];
 }
 
 export const START = '/ein-ausgaenge';
@@ -25,7 +27,8 @@ export const START = '/ein-ausgaenge';
 export const NAV: readonly NavItem[] = [
   { to: '/ein-ausgaenge', label: 'Ein- & Ausgänge', icon: ArrowLeftRight },
   { to: '/termine', label: 'Termine', icon: CalendarDays },
-  { to: '/belege', label: 'Rechnungen & Quittungen', icon: FileText },
+  // Oberbegriff für Quittungen, Rechnungen, Angebote und Eigenbelege
+  { to: '/belege', label: 'Belege', icon: FileText, keywords: ['Quittungen', 'Rechnungen', 'Angebote', 'Eigenbelege'] },
   { to: '/kunden', label: 'Kunden', icon: Users },
   { to: '/auswertung', label: 'Auswertung', icon: ChartColumn },
 ];

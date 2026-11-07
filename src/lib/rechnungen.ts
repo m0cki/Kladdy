@@ -1,4 +1,4 @@
-/* Rechnungen & Quittungen (§6.6) – reine Logik ohne Datenbank: Status und Badges, Liste (Alle · Offen · Bezahlt,
+/* Belege (§6.6) – reine Logik ohne Datenbank: Status und Badges, Liste (Alle · Offen · Bezahlt,
  * Zeitraum Monat · Jahr · Gesamt nach Belegdatum, Suche, Sortierung), Status-Menü je Art, Formular der Beleg-Maske
  * ⇄ Belegdokument (Vorschau, Pflichtangaben) ⇄ Eingabe für die Rust-Commands (src-tauri/src/rechnungen.rs).
  * Geld nur in Cent. Kunden per ID („Name · K-0012“, Nachfrage bei gleichem Namen wie in der Erfassen-Schublade).

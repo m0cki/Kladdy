@@ -20,7 +20,7 @@ const isActive = (path: string, to: string) => path === to || path.startsWith(to
 /* Kein Zähler an „Ein- & Ausgänge“: Buchungen ohne Datei sind beim Arbeiten mit Papierquittungen normal (Filter „ohne Beleg“
  * in der Liste bleibt). */
 
-/** Roter Zähler an „Rechnungen & Quittungen“: überfällige Rechnungen (§6.1). */
+/** Roter Zähler an „Belege“: überfällige Rechnungen (§6.1). */
 function useUeberfaellig(): number {
   const stand = useUi((s) => s.datenStand);
   const [n, setN] = useState(0);

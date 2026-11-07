@@ -28,7 +28,7 @@ export interface ArtInfo {
   nrLabel: string;
 }
 
-export const BELEGARTEN: readonly Belegart[] = ['rechnung', 'quittung', 'angebot', 'eigenbeleg'];
+export const BELEGARTEN: readonly Belegart[] = ['quittung', 'rechnung', 'angebot', 'eigenbeleg'];
 
 /** Wie im Prototyp (ART): Rechnung/Angebot A4 hoch, Quittung/Eigenbeleg A5 quer. */
 export const ARTEN: Readonly<Record<Belegart, ArtInfo>> = {

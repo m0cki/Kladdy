@@ -1,20 +1,20 @@
 /* Vorlagen-Baukasten (ANLEITUNG §7.0, §6.7; Prototyp js/pages/vorlagen.js): Belege aus Bausteinen zusammenstellen.
- * - Art-Umschalter Rechnung · Quittung · Angebot · Eigenbeleg, auch aus der Adresse (?art=rechnung), damit die
- *   Beleg-Maske direkt hierher verlinken kann. Ohne ?art= gilt die zuletzt gewählte Art.
+ * - Art-Umschalter Quittung · Rechnung · Angebot · Eigenbeleg, auch aus der Adresse (?art=rechnung), damit die
+ *   Beleg-Maske direkt hierher verlinken kann. Ohne ?art= gilt die zuletzt gewählte Art, zu Beginn die Quittung.
  * - Leiste über dem Baukasten: alle mitgelieferten Designs (lib/vorlagen/standard.ts) und die eigenen Vorlagen der Art
  *   (lib/vorlagen/eigene.ts), gezeigt wird die gewählte (?design=formular bzw. ?design=eigen:12; sonst die zuletzt
  *   gezeigte je Art, sonst die aktive). Zeigen ändert nie, was neue Belege nehmen – das tun „Diese verwenden“
  *   (Einstellung 'vorlagen_design') und die erste Änderung am aktiven Design (die Kopie wird aktiv). „Neue Vorlage“ legt mit Namen eine eigene an (Bausteine der gezeigten),
  *   Stift = umbenennen, Papierkorb = entfernen (archiviert, mit Rückgängig; Belege, die sie nutzen, bleiben gültig).
  * - Links: Bausteinliste (Griff zum Ziehen per Zeiger, ↑/↓ auf dem Griff; Auge = ausblenden, × = entfernen mit
- *   Rückgängig), „+ Baustein hinzufügen“ (Palette mit allen Bausteinen der Art, eingefügt unter dem ausgewählten),
+ *   Rückgängig; Bausteine mit einer Pflichtangabe tragen nur einen Hinweis, entfernen lässt sich jeder), „+ Baustein hinzufügen“ (Palette mit allen Bausteinen der Art, eingefügt unter dem ausgewählten),
  *   darunter die Einstellungen des gewählten Bausteins mit Platzhalter-Chips (fügen {name} an der Schreibmarke ein) und
  *   der Pflichtangaben-Check (§2.3) mit den Daten der Vorschau – ohne „Steuerhinweis (§ 19)“ sofort rot.
- * - Rechts: Live-Vorschau mit Beispieldaten (eigene Firmendaten, sobald eingetragen) oder – Umschalter „Beispiel ·
- *   Letzter Beleg“, nur wenn es einen gibt, je Art gemerkt – mit dem letzten Beleg der Art in den aktuellen Bausteinen
- *   (lib/vorlagen/vorschau.ts: nur gelesen, ohne Nummer ⇒ Wasserzeichen ENTWURF). Bei Quittung und Eigenbeleg
- *   zusätzlich „Blanko“: Formular zum Ausdrucken und Ausfüllen von Hand (beispiel.ts `blankobeleg`: Firmendaten
- *   gedruckt, Werte als Schreiblinien, kein Wasserzeichen, keine Nummer, nichts gespeichert). Klick ins Blatt wählt den
+ * - Rechts: Live-Vorschau, Umschalter „Blanko · Beispiel · Letzter Beleg“ (lib/vorlagen/vorschau.ts). Standard ist
+ *   „Blanko“: Formular zum Ausdrucken und Ausfüllen von Hand (beispiel.ts `blankobeleg`: Firmendaten gedruckt, Werte
+ *   als Schreiblinien, kein Wasserzeichen, keine Nummer, nichts gespeichert). „Beispiel“ zeigt Musterdaten (eigene
+ *   Firmendaten, sobald eingetragen) und wird nicht gemerkt; „Letzter Beleg“ (nur wenn es einen gibt, je Art gemerkt)
+ *   den letzten Beleg der Art in den aktuellen Bausteinen (nur gelesen, ohne Nummer ⇒ Wasserzeichen ENTWURF). Klick ins Blatt wählt den
  *   Baustein; Klick auf einen Text aus einer Einstellung bearbeitet ihn direkt im Blatt (FormatEditor: fett, kursiv,
  *   unterstrichen, Platzhalter als Chips; Esc oder Klick daneben beendet). Die Einstellungskarte nutzt denselben Editor.
  *   Jede Eingabe läuft über `einstellen` (Autosave, eigene Kopie, Protokoll wie bisher). „PDF“ setzt das Blatt mit Tectonic wie der Testbeleg (Entwurf, keine Nummer, nichts wird abgelegt) und
@@ -73,7 +73,7 @@ import {
   zurueckEinfuegen,
   zusammenfassung,
 } from '../lib/vorlagen/baukasten';
-import { BEISPIEL_FIRMA, beispielbeleg, blankobeleg, firmaOderBeispiel, hatBlanko } from '../lib/vorlagen/beispiel';
+import { BEISPIEL_FIRMA, beispielbeleg, blankobeleg, firmaOderBeispiel } from '../lib/vorlagen/beispiel';
 import { ARTEN, BELEGARTEN, PLATZHALTER, PLATZHALTER_KURZ, istBelegart, zerlegen, type BelegDokument, type Belegart, type PlatzhalterName, type Textteil } from '../lib/vorlagen/dokument';
 import { pflichtCheck, type Pflichtangabe } from '../lib/vorlagen/pflicht';
 import {
@@ -146,11 +146,15 @@ const BLANKO_HINWEIS: Readonly<Record<Belegart, string>> = {
     'Ohne Nummer gedruckt, nichts wird gespeichert. Beim Buchen zeigt Kladdy die Buchungsnummer – sie kommt ins Feld „Buchungs-Nr.“, so gehören Zettel und Buchung zusammen.',
   eigenbeleg:
     'Ohne Nummer gedruckt, nichts wird gespeichert. Trag eine eigene Nummer ins Feld „Nr.“ ein und gib sie beim Buchen der Ausgabe als Beleg-Nr. an.',
-  rechnung: '',
-  angebot: '',
+  rechnung:
+    'Ohne Nummer gedruckt, nichts wird gespeichert. Gib der Rechnung eine eigene fortlaufende Nummer und trag sie beim Buchen der Einnahme als Beleg-Nr. ein.',
+  angebot: 'Ohne Nummer gedruckt, nichts wird gespeichert – zum Ausfüllen von Hand, z. B. beim Kunden vor Ort.',
 };
 /** „Neue Quittungen verwenden …“ */
 const MEHRZAHL: Readonly<Record<Belegart, string>> = { rechnung: 'Rechnungen', quittung: 'Quittungen', angebot: 'Angebote', eigenbeleg: 'Eigenbelege' };
+/** Tooltip am Pflicht-Hinweis eines Bausteins */
+const pflichtTitel = (angaben: readonly string[]): string =>
+  `Druckt die Pflichtangabe ${angaben.map((a) => `„${a}“`).join(', ')}. Nur ein Hinweis – ohne den Baustein zeigt der Pflichtangaben-Check, was fehlt.`;
 const QUELLE_BEISPIEL: SegOption<Vorschauquelle> = { value: 'beispiel', label: 'Beispiel' };
 const QUELLE_BELEG: SegOption<Vorschauquelle> = { value: 'beleg', label: 'Letzter Beleg' };
 const QUELLE_BLANKO: SegOption<Vorschauquelle> = { value: 'blanko', label: 'Blanko' };
@@ -164,7 +168,7 @@ const speicher = (): Storage | undefined => {
 };
 
 // Zuletzt gewählte Art bleibt beim Seitenwechsel erhalten (wenn die Adresse keine nennt)
-let zuletzt: Belegart = 'rechnung';
+let zuletzt: Belegart = 'quittung';
 
 /** Letzter Schreibauftrag dieser Seite. Laden wartet darauf, damit ein eben (beim Verlassen der Art) gespeicherter
  *  Stand nicht veraltet zurückkommt; untereinander laufen die Aufträge ohnehin der Reihe nach (nacheinander). */
@@ -418,7 +422,7 @@ export default function Vorlagen() {
         icon={Blocks}
         title="Vorlagen"
         sub="So sehen deine Belege aus. Baustein wählen und einstellen – oder direkt ins Blatt klicken und Texte ändern."
-        back={{ to: '/belege', label: 'Rechnungen & Quittungen' }}
+        back={{ to: '/belege', label: 'Belege' }}
         actions={<Seg className="tabs" options={ART_OPTIONEN} value={art} onChange={artWaehlen} ariaLabel="Belegart der Vorlage" />}
       />
       {!basis || !bereit || !letzte ? (
@@ -752,9 +756,10 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
 
   const logo = useFirmenlogo((s) => s.name);
   const mitBeleg = quelle === 'beleg' && letzter != null;
-  /** Blanko-Formular zum Ausfüllen von Hand (nur Quittung und Eigenbeleg) */
-  const blanko = quelle === 'blanko' && hatBlanko(art);
-  const quellen = [QUELLE_BEISPIEL, ...(letzter ? [QUELLE_BELEG] : []), ...(hatBlanko(art) ? [QUELLE_BLANKO] : [])];
+  /** Blanko-Formular zum Ausfüllen von Hand */
+  const blanko = quelle === 'blanko';
+  // Blanko zuerst: dort startet die Seite (vorschau.ts), Beispiel ist zum Anschauen mit Musterdaten
+  const quellen = [QUELLE_BLANKO, QUELLE_BEISPIEL, ...(letzter ? [QUELLE_BELEG] : [])];
   const belegId = mitBeleg ? letzter.id : null;
 
   // Letzten Beleg lesen wie die Beleg-Maske (nichts wird geschrieben); weg oder Fehler ⇒ zurück zu den Beispieldaten
@@ -798,11 +803,18 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
     const b = bausteine.find((x) => !x.aus && (x.typ === 'fusszeile' ? aufloesen(x).an('kontakt') : x.typ === 'anschrift_meta' ? aufloesen(x).an('steuernr') : zusammenfassung(x).includes('{steuernummer}')));
     return b ? BAUSTEINE[b.typ].name : null;
   }, [bausteine]);
-  /** Bausteine, ohne die eine Pflichtangabe fehlen würde (§ 33/§ 34a UStDV): nicht ausblenden, nicht entfernen */
+  /** Pflichtangaben, die ohne den Baustein fehlen würden (§ 33/§ 34a UStDV), je Index. Nur ein Hinweis: ausblenden und
+   *  entfernen geht trotzdem – was dann fehlt, zeigt der Pflichtangaben-Check. */
   const pflichtBausteine = useMemo(() => {
-    const fehlen = (liste: readonly Baustein[]) => pflichtCheck(doc, liste).filter((p) => !p.ok).length;
+    const fehlen = (liste: readonly Baustein[]) => new Set(pflichtCheck(doc, liste).filter((p) => !p.ok).map((p) => p.label));
     const jetzt = fehlen(bausteine);
-    return new Set(bausteine.flatMap((b, i) => (!b.aus && fehlen(bausteine.filter((_, k) => k !== i)) > jetzt ? [i] : [])));
+    const m = new Map<number, string[]>();
+    bausteine.forEach((b, i) => {
+      if (b.aus) return;
+      const neu = [...fehlen(bausteine.filter((_, k) => k !== i))].filter((l) => !jetzt.has(l));
+      if (neu.length) m.set(i, neu);
+    });
+    return m;
   }, [doc, bausteine]);
   const eigeneFirma = basis.firma !== BEISPIEL_FIRMA;
 
@@ -1076,9 +1088,9 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
                       <b>
                         {def.name}
                         {pflichtBausteine.has(i) ? (
-                          <span className="vl-pflicht" title="Enthält eine Pflichtangabe – bleibt im Beleg (Texte sind trotzdem änderbar)">
+                          <span className="vl-pflicht" title={pflichtTitel(pflichtBausteine.get(i)!)}>
                             <Asterisk />
-                            Pflicht
+                            Pflichtangabe
                           </span>
                         ) : null}
                       </b>
@@ -1092,8 +1104,6 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
                         )}
                       </small>
                     </button>
-                    {pflichtBausteine.has(i) ? null : (
-                    <>
                     <button
                       type="button"
                       className="icon-btn sm vl-eye"
@@ -1118,8 +1128,6 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
                     >
                       <X />
                     </button>
-                    </>
-                    )}
                   </li>
                   {i === sel && !zug ? (
                     <li className="vl-inline" onClick={(e) => e.stopPropagation()}>
@@ -1128,7 +1136,7 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
                         b={b}
                         index={sel}
                         anzahl={bausteine.length}
-                        pflicht={pflichtBausteine.has(sel)}
+                        pflicht={pflichtBausteine.get(sel) ?? null}
                         setze={(key, wert) => setzen(sel, key, wert)}
                         schieben={(richtung) => schieben(sel, richtung, false)}
                         umschalten={() => aendern(umschalten(bausteine, sel))}
@@ -1144,7 +1152,7 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
             )}
           </ul>
           <p className="vl-legende vl-legende-unten">
-            Angaben in ‹ › füllt Kladdy beim Ausstellen aus · <Asterisk className="ic vl-leg-ic" /> Pflicht bleibt im Beleg, der Text ist änderbar.
+            Angaben in ‹ › füllt Kladdy beim Ausstellen aus · <Asterisk className="ic vl-leg-ic" /> enthält eine Pflichtangabe – nur ein Hinweis, entfernen geht trotzdem.
           </p>
           <div className="vl-add">
             <button type="button" className="btn subtle" aria-haspopup="dialog" onClick={() => setPalette(true)}>
@@ -1267,8 +1275,8 @@ interface KarteProps {
   b: Baustein | undefined;
   index: number;
   anzahl: number;
-  /** enthält eine Pflichtangabe: nicht ausblenden, nicht entfernen */
-  pflicht: boolean;
+  /** Pflichtangaben, die ohne den Baustein fehlen würden (nur ein Hinweis); null = keine */
+  pflicht: readonly string[] | null;
   setze: (key: string, wert: Einstellung) => void;
   schieben: (richtung: -1 | 1) => void;
   umschalten: () => void;
@@ -1308,26 +1316,26 @@ function BausteinKarte({ b, index, anzahl, pflicht, setze, schieben, umschalten:
           </button>
         </span>
         <span className="spacer" />
-        {pflicht ? (
-          <span className="vl-pflicht-hinweis" title="Der Baustein bleibt im Beleg; seine Texte und Einstellungen darfst du ändern">
-            <Asterisk />
-            Pflicht – bleibt im Beleg, Texte änderbar
-          </span>
-        ) : (
-          <>
-            {b.typ === 'abstand' || b.typ === 'trennlinie' ? null : (
-              <button type="button" className="btn subtle sm" onClick={ausEin}>
-                {b.aus ? <Eye /> : <EyeOff />}
-                {b.aus ? 'Einblenden' : 'Ausblenden'}
-              </button>
-            )}
-            <button type="button" className="btn subtle sm vl-del-btn" onClick={weg}>
-              <X />
-              Entfernen
-            </button>
-          </>
+        {b.typ === 'abstand' || b.typ === 'trennlinie' ? null : (
+          <button type="button" className="btn subtle sm" onClick={ausEin}>
+            {b.aus ? <Eye /> : <EyeOff />}
+            {b.aus ? 'Einblenden' : 'Ausblenden'}
+          </button>
         )}
+        <button type="button" className="btn subtle sm vl-del-btn" onClick={weg}>
+          <X />
+          Entfernen
+        </button>
       </div>
+      {pflicht ? (
+        <p className="vl-pflicht-hinweis">
+          <Asterisk />
+          <span>
+            Druckt die Pflichtangabe {pflicht.map((a) => `„${a}“`).join(', ')} – nur ein Hinweis, du kannst den Baustein trotzdem
+            ausblenden oder entfernen.
+          </span>
+        </p>
+      ) : null}
       {def.felder.length ? (
         <div className="form">
           {def.felder.map((f) => {

@@ -55,7 +55,7 @@ type Eintrag = Ziel | DatenEintrag;
 const go = (to: string) => (nav: Nav) => nav(to);
 
 const SEITEN: Ziel[] = [
-  ...NAV.map((n) => ({ id: `seite:${n.to}`, art: 'seite' as const, gruppe: 'Seiten', label: n.label, icon: n.icon, run: go(n.to) })),
+  ...NAV.map((n) => ({ id: `seite:${n.to}`, art: 'seite' as const, gruppe: 'Seiten', label: n.label, keywords: n.keywords, icon: n.icon, run: go(n.to) })),
   ...AUSWERTUNG.filter((t) => t.to !== '/auswertung').map((t) => ({
     id: `seite:${t.to}`,
     art: 'seite' as const,
@@ -67,7 +67,7 @@ const SEITEN: Ziel[] = [
     run: go(t.to),
   })),
   { id: 'seite:/auswertung#ueberblick', art: 'seite', gruppe: 'Seiten', label: 'Überblick', sub: 'Auswertung · Wie läuft das Geschäft?', keywords: ['Auswertung', 'Dashboard'], icon: AUSWERTUNG[0].icon, run: go('/auswertung') },
-  { id: 'seite:/belege/vorlagen', art: 'seite', gruppe: 'Seiten', label: 'Vorlagen', sub: 'Rechnungen & Quittungen · Bausteine', keywords: ['Vorlage', 'Baukasten', 'Layout'], icon: FileStack, run: go('/belege/vorlagen') },
+  { id: 'seite:/belege/vorlagen', art: 'seite', gruppe: 'Seiten', label: 'Vorlagen', sub: 'Belege · Bausteine', keywords: ['Vorlage', 'Baukasten', 'Layout'], icon: FileStack, run: go('/belege/vorlagen') },
   { id: 'seite:/einstellungen', art: 'seite', gruppe: 'Seiten', label: 'Einstellungen', keywords: ['Optionen', 'Präferenzen'], icon: Settings, run: go(EINSTELLUNGEN_PFAD) },
 ];
 

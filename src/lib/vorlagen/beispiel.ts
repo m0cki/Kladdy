@@ -3,17 +3,13 @@
  * LaTeX-Sonderzeichen, damit ein Fehler im Escaping sofort beim Kompilieren auffällt. Er bleibt ein Entwurf ohne Nummer –
  * Testbelege verbrauchen nie eine echte Nummer (GoBD). Der Beispielbeleg der Vorlagen-Seite ist freundlich (wie
  * mitBeispiel() im Prototyp), gibt es für alle vier Arten und ist ebenfalls ein Entwurf ohne Nummer.
- * Das Blanko-Formular (`blankobeleg`, Quittung und Eigenbeleg) hat nur Firmendaten und die Standardtexte der Art, alle
- * Werte des Belegs bleiben leer (Vorschau und PDF drucken Schreiblinien). Es ist kein Beleg: keine Nummer, nichts
- * wird gespeichert (GoBD). */
+ * Das Blanko-Formular (`blankobeleg`, alle vier Arten) hat nur Firmendaten und die Standardtexte der Art, alle Werte
+ * des Belegs bleiben leer (Vorschau und PDF drucken Schreiblinien, Rechnung und Angebot leere Positionszeilen). Es ist
+ * kein Beleg: keine Nummer, nichts wird gespeichert (GoBD). */
 import type { Firma } from '../firma';
 import type { UstModus } from '../queries/einstellungen';
 import { plusTage } from '../zeitraum';
 import { STANDARD_TEXTE, type BelegDokument, type Belegart } from './dokument';
-
-/** Arten, für die es ein Blanko-Formular zum Ausfüllen von Hand gibt (Rechnung und Angebot brauchen Positionen). */
-export const BLANKO_ARTEN: readonly Belegart[] = ['quittung', 'eigenbeleg'];
-export const hatBlanko = (art: Belegart): boolean => BLANKO_ARTEN.includes(art);
 
 /** Blanko-Formular: nur Firma, Steuerart und Standardtexte der Art (das Logo setzt die Seite); alle Werte leer. */
 export function blankobeleg(art: Belegart, firma: Firma, ust_modus: UstModus): BelegDokument {
