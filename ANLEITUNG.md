@@ -1774,6 +1774,10 @@ Logo der App: abgerundetes Quadrat (Radius 10) mit Verlauf `linear-gradient(140d
 Beleg-/Buch-Symbol. Der Schatten `drop-shadow(0 6px 14px color-mix(in oklab, var(--accent) 45%, transparent))` ist derselbe wie in PowerAnalytic.
 Hat der Nutzer ein **Firmenlogo** hochgeladen (§6.10), steht dort stattdessen sein Logo: 34 × 34 px, weiße Kachel, Radius 9 px,
 3 px Innenabstand, `object-fit: contain`, feine Kontur `0 0 0 1px var(--border)`. Das App-Symbol im Dock bleibt immer das Kladdy-Symbol.
+**App-Symbol im Dock** (`src-tauri/icons/`): weißer Koala-Kopf (helle Innenohren `#bfdde1`, Augen und Nase `#123a42`) auf dem
+Petrol-Verlauf `#0b6a77` → `#435e8b` (Standard-Schema, fest – folgt nicht der gewählten Akzentfarbe). Quelle ist
+`src-tauri/icons/icon.svg` (Kachel 824 px im 1024er macOS-Raster mit Schatten); neu erzeugen mit
+`npm run tauri icon src-tauri/icons/icon.svg`.
 
 ---
 
