@@ -6,7 +6,7 @@
  * Tests: termine.test.ts */
 import { datumKurz, kundeAufloesen, zahlungswegName, type KundeKurz, type Zahlungsart } from './buchungen';
 import type { Vorbelegung } from './erfassen';
-import type { ErtragBezug, ErtragsArt, Ertragsweg } from './ertrag';
+import type { Ertrag, ErtragBezug, ErtragsArt, Ertragsweg } from './ertrag';
 import { tageZwischen, vorText } from './kunden';
 import { isoWoche, wochenStart } from './liquiditaet';
 import { formatBetrag, parseBetrag } from './money';
@@ -775,12 +775,23 @@ export function vorbelegungMitBezug(v: Vorbelegung, b: ErfassenBezug | null): Vo
   };
 }
 
-/** Beleg-Angaben aus dem Entwurf: Text der einzigen Position (wenn er vom Betreff abweicht), Anschrift, Vorlage. */
-export function ertragAusEntwurf(e: ErfassenBezug['entwurf']): { leistung: string; adresse: string; vorlage: { id: number | null; design: string } | null } {
-  if (!e) return { leistung: '', adresse: '', vorlage: null };
+/** Beleg-Angaben aus dem Entwurf für den Beleg-Kasten der Schublade: seine Positionen, Anschrift, Vorlage und ein
+ *  eigenes Leistungsdatum bzw. ein Zeitraum (gleich dem Entwurfsdatum ⇒ folgt dem Datum der Schublade). */
+export function ertragAusEntwurf(
+  e: ErfassenBezug['entwurf'],
+): Pick<Ertrag, 'adresse' | 'vorlage' | 'leistungVon' | 'leistungBis'> & Partial<Pick<Ertrag, 'positionen' | 'zielTage'>> {
+  if (!e) return { adresse: '', vorlage: null, leistungVon: '', leistungBis: '' };
   const f = e.formular;
-  const pos = f.positionen.length === 1 ? f.positionen[0].beschreibung.trim() : '';
-  return { leistung: pos && pos !== f.betreff.trim() ? pos : '', adresse: f.adresse, vorlage: { id: f.vorlageId, design: f.vorlageDesign } };
+  const eigen = f.leistungVon && (f.leistungVon !== f.datum || f.leistungBis) ? f.leistungVon : '';
+  return {
+    positionen: f.positionen.map((p) => ({ ...p })),
+    adresse: f.adresse,
+    vorlage: { id: f.vorlageId, design: f.vorlageDesign },
+    leistungVon: eigen,
+    leistungBis: eigen ? f.leistungBis : '',
+    // Zahlungsziel einer vorbereiteten Rechnung (sonst gilt Einstellungen › Belege)
+    zielTage: f.art === 'rechnung' ? f.zielTage : '',
+  };
 }
 
 /** Bezug für belegVorbereiten (lib/ertrag.ts): Termin (Leistungsdatum) und Formular des Entwurfs. */

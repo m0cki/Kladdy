@@ -752,10 +752,10 @@ describe('Kopf mit Logo: Lage und Größe', () => {
 });
 
 describe('Bankverbindung ohne BIC', () => {
-  it('BIC-Zeile nur mit BIC; ohne BIC steht die Bank allein, ohne beides nichts', () => {
+  it('ohne BIC steht in der Zeile die Bank (kein & innerhalb von \\ifdefempty, Tabelle bleibt stabil)', () => {
     const t = mainTex('rechnung', [{ typ: 'zahlung' }], '#6366f1').tex;
     expect(t).toContain(
-      String.raw`\ifdefempty{\BIC}{\ifdefempty{\Bank}{}{\textcolor{grau}{Bank} & \Bank\\}}{\textcolor{grau}{BIC} & \BIC\ifdefempty{\Bank}{}{ · \Bank}\\}`,
+      String.raw`\textcolor{grau}{\ifdefempty{\BIC}{Bank}{BIC}} & \ifdefempty{\BIC}{\Bank}{\BIC\ifdefempty{\Bank}{}{ · \Bank}}\\`,
     );
     expect(klammernOk(t)).toBe(true);
     const ohneBic = datenTex({ ...rechnung(), firma: { ...rechnung().firma, bic: '' } });

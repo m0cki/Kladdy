@@ -1251,17 +1251,23 @@ async fn einnahme_kategorie(
     erste.ok_or_else(|| "Es gibt keine aktive Einnahme-Kategorie.".to_string())
 }
 
-/// Beschreibung der Buchung: Betreff, sonst erste Position, sonst die Belegart.
+/// Beschreibung der Buchung: Betreff, sonst erste Position (bei mehreren „… und 2 weitere“), sonst die Belegart.
+/// Gegenstück im Frontend: buchungstextAus (src/lib/rechnungen.ts).
 fn buchungstext(betreff: Option<&str>, positionen: &[Position], art: &str) -> String {
     betreff
         .map(|b| b.lines().next().unwrap_or(b).trim().to_string())
         .filter(|b| !b.is_empty())
         .or_else(|| {
-            positionen
-                .first()
-                .map(|p| p.beschreibung.replace('\n', " "))
+            let erste = positionen.first()?.beschreibung.replace('\n', " ");
+            let erste = erste.trim();
+            if erste.is_empty() {
+                return None;
+            }
+            Some(match positionen.len() - 1 {
+                0 => erste.to_string(),
+                weitere => format!("{erste} und {weitere} weitere"),
+            })
         })
-        .filter(|b| !b.is_empty())
         .unwrap_or_else(|| art_name(art).to_string())
 }
 
@@ -2291,6 +2297,29 @@ mod tests {
         let _ = std::fs::remove_dir_all(&p);
         std::fs::create_dir_all(&p).unwrap();
         p
+    }
+
+    #[test]
+    fn buchungstext_aus_betreff_oder_positionen() {
+        let pos = |t: &str| Position {
+            beschreibung: t.into(),
+            menge: 1.0,
+            einheit: None,
+            einzelpreis_cent: 100,
+            kategorie_id: None,
+        };
+        let drei = [pos("Golf  "), pos("Passat"), pos("Polo")];
+        assert_eq!(
+            buchungstext(Some("Fuhrpark\nOktober"), &drei, "rechnung"),
+            "Fuhrpark"
+        );
+        assert_eq!(
+            buchungstext(Some("  "), &drei, "rechnung"),
+            "Golf und 2 weitere"
+        );
+        assert_eq!(buchungstext(None, &drei[..1], "quittung"), "Golf");
+        assert_eq!(buchungstext(None, &[pos(" ")], "quittung"), "Quittung");
+        assert_eq!(buchungstext(None, &[], "rechnung"), "Rechnung");
     }
 
     #[test]

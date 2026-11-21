@@ -484,9 +484,14 @@ describe('Erfassen-Schublade zum Termin', () => {
     expect(vorbelegungMitBezug({ typ: 'ausgabe' }, null)).toEqual({ typ: 'ausgabe' });
     expect(vorbelegungMitBezug({}, { termin: termin({ id: 7, kunde_id: 3 }), entwurf: null })).toEqual({ typ: 'einnahme', kunde: 3, betrag: 6_500, text: 'Rasen mähen', termin: 7 });
 
-    expect(ertragAusEntwurf(bezug.entwurf)).toEqual({ leistung: '', adresse: '', vorlage: { id: 4, design: 'klassisch' } });
-    expect(ertragAusEntwurf({ ...bezug.entwurf!, formular: { ...formular, betreff: 'Eigener' } }).leistung).toBe('Hecke');
-    expect(ertragAusEntwurf(null)).toEqual({ leistung: '', adresse: '', vorlage: null });
+    // die Positionen kommen mit (Kopie), das Leistungsdatum nur, wenn es vom Datum des Entwurfs abweicht
+    const aus = ertragAusEntwurf(bezug.entwurf);
+    expect(aus).toEqual({ positionen: formular.positionen, adresse: '', vorlage: { id: 4, design: 'klassisch' }, leistungVon: '', leistungBis: '', zielTage: formular.art === 'rechnung' ? formular.zielTage : '' });
+    expect(aus.positionen).not.toBe(formular.positionen);
+    expect(aus.positionen?.[0]).toMatchObject({ beschreibung: 'Hecke', preis: '90,00' });
+    const zeitraum = ertragAusEntwurf({ ...bezug.entwurf!, formular: { ...formular, leistungVon: '2026-10-19', leistungBis: '2026-10-21' } });
+    expect(zeitraum).toMatchObject({ leistungVon: '2026-10-19', leistungBis: '2026-10-21' });
+    expect(ertragAusEntwurf(null)).toEqual({ adresse: '', vorlage: null, leistungVon: '', leistungBis: '' });
     expect(ertragBezug(bezug)).toEqual({ termin: { id: 7, datum: H }, entwurf: formular });
     expect(ertragBezug(null)).toBeNull();
   });

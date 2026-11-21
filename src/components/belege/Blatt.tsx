@@ -550,21 +550,9 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
           <dd>{F.name}</dd>
           <dt>IBAN</dt>
           <dd className="blk-iban">{F.iban ? ibanFormat(F.iban) : ''}</dd>
-          {/* BIC nur, wenn hinterlegt (IBAN allein genügt); ohne BIC die Bank allein, ohne beides keine Zeile – wie im PDF */}
-          {F.bic.trim() ? (
-            <>
-              <dt>BIC</dt>
-              <dd>
-                {F.bic}
-                {F.bank.trim() ? ` · ${F.bank}` : ''}
-              </dd>
-            </>
-          ) : F.bank.trim() ? (
-            <>
-              <dt>Bank</dt>
-              <dd>{F.bank}</dd>
-            </>
-          ) : null}
+          {/* BIC ist freiwillig (SEPA): ohne BIC steht dort nur die Bank (wie im LaTeX) */}
+          <dt>{F.bic.trim() ? 'BIC' : 'Bank'}</dt>
+          <dd>{[F.bic.trim(), F.bank.trim()].filter(Boolean).join(' · ')}</dd>
           <dt>Betrag</dt>
           <dd>
             {/* Blanko: Betrag und Rechnungsnummer schreibt man von Hand */}

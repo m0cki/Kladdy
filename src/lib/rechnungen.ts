@@ -838,6 +838,16 @@ export function betragSetzen(f: BelegFormular, eingabe: string): BelegFormular {
   return { ...f, positionen: [{ ...erste, menge: '1', preis: eingabe, beschreibung: erste.beschreibung || f.betreff }, ...rest] };
 }
 
+/** Text der Einnahme zu einem Beleg – wie buchungstext in src-tauri/src/rechnungen.rs: Betreff (erste Zeile), sonst
+ *  die erste Position (bei mehreren „Golf und 2 weitere“), sonst die Belegart. */
+export function buchungstextAus(betreff: string, positionen: readonly Pick<BelegPosition, 'beschreibung'>[], art: Belegart): string {
+  const b = (betreff.split('\n')[0] ?? '').trim();
+  if (b) return b;
+  const erste = (positionen[0]?.beschreibung ?? '').replace(/\r?\n/g, ' ').trim();
+  if (erste) return positionen.length > 1 ? `${erste} und ${positionen.length - 1} weitere` : erste;
+  return ART_NAME[art];
+}
+
 /** Summe des Formulars in Cent (Vorschau, Hinweise). */
 export const formularSumme = (f: BelegFormular): number => belegSumme({ positionen: positionenAus(f) });
 

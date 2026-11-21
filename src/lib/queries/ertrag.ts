@@ -6,7 +6,7 @@ import type { BelegZeile } from '../rechnungen';
 import { ladeBelegEinstellungen, ladeFirma, ladeUstModus } from './einstellungen';
 import { ladeFirmenlogo } from './firmenlogo';
 import { ladeNummernkreise } from './nummernkreise';
-import { ladeKundenAnschrift, ladeOffeneRechnungen } from './rechnungen';
+import { ladeKundenAnschrift, ladeOffeneRechnungen, ladePositionsVorschlaege } from './rechnungen';
 import { ladeKennwerte } from './steuer';
 import { ladeVorlagenFuerArt } from './vorlagen';
 
@@ -16,10 +16,12 @@ export interface ErtragStamm extends Omit<ErtragKontext, 'heute'> {
   /** Einstellung „Neue Einnahme“: Beleg gleich ausstellen oder nur buchen */
   einnahmeWeg: 'beleg' | 'ohne';
   offene: BelegZeile[];
+  /** bisherige Positionstexte mit Einheit und Preis (Vorschläge in der Positionen-Liste) */
+  vorschlaege: { beschreibung: string; einheit: string | null; einzelpreis_cent: number }[];
 }
 
 export async function ladeErtragStamm(): Promise<ErtragStamm> {
-  const [kunden, firma, ustModus, kreise, kennwerte, einstellungen, quittung, rechnung, offene, logo] = await Promise.all([
+  const [kunden, firma, ustModus, kreise, kennwerte, einstellungen, quittung, rechnung, offene, logo, vorschlaege] = await Promise.all([
     ladeKundenAnschrift(),
     ladeFirma(),
     ladeUstModus(),
@@ -30,6 +32,8 @@ export async function ladeErtragStamm(): Promise<ErtragStamm> {
     ladeVorlagenFuerArt('rechnung'),
     ladeOffeneRechnungen(),
     ladeFirmenlogo(),
+    // Vorschläge sind nur eine Hilfe – fehlen sie, geht das Erfassen trotzdem
+    ladePositionsVorschlaege().catch(() => []),
   ]);
   return {
     kunden,
@@ -43,5 +47,6 @@ export async function ladeErtragStamm(): Promise<ErtragStamm> {
     belegArt: einstellungen.beleg_art,
     einnahmeWeg: einstellungen.einnahme_weg,
     offene,
+    vorschlaege,
   };
 }

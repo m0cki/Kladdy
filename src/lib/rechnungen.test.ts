@@ -3,6 +3,7 @@ import {
   anschriftLesen,
   anschriftText,
   artWechseln,
+  buchungstextAus,
   betreffSetzen,
   faelligAus,
   faelligText,
@@ -165,6 +166,14 @@ describe('Liste', () => {
 });
 
 describe('Formular', () => {
+  it('Buchungstext wie Rust (buchungstext): Betreff, sonst erste Position bzw. „… und n weitere“, sonst die Art', () => {
+    expect(buchungstextAus(' Gartenpflege\nzweite Zeile', [{ beschreibung: 'Rasen' }], 'rechnung')).toBe('Gartenpflege');
+    expect(buchungstextAus('', [{ beschreibung: ' Rasen\nmähen ' }], 'quittung')).toBe('Rasen mähen');
+    expect(buchungstextAus('', [{ beschreibung: 'Golf' }, { beschreibung: 'Passat' }, { beschreibung: 'Polo' }], 'quittung')).toBe('Golf und 2 weitere');
+    expect(buchungstextAus(' ', [{ beschreibung: ' ' }], 'rechnung')).toBe('Rechnung');
+    expect(buchungstextAus('', [], 'quittung')).toBe('Quittung');
+  });
+
   it('Mengen, Preise, Positionen', () => {
     expect(parseMenge('1,5')).toBe(1.5);
     expect(parseMenge('2')).toBe(2);
