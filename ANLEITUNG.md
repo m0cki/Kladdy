@@ -411,6 +411,9 @@ für die eigene App.
    neue Version, ein Toast „Version 1.2.0 ist da · Was ist neu? · Jetzt aktualisieren“ → `downloadAndInstall()` mit
    Fortschritt → `relaunch()`. **Vorher automatisch ein Backup** der Datenbank anlegen. Berechtigungen in
    `capabilities/default.json`: `"updater:default"`, `"process:allow-restart"`.
+   **Sicherung vor dem Update (umgesetzt 21.11.2026):** `installUpdate()` ruft vor dem Laden
+   `sicherung_anlegen('vor-update')` (Kopie der offenen Datenbank nach `sicherungen/vor-update/`). Schlägt sie fehl, wird
+   **nichts installiert**: Warn-Toast mit Grund und „Erneut versuchen“, die alte Version läuft weiter (§5 Sicherungen).
    **Laden und Neustart getrennt (umgesetzt 15.10.2026, `src/lib/updates.ts`):** wie bei Mac-Apps üblich.
    „Jetzt aktualisieren“ lädt und installiert nur (`update.download()` + `update.install()`, Fortschritt im Toast, man
    kann weiterarbeiten). Danach Toast „Update bereit · Jetzt neu starten · Später“. „Später“ (oder Toast wegklicken)
@@ -677,6 +680,23 @@ Regeln:
   für Dezember erhalten also eine Nummer des neuen Jahres.
 - **Kauf eines Anlageguts** (über der GWG-Grenze): echte Zahlung (`art` 'zahlung', mit Beleg und Zahlungsweg), aber in der
   EÜR nicht sofort abziehbar – sie verweist per `anlage_id` auf die Anlage, abgezogen wird über die AfA-Buchungen.
+
+**Sicherungen (umgesetzt 21.11.2026, `src-tauri/src/sicherungen.rs`, `src/lib/sicherungen.ts`):** Kopien per
+`VACUUM INTO` in `<appDataDir>/sicherungen/<anlass>/<stamm>-<anlass>-JJJJMMTT-hhmmss.db` (UTC, nie überschrieben;
+`kladdy` bzw. `kladdy-dev` trennt Release und Entwicklerversion). Anlässe: `automatisch` (bei jedem Start, ehe die Datenbank
+geöffnet wird; nur wenn die Datei existiert und nicht leer ist), `manuell` („Jetzt sichern“), `vor-update`,
+`vor-migration` (vor offenen Migrationen, wie bisher) und `vor-wiederherstellung`. Nur `automatisch/` rotiert: die 10
+neuesten plus je Kalendermonat die neueste für 12 Monate; alle anderen Ordner werden nie gelöscht. Fehler beim
+automatischen Sichern blockieren den Start nicht, sie erscheinen als Warn-Toast. Einstellungen › Daten › Sicherungen listet
+alle Kopien (Zeitpunkt, Anlass, Größe, Buchungen/Belege/Kunden, schreibgeschützt aus der Kopie gelesen; fremde oder neuere
+Kopien „nicht nutzbar“). **Wiederherstellen:** Pfad geprüft (nur `sicherungen/<anlass>/<datei>`, kein `..`, keine
+Symlinks), Kopie geprüft (`quick_check`, bekannte Migrationen mit passender Prüfsumme), Merkdatei `<db>.wiederherstellen`,
+Neustart. Beim nächsten Start vor allem anderen: aktuellen Stand nach `vor-wiederherstellung/` sichern (klappt das nicht
+⇒ Abbruch, nichts überschrieben), `-wal`/`-shm` entfernen, Kopie über eine temporäre Datei atomar einsetzen; danach laufen
+die Migrationen wie gewohnt (mit eigener Sicherung). Abgelegte Belegdateien und das Logo sind nicht in der Kopie.
+**Schutz der Migrationen (cargo test):** SHA-256 jeder ausgelieferten Migration ist festgehalten (ausgelieferte
+Migrationen nie ändern, für jede neue einen Hash ergänzen); ein Upgrade-Test füllt für jeden Zwischenstand alle
+vorhandenen Tabellen, migriert auf den neuesten Stand und prüft, dass keine Zeile fehlt und Stichwerte gleich bleiben.
 
 ---
 

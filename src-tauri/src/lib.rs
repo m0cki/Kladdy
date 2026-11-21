@@ -13,6 +13,7 @@ mod latex;
 mod liquiditaet;
 mod nummern;
 mod rechnungen;
+mod sicherungen;
 mod tectonic;
 mod termine;
 
@@ -131,13 +132,19 @@ pub fn run() {
     #[cfg(debug_assertions)]
     let builder = builder.plugin(demo::modus_plugin());
     builder
-        // Datenbank (§5): erst sichern, dann darf das SQL-Plugin migrieren – Reihenfolge nicht vertauschen.
-        // Scheitert die Sicherung, bleibt die Datei zu (`datenbank_url`); die Meldung liefert `sicherung_status`.
+        // Datenbank (§5): erst wiederherstellen (falls vorgemerkt) und sichern, dann darf das SQL-Plugin migrieren –
+        // Reihenfolge nicht vertauschen. Scheitert die Sicherung vor Migrationen, bleibt die Datei zu
+        // (`datenbank_url`); die Meldung liefert `sicherung_status`, alles andere `sicherungen_start_bericht`.
         .plugin(datenbank::sicherungs_plugin())
         .plugin(datenbank::sql_plugin())
         .invoke_handler(tauri::generate_handler![
             datenbank::datenbank_url,
             datenbank::sicherung_status,
+            sicherungen::sicherung_anlegen,
+            sicherungen::sicherungen_auflisten,
+            sicherungen::sicherungen_ordner_zeigen,
+            sicherungen::sicherung_wiederherstellen_vormerken,
+            sicherungen::sicherungen_start_bericht,
             ist_entwicklerversion,
             buchungen::buchung_anlegen,
             buchungen::buchung_aendern,

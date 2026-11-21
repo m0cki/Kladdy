@@ -1,5 +1,6 @@
 /* App-Rahmen: Aurora, Seitenleiste, Kopfzeile, Inhalt, Schubladen, Toasts, beim Start Update-Prüfung
- * und Meldung, wenn die Sicherung vor einem Datenbank-Update fehlgeschlagen ist.
+ * und Meldung, wenn die Sicherung vor einem Datenbank-Update fehlgeschlagen ist, eine Sicherung wiederhergestellt
+ * wurde oder die automatische Sicherung beim Start nicht geklappt hat (lib/sicherungen.ts).
  * Datei-Drop aufs Fenster: lib/belegablage.ts (Overlay „Beleg hier ablegen“).
  * Globale Kürzel: In der Mac-App gehören ⌘N, ⌘O, ⇧⌘L und ⌘\ dem nativen Menü (Events über lib/menu.ts);
  * im Browser (npm run dev) übernimmt sie der Tastatur-Handler hier. ⌘K (Suche) ist immer Sache der Oberfläche. */
@@ -12,7 +13,8 @@ import { demoStatusLaden } from '../../lib/demo';
 import { runCommand } from '../../lib/commands';
 import { watchFenster } from '../../lib/fenster';
 import { inTauri, onMenu, type MenuId } from '../../lib/menu';
-import { isEinstellungen } from '../../lib/einstellungen-index';
+import { bereichPfad, isEinstellungen } from '../../lib/einstellungen-index';
+import { startBericht, wiederhergestelltText } from '../../lib/sicherungen';
 import { autoCheckOnStart } from '../../lib/updates';
 import { useUi } from '../../store/ui';
 import { Toasts } from '../ui/Toasts';
@@ -56,6 +58,20 @@ export function AppShell() {
           sticky: true,
           actions: [{ label: 'Neu starten', run: () => void relaunch().catch((e: unknown) => console.error('Neustart fehlgeschlagen', e)) }],
         });
+      })
+      .catch(() => undefined);
+  }, []);
+  // Was beim Start mit den Sicherungen passiert ist (einmal abholbar): Wiederherstellen erledigt oder fehlgeschlagen,
+  // automatische Sicherung fehlgeschlagen. Die App läuft in jedem Fall normal weiter.
+  useEffect(() => {
+    void startBericht()
+      .then((b) => {
+        const ui = useUi.getState();
+        const ansehen = { label: 'Sicherungen ansehen', run: () => navRef.current(bereichPfad('daten', 'sicherungen')) };
+        if (b.wiederhergestellt) {
+          ui.showToast({ key: 'wiederhergestellt', text: wiederhergestelltText(b.wiederhergestellt), icon: 'check', sticky: true });
+        }
+        b.fehler.forEach((text, i) => ui.showToast({ key: `sicherung-start-${i}`, text, icon: 'warn', sticky: true, actions: [ansehen] }));
       })
       .catch(() => undefined);
   }, []);
