@@ -47,7 +47,7 @@ export const BEREICHE: readonly Bereich[] = [
   { id: 'belege', label: 'Belege', icon: FileText },
   { id: 'steuern', label: 'Steuern', icon: Landmark },
   { id: 'nummernkreise', label: 'Nummernkreise', icon: Hash },
-  { id: 'datensicherung', label: 'Datensicherung', icon: HardDriveDownload, phase: 5, inhalt: 'Sicherungsziel, „Jetzt sichern“ und „Wiederherstellen …“.' },
+  { id: 'datensicherung', label: 'Datensicherung', icon: HardDriveDownload, phase: 5, inhalt: 'Sicherungsziel außerhalb des Macs (USB-Stick, iCloud Drive). Die Sicherungen auf diesem Mac stehen unter „Daten“.' },
   { id: 'daten', label: 'Daten', icon: Database },
   { id: 'updates', label: 'Updates & Über Kladdy', icon: Info },
 ];
@@ -126,7 +126,13 @@ export const EINSTELLUNGEN: readonly EinstellungsEintrag[] = [
     bereich: 'nummernkreise' as const,
     keywords: ['Nummernkreis', 'Muster', 'Nächste Nummer', KREIS_NAMEN[id]],
   })),
-  /* Daten (§3.1, §6.10); Demo-Daten nur in der Entwicklerversion (lib/demo.ts) */
+  /* Daten (§3.1, §5, §6.10); Demo-Daten nur in der Entwicklerversion (lib/demo.ts) */
+  {
+    id: 'sicherungen',
+    label: 'Sicherungen',
+    bereich: 'daten',
+    keywords: ['Backup', 'Sicherung', 'Jetzt sichern', 'Wiederherstellen', 'Finder', 'Datenverlust', 'Update'],
+  },
   { id: 'tectonic', label: 'Tectonic-Pfad', bereich: 'daten', keywords: ['LaTeX', 'PDF', 'Homebrew', 'Programm'] },
   { id: 'tectonic-pruefen', label: 'Tectonic prüfen', bereich: 'daten', keywords: ['LaTeX', 'PDF', 'Version', 'testen'] },
   { id: 'testbeleg', label: 'Testbeleg erzeugen', bereich: 'daten', keywords: ['PDF', 'LaTeX', 'Rechnung', 'Quittung', 'Vorschau', 'Probe'] },

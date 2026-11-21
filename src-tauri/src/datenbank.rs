@@ -13,6 +13,8 @@
 //!   `db-sicherung` beim Start eine Kopie per `VACUUM INTO` an. Schlägt das fehl, startet die App trotzdem, öffnet
 //!   die Datei aber nicht (lieber keine Daten als eine Migration ohne Sicherung): `SicherungsStatus` merkt sich die
 //!   Meldung, `datenbank_url` gibt die Datei nicht heraus, `sicherung_status` liefert die Meldung fürs Frontend.
+//! - Dazu (src/sicherungen.rs): vorgemerkte Wiederherstellung vor allem anderen, automatische Sicherung bei jedem
+//!   Start (blockiert nie), Sicherungen von Hand und vor Updates.
 
 #[cfg(any(test, debug_assertions))]
 use std::future::Future;
@@ -31,6 +33,8 @@ use tauri::plugin::{Builder as PluginBuilder, TauriPlugin};
 use tauri::{Manager, Runtime};
 use tauri_plugin_sql::{Migration, MigrationKind};
 
+use crate::sicherungen;
+
 /// Dateiname der Datenbank. Einzige Quelle; das Frontend fragt ihn über `datenbank_url` ab.
 pub const DB_DATEI: &str = if cfg!(debug_assertions) {
     "kladdy-dev.db"
@@ -38,7 +42,7 @@ pub const DB_DATEI: &str = if cfg!(debug_assertions) {
     "kladdy.db"
 };
 
-/// Unterordner (im App-Verzeichnis) für die Kopien vor einer Migration.
+/// Unterordner (im App-Verzeichnis) für die Kopien vor einer Migration (`sicherungen::Art::VorMigration`).
 const SICHERUNGS_ORDNER: &str = "sicherungen/vor-migration";
 
 /// Eine Migration aus `src-tauri/migrations/`.
@@ -209,15 +213,28 @@ impl MigrationSource<'static> for MigrationsQuelle {
 /// Migrationen offen sind. Die Demo-Datei braucht keine Sicherung (wird frisch angelegt, siehe src/demo.rs).
 /// Schlägt die Sicherung fehl, startet die App trotzdem (ein Fehler hier hieße: stiller Abbruch ohne Fenster).
 /// `SicherungsStatus` hält dann die Meldung, und die Datei wird weder geöffnet noch migriert.
+///
+/// Reihenfolge beim Start (alles vor dem SQL-Plugin, also bevor irgendwer die Datei öffnet):
+/// 1. vorgemerkte Wiederherstellung (src/sicherungen.rs, sichert vorher den aktuellen Stand),
+/// 2. Sicherung vor offenen Migrationen (blockiert bei Fehler das Öffnen, siehe oben),
+/// 3. automatische Sicherung samt Rotation (blockiert nie, Fehler gehen in den `StartBericht`).
 pub fn sicherungs_plugin<R: Runtime>() -> TauriPlugin<R> {
     PluginBuilder::new("db-sicherung")
         .setup(|app, _api| {
             let ordner = app.path().app_config_dir()?;
             let db = ordner.join(DB_DATEI);
+            let sicherungen = ordner.join(sicherungen::ORDNER);
+            let jetzt = jetzt_sekunden();
+            let wiederherstellung =
+                sicherungen::vorgemerkte_wiederherstellung(&db, &sicherungen, jetzt);
             let ziel = ordner.join(SICHERUNGS_ORDNER);
             let versionen: Vec<i64> = MIGRATIONEN.iter().map(|m| m.version).collect();
-            let fehler = sicherung_beim_start(&db, &ziel, &versionen, jetzt_sekunden());
+            let fehler = sicherung_beim_start(&db, &ziel, &versionen, jetzt);
+            let automatisch = sicherungen::automatisch_beim_start(&db, &sicherungen, jetzt);
             app.manage(SicherungsStatus(fehler));
+            app.manage(sicherungen::StartBericht(std::sync::Mutex::new(Some(
+                sicherungen::Bericht::aus(wiederherstellung, automatisch),
+            ))));
             Ok(())
         })
         .build()
@@ -270,7 +287,7 @@ pub fn db_fehler(e: sqlx::Error) -> String {
     }
 }
 
-fn jetzt_sekunden() -> u64 {
+pub(crate) fn jetzt_sekunden() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs())
@@ -289,7 +306,7 @@ pub fn offene_migrationen(angewendet: &[i64], bekannt: &[i64]) -> Vec<i64> {
 }
 
 /// Datum und Uhrzeit (UTC) aus Unix-Sekunden ohne Zusatz-Crate (Tage → Datum nach H. Hinnant, „civil_from_days“).
-fn utc_teile(sekunden: u64) -> (i64, i64, i64, u64, u64, u64) {
+pub(crate) fn utc_teile(sekunden: u64) -> (i64, i64, i64, u64, u64, u64) {
     let tage = (sekunden / 86_400) as i64;
     let rest = sekunden % 86_400;
     let (h, mi, s) = (rest / 3600, rest % 3600 / 60, rest % 60);
@@ -423,22 +440,17 @@ pub(crate) mod testhilfe {
         migrator.run_direct(&mut c).await.unwrap();
         c
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use sqlx::migrate::Migrator;
 
     /// Eigener leerer Ordner je Test (ohne tempfile-Crate).
-    fn testordner(name: &str) -> PathBuf {
+    pub fn testordner(name: &str) -> PathBuf {
         let p = std::env::temp_dir().join(format!("kladdy-test-{}-{name}", std::process::id()));
         let _ = std::fs::remove_dir_all(&p);
         std::fs::create_dir_all(&p).unwrap();
         p
     }
 
-    async fn verbinden(pfad: &Path) -> SqliteConnection {
+    /// Verbindung zu einer Datei (legt sie bei Bedarf an).
+    pub async fn verbinden(pfad: &Path) -> SqliteConnection {
         SqliteConnectOptions::new()
             .filename(pfad)
             .create_if_missing(true)
@@ -448,7 +460,7 @@ mod tests {
     }
 
     /// Wendet die ersten `bis` Migrationen an.
-    async fn migrieren(pfad: &Path, bis: usize) {
+    pub async fn migrieren(pfad: &Path, bis: usize) {
         let mut c = verbinden(pfad).await;
         let migrator = Migrator::new(MigrationsQuelle(MIGRATIONEN.iter().take(bis).collect()))
             .await
@@ -456,6 +468,12 @@ mod tests {
         migrator.run_direct(&mut c).await.unwrap();
         c.close().await.unwrap();
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::testhilfe::{migrieren, testordner, verbinden};
+    use super::*;
 
     fn versionen() -> Vec<i64> {
         MIGRATIONEN.iter().map(|m| m.version).collect()
@@ -1273,6 +1291,389 @@ mod tests {
             c.close().await.unwrap();
         });
         let _ = std::fs::remove_dir_all(&ordner);
+    }
+
+    /// SHA-256 des SQL-Texts jeder ausgelieferten Migration. Ausgelieferte Migrationen NIE ändern: sqlx merkt sich
+    /// je Version eine Prüfsumme und verweigert sonst das Öffnen der Datenbank (die App wirkt dann leer). Schlägt
+    /// dieser Test fehl, wurde eine alte Datei geändert ⇒ Änderung zurücknehmen und als neue Migration anhängen.
+    /// Neue Migration ⇒ ihren Hash hier ergänzen (`shasum -a 256 src-tauri/migrations/00NN_*.sql`).
+    const PRUEFSUMMEN: &[(i64, &str)] = &[
+        (
+            1,
+            "4fbc9680ba2ad8b2d3142bfa46ceb2e32022e4a7928da2cd31365d1d77cb04a7",
+        ),
+        (
+            2,
+            "e7096aa13d994841f9dbffa39f7e3cf72ea9feea242b37e37de0b055e0ba2773",
+        ),
+        (
+            3,
+            "a4b1f2b071ea2a15aff0ccdaaf858f775523a219961cfe1b636b0e098abb2ee2",
+        ),
+        (
+            4,
+            "bdaacd8ffc95155913c21f31ca945a66cf5e6628c62d3d1522eea5e874613020",
+        ),
+        (
+            5,
+            "ac5bfd0710eb332d52eca66dc3b06b5a9083267bd3d0dcb45a792e4a1e71c361",
+        ),
+        (
+            6,
+            "decf264a16779259c1b7afd8e1fa8a0f18238b6562ff2bd3868104cd4fafa701",
+        ),
+        (
+            7,
+            "1365c6fb6ea477dbfead5c1022aae99dec811754a9b5423fb2d40402d306dff5",
+        ),
+        (
+            8,
+            "4d03ddc28c9294f339c37897bb7d4e5411b9ab28220ba558cfcc587dcf3449f0",
+        ),
+        (
+            9,
+            "b4d63d2474badb02ea4e1d24d0f01dcde95ef9e1a1ace7bb7c84b527681b786c",
+        ),
+        (
+            10,
+            "773ce660841ec963d20538b7339588514617d54be709fde8ea9ff43d290f01ea",
+        ),
+        (
+            11,
+            "69ad5dd163de6fc2f3f2eb4d329ad1a0f05f3a2eaeec4821cbe1708f20f03e20",
+        ),
+    ];
+
+    #[test]
+    fn ausgelieferte_migrationen_unveraendert() {
+        use sha2::{Digest, Sha256};
+        assert_eq!(
+            MIGRATIONEN.len(),
+            PRUEFSUMMEN.len(),
+            "Neue Migration? Ihren SHA-256 in PRUEFSUMMEN ergänzen."
+        );
+        for (m, (version, soll)) in MIGRATIONEN.iter().zip(PRUEFSUMMEN) {
+            assert_eq!(m.version, *version);
+            let ist: String = Sha256::digest(m.sql.as_bytes())
+                .iter()
+                .map(|b| format!("{b:02x}"))
+                .collect();
+            assert_eq!(
+                ist, *soll,
+                "Migration {version} wurde nach der Auslieferung geändert. Nie ändern, neue Migration anhängen!"
+            );
+        }
+    }
+
+    /// Spalten je Nutztabelle (ohne sqlx- und SQLite-eigene Tabellen).
+    type Spalten = std::collections::BTreeMap<String, Vec<String>>;
+    /// Tabelle ⇒ Primärschlüssel ⇒ Spalte ⇒ Wert (als SQL-Literal über `quote()`, so ist NULL von 'NULL' verschieden).
+    type Abbild = std::collections::BTreeMap<
+        String,
+        std::collections::BTreeMap<String, std::collections::BTreeMap<String, String>>,
+    >;
+
+    async fn spalten_lesen(c: &mut SqliteConnection) -> Spalten {
+        let tabellen: Vec<String> = sqlx::query_scalar(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name <> '_sqlx_migrations' ORDER BY name",
+        )
+        .fetch_all(&mut *c)
+        .await
+        .unwrap();
+        let mut spalten = Spalten::new();
+        for t in tabellen {
+            let namen: Vec<String> =
+                sqlx::query_scalar("SELECT name FROM pragma_table_info(?) ORDER BY cid")
+                    .bind(&t)
+                    .fetch_all(&mut *c)
+                    .await
+                    .unwrap();
+            spalten.insert(t, namen);
+        }
+        spalten
+    }
+
+    /// Liest alle Zeilen der Tabellen in `spalten` (nur diese Spalten), Schlüssel = Primärschlüssel (sonst rowid).
+    async fn abbild(c: &mut SqliteConnection, spalten: &Spalten) -> Abbild {
+        use sqlx::Row;
+        let mut abbild = Abbild::new();
+        for (t, namen) in spalten {
+            let pk: Vec<String> = sqlx::query_scalar(
+                "SELECT name FROM pragma_table_info(?) WHERE pk > 0 ORDER BY pk",
+            )
+            .bind(t)
+            .fetch_all(&mut *c)
+            .await
+            .unwrap();
+            let schluessel = if pk.is_empty() {
+                "quote(rowid)".to_string()
+            } else {
+                pk.iter()
+                    .map(|p| format!("quote(\"{p}\")"))
+                    .collect::<Vec<_>>()
+                    .join(" || '|' || ")
+            };
+            let werte: Vec<String> = namen.iter().map(|n| format!("quote(\"{n}\")")).collect();
+            let sql = format!("SELECT {schluessel}, {} FROM \"{t}\"", werte.join(", "));
+            let zeilen = sqlx::query(&sql).fetch_all(&mut *c).await.unwrap();
+            let mut tabelle = std::collections::BTreeMap::new();
+            for z in zeilen {
+                let k: String = z.get(0);
+                let felder = namen
+                    .iter()
+                    .enumerate()
+                    .map(|(i, n)| (n.clone(), z.get::<String, _>(i + 1)))
+                    .collect();
+                tabelle.insert(k, felder);
+            }
+            abbild.insert(t.clone(), tabelle);
+        }
+        abbild
+    }
+
+    /// Repräsentative Daten auf Schemastand `k` (nur Tabellen und Spalten, die es dann schon gibt), in der
+    /// Reihenfolge, in der die App sie schreibt (Positionen vor der Nummer, Belege vor dem PDF-Verweis).
+    async fn fuellen(c: &mut SqliteConnection, k: usize) {
+        let mut sql: Vec<&str> = vec![
+            "INSERT INTO einstellungen (schluessel, wert) VALUES
+               ('firma', '{\"name\":\"Gartenservice Müller\",\"iban\":\"DE02120300000000202051\"}'),
+               ('beleg_art', '\"quittung\"'),
+               ('vorlagen_design', '{\"quittung\":\"klassisch\"}')",
+            "INSERT INTO steuer_parameter (jahr, schluessel, wert) VALUES (2027, 'ku_grenze_vorjahr_cent', '2500000')",
+            "UPDATE steuer_parameter SET wert = '2600000' WHERE jahr = 2026 AND schluessel = 'ku_grenze_vorjahr_cent'",
+            "INSERT INTO kategorien (id, name, typ, euer_bereich, sortierung) VALUES (50, 'Werbung', 'ausgabe', 'Übrige Betriebsausgaben', 9)",
+            "UPDATE kategorien SET stichworte = 'rasen,hecke,garten' WHERE id = 1",
+            "INSERT INTO kunden (id, nummer, name, strasse, plz, ort, email, notiz, erstellt_am) VALUES
+               (1, 'K-0001', 'Anna Schmidt', 'Lindenweg 3', '12345', 'Musterstadt', 'anna@example.org', 'Hund im Garten', '2026-01-05T09:00:00Z'),
+               (2, 'K-0002', 'Müller & Söhne 100%', NULL, NULL, NULL, NULL, NULL, '2026-02-01T09:00:00Z')",
+            "UPDATE nummernkreise SET jahr = 2026, naechste = 5 WHERE id = 'buchung'",
+            "UPDATE nummernkreise SET naechste = 3 WHERE id = 'kunde'",
+            "UPDATE nummernkreise SET jahr = 2026, naechste = 2 WHERE id = 'quittung'",
+            "INSERT INTO termine (id, kunde_id, datum, von, bis, adresse, leistung, betrag_geschaetzt_cent, status, erstellt_am, geaendert_am)
+               VALUES (1, 1, '2026-03-02', '09:00', '11:00', 'Lindenweg 3', 'Hecke schneiden', 8000, 'erledigt', 'a', 'a')",
+            "INSERT INTO vorlagen (id, name, art, bloecke_json, ist_standard, geaendert_am) VALUES
+               (1, 'Meine Rechnung', 'rechnung', '[{\"typ\":\"kopf\",\"logo\":true}]', 1, '2026-02-01T10:00:00Z'),
+               (2, 'Meine Quittung', 'quittung', '[{\"typ\":\"titel\"}]', 0, '2026-02-02T10:00:00Z')",
+            "INSERT INTO vorlagen_assets (id, vorlage_id, dateiname, pfad) VALUES (1, 1, 'logo.png', 'assets/logo-1.png')",
+            "INSERT INTO rechnungen (id, art, status, kunde_id, datum, summe_cent, termin_id, erstellt_am, geaendert_am)
+               VALUES (1, 'quittung', 'entwurf', 1, '2026-03-02', 12345, 1, 'a', 'a')",
+            "INSERT INTO rechnungspositionen (id, rechnung_id, pos, beschreibung, menge, einheit, einzelpreis_cent, kategorie_id) VALUES
+               (1, 1, 1, 'Hecke schneiden', 1.5, 'Std.', 4500, 1),
+               (2, 1, 2, 'Grünschnitt entsorgen', 1, NULL, 5595, 1)",
+            "INSERT INTO rechnungen (id, art, status, kunde_id, betreff, summe_cent, erstellt_am, geaendert_am)
+               VALUES (2, 'rechnung', 'entwurf', 2, 'Winterdienst', 30000, 'a', 'a')",
+            "INSERT INTO rechnungspositionen (id, rechnung_id, pos, beschreibung, menge, einzelpreis_cent) VALUES (3, 2, 1, 'Winterdienst Dezember', 1, 30000)",
+            "INSERT INTO anlagen (id, bezeichnung, anschaffung_datum, kosten_cent, nutzungsdauer_jahre) VALUES (1, 'Rasenmäher', '2026-01-10', 100000, 4)",
+            "INSERT INTO wiederkehrend (id, vorlage_json, rhythmus, naechstes_datum) VALUES (1, '{\"betrag_cent\":2999}', 'monatlich', '2026-04-01')",
+            "INSERT INTO buchungen (id, nummer, typ, zahlungsdatum, belegdatum, betrag_cent, kategorie_id, kunde_id, zahlungsart, belegnummer, beschreibung, rechnung_id, termin_id, erstellt_am, geaendert_am)
+               VALUES (1, '2026-0001', 'einnahme', '2026-03-02', '2026-03-02', 12345, 1, 1, 'bar', 'QU-2026-001', 'Hecke schneiden', 1, 1, 'a', 'a')",
+            "INSERT INTO buchungen (id, nummer, typ, zahlungsdatum, betrag_cent, kategorie_id, lieferant, zahlungsart, beschreibung, wiederkehrend_id, erstellt_am, geaendert_am) VALUES
+               (2, '2026-0002', 'ausgabe', '2026-03-05', 6789, 3, 'Aral Tankstelle', 'bank', 'Diesel', 1, 'a', 'a'),
+               (3, '2026-0003', 'ausgabe', '2026-03-05', 6789, 3, 'Aral Tankstelle', 'bank', 'Diesel', NULL, 'a', 'a')",
+            "UPDATE buchungen SET storno_von_id = 2 WHERE id = 3",
+            "INSERT INTO buchungen (id, nummer, typ, zahlungsdatum, betrag_cent, kategorie_id, art, zahlungsart, beschreibung, anlage_id, erstellt_am, geaendert_am)
+               VALUES (4, '2026-0004', 'ausgabe', '2026-12-31', 25000, 4, 'afa', NULL, 'AfA Rasenmäher', 1, 'a', 'a')",
+            "INSERT INTO belege (id, buchung_id, pfad, originalname, mime, sha256, groesse, art, aufbewahren_bis, erstellt_am)
+               VALUES (1, 2, '2026/aa11.pdf', 'tankbeleg.pdf', 'application/pdf', 'aa11', 2048, 'beleg', '2034-12-31', 'a')",
+            "INSERT INTO belege (id, rechnung_id, pfad, mime, sha256, groesse, art, aufbewahren_bis, erstellt_am)
+               VALUES (2, 1, '2026/bb22.pdf', 'application/pdf', 'bb22', 4096, 'rechnung_pdf', '2036-12-31', 'a')",
+            "INSERT INTO planposten (id, datum, text, betrag_cent) VALUES (1, '2026-04-15', 'Kfz-Versicherung', -45000)",
+            "INSERT INTO fahrten (id, datum, start, ziel, zweck, km, kunde_id) VALUES (1, '2026-03-02', 'Büro', 'Lindenweg 3', 'Hecke', 12.5, 1)",
+            "INSERT INTO variablen (name, wert, beschreibung) VALUES ('stundensatz', '45', 'Stundensatz in €')",
+            "INSERT INTO kennzahlen (id, name, formel, format, angeheftet) VALUES (1, 'Marge', 'gewinn / einnahmen', 'prozent', 1)",
+        ];
+        if k >= 7 {
+            sql.push("UPDATE rechnungen SET zahlungsart = 'bar', entwurf_json = '{\"herkunft\":\"termin\"}' WHERE id = 1");
+            sql.push("UPDATE rechnungen SET entwurf_json = '{\"vorlage_design\":\"klassisch\"}' WHERE id = 2");
+        }
+        sql.push(
+            "UPDATE rechnungen SET nummer = 'QU-2026-001', status = 'bezahlt', kunde_name = 'Anna Schmidt',
+               kunde_adresse = 'Lindenweg 3, 12345 Musterstadt', kunde_nummer = 'K-0001', bezahlt_am = '2026-03-02',
+               pdf_beleg_id = 2, snapshot_json = '{\"nummer\":\"QU-2026-001\"}' WHERE id = 1",
+        );
+        if k >= 3 {
+            sql.push(
+                "INSERT INTO protokoll (id, zeitpunkt, tabelle, datensatz_id, aktion, alt_json, neu_json, schluessel) VALUES
+                   (1, '2026-03-02T10:00:00Z', 'buchungen', 1, 'neu', NULL, '{\"betrag_cent\":12345}', NULL),
+                   (2, '2026-03-06T10:00:00Z', 'buchungen', 2, 'storniert', '{\"betrag_cent\":6789}', NULL, NULL),
+                   (3, '2026-01-02T08:00:00Z', 'einstellungen', 0, 'geaendert', '{}', '{\"name\":\"Gartenservice Müller\"}', 'firma')",
+            );
+        } else {
+            sql.push(
+                "INSERT INTO protokoll (id, zeitpunkt, tabelle, datensatz_id, aktion, alt_json, neu_json) VALUES
+                   (1, '2026-03-02T10:00:00Z', 'buchungen', 1, 'neu', NULL, '{\"betrag_cent\":12345}'),
+                   (2, '2026-03-06T10:00:00Z', 'buchungen', 2, 'storniert', '{\"betrag_cent\":6789}', NULL)",
+            );
+        }
+        if k >= 8 {
+            sql.push("INSERT INTO euer_zuordnung (jahr, kategorie_id, euer_bereich, euer_zeile) VALUES (2027, 1, NULL, 12)");
+            sql.push(
+                "UPDATE euer_zuordnung SET euer_zeile = 20 WHERE jahr = 2026 AND kategorie_id = 3",
+            );
+        }
+        if k >= 10 {
+            sql.push(
+                "INSERT INTO vorlagen (id, name, art, bloecke_json, ist_standard, geaendert_am, basis)
+                   VALUES (3, 'Meine Quittung (Formular)', 'quittung', '[]', 1, '2026-02-03T10:00:00Z', 'formular')",
+            );
+        }
+        sql.push("INSERT INTO festschreibungen (bis_datum, am) VALUES ('2025-12-31', '2026-01-10T08:00:00Z')");
+        for s in sql {
+            sqlx::query(s)
+                .execute(&mut *c)
+                .await
+                .unwrap_or_else(|e| panic!("Stand {k}: {e}\n{s}"));
+        }
+    }
+
+    /// Upgrade von jedem früheren Schemastand auf den neuesten: keine Zeile geht verloren, kein vorhandener Wert
+    /// ändert sich – außer den beabsichtigten Umstellungen aus 0011 (aktive eigene Vorlage in `vorlagen_design`,
+    /// `vorlage_id` der Entwürfe), die genau so erwartet werden.
+    #[test]
+    fn upgrade_von_jedem_stand_verliert_nichts() {
+        let neueste = MIGRATIONEN.len();
+        for k in 2..neueste {
+            let ordner = testordner(&format!("upgrade-{k}"));
+            let db = ordner.join("kladdy.db");
+            tauri::async_runtime::block_on(async {
+                migrieren(&db, k).await;
+                let mut c = verbinden(&db).await;
+                fuellen(&mut c, k).await;
+                let spalten = spalten_lesen(&mut c).await;
+                let vorher = abbild(&mut c, &spalten).await;
+                c.close().await.unwrap();
+
+                migrieren(&db, neueste).await;
+                let mut c = verbinden(&db).await;
+                let nachher = abbild(&mut c, &spalten).await;
+
+                // Keine Zeile fehlt (neue, z. B. Kategorien aus 0008, dürfen dazukommen); Unterschiede sammeln
+                let mut unterschiede = Vec::new();
+                for (t, zeilen) in &vorher {
+                    let neu = &nachher[t];
+                    let fehlen: Vec<&String> =
+                        zeilen.keys().filter(|s| !neu.contains_key(*s)).collect();
+                    assert!(fehlen.is_empty(), "Stand {k}: in {t} fehlen {fehlen:?}");
+                    for (schluessel, felder) in zeilen {
+                        for (spalte, wert) in felder {
+                            let w = &neu[schluessel][spalte];
+                            if w != wert {
+                                unterschiede
+                                    .push(format!("{t}[{schluessel}].{spalte}: {wert} ⇒ {w}"));
+                            }
+                        }
+                    }
+                }
+                assert_eq!(
+                    unterschiede,
+                    vec![
+                        "einstellungen['vorlagen_design'].wert: '{\"quittung\":\"klassisch\"}' ⇒ '{\"quittung\":\"klassisch\",\"rechnung\":\"eigen:1\"}'".to_string(),
+                        "rechnungen[2].vorlage_id: NULL ⇒ 1".to_string(),
+                    ],
+                    "Stand {k}"
+                );
+                for t in [
+                    "buchungen",
+                    "kunden",
+                    "rechnungen",
+                    "rechnungspositionen",
+                    "belege",
+                    "einstellungen",
+                    "vorlagen",
+                    "protokoll",
+                ] {
+                    assert!(!vorher[t].is_empty(), "Stand {k}: {t} ohne Testdaten");
+                }
+
+                // Stichproben: Beträge, Nummern, Namen
+                let buchungen: Vec<(String, i64, Option<i64>)> = sqlx::query_as(
+                    "SELECT nummer, betrag_cent, storno_von_id FROM buchungen ORDER BY id",
+                )
+                .fetch_all(&mut c)
+                .await
+                .unwrap();
+                assert_eq!(
+                    buchungen,
+                    vec![
+                        ("2026-0001".into(), 12345, None),
+                        ("2026-0002".into(), 6789, None),
+                        ("2026-0003".into(), 6789, Some(2)),
+                        ("2026-0004".into(), 25000, None),
+                    ]
+                );
+                let quittung: (String, String, i64, String) = sqlx::query_as(
+                    "SELECT nummer, kunde_name, summe_cent, status FROM rechnungen WHERE id = 1",
+                )
+                .fetch_one(&mut c)
+                .await
+                .unwrap();
+                assert_eq!(
+                    quittung,
+                    (
+                        "QU-2026-001".into(),
+                        "Anna Schmidt".into(),
+                        12345,
+                        "bezahlt".into()
+                    )
+                );
+                let positionen: f64 = sqlx::query_scalar(
+                    "SELECT sum(menge * einzelpreis_cent) FROM rechnungspositionen WHERE rechnung_id = 1",
+                )
+                .fetch_one(&mut c)
+                .await
+                .unwrap();
+                assert_eq!(positionen, 12345.0);
+                let kunden: Vec<String> = sqlx::query_scalar("SELECT name FROM kunden ORDER BY id")
+                    .fetch_all(&mut c)
+                    .await
+                    .unwrap();
+                assert_eq!(kunden, vec!["Anna Schmidt", "Müller & Söhne 100%"]);
+                let belege: Vec<String> =
+                    sqlx::query_scalar("SELECT sha256 FROM belege ORDER BY id")
+                        .fetch_all(&mut c)
+                        .await
+                        .unwrap();
+                assert_eq!(belege, vec!["aa11", "bb22"]);
+                let vorlagen: Vec<(i64, String, i64)> =
+                    sqlx::query_as("SELECT id, name, archiviert FROM vorlagen ORDER BY id")
+                        .fetch_all(&mut c)
+                        .await
+                        .unwrap();
+                assert_eq!(vorlagen[0], (1, "Meine Rechnung".into(), 0));
+                assert_eq!(
+                    vorlagen[1],
+                    (2, "Meine Quittung".into(), 1),
+                    "abgeschaltete Kopie ⇒ archiviert"
+                );
+                let kunde_nr: i64 =
+                    sqlx::query_scalar("SELECT naechste FROM nummernkreise WHERE id = 'kunde'")
+                        .fetch_one(&mut c)
+                        .await
+                        .unwrap();
+                assert_eq!(kunde_nr, 3);
+                // Schema stimmig, Datei heil, neuester Stand
+                assert!(
+                    sqlx::query("PRAGMA foreign_key_check")
+                        .fetch_all(&mut c)
+                        .await
+                        .unwrap()
+                        .is_empty(),
+                    "Stand {k}: Fremdschlüssel verletzt"
+                );
+                let heil: String = sqlx::query_scalar("PRAGMA integrity_check")
+                    .fetch_one(&mut c)
+                    .await
+                    .unwrap();
+                assert_eq!(heil, "ok");
+                let stand: i64 = sqlx::query_scalar("SELECT max(version) FROM _sqlx_migrations")
+                    .fetch_one(&mut c)
+                    .await
+                    .unwrap();
+                assert_eq!(stand, neueste as i64);
+                c.close().await.unwrap();
+            });
+            let _ = std::fs::remove_dir_all(&ordner);
+        }
     }
 
     #[test]

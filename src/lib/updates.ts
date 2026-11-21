@@ -1,7 +1,8 @@
 /* Updates aus der App heraus (§3.2): tauri-plugin-updater + tauri-plugin-process.
  * - Automatisch beim Start höchstens einmal pro Tag, nur wenn „Automatisch nach Updates suchen“ an ist (Standard: an).
  * - Von Hand über das Menü „Nach Updates suchen …“ und den Knopf in den Einstellungen.
- * - Neue Version ⇒ Toast „Version X ist da“ · „Was ist neu?“ · „Jetzt aktualisieren“ ⇒ laden und installieren mit
+ * - Neue Version ⇒ Toast „Version X ist da“ · „Was ist neu?“ · „Jetzt aktualisieren“ ⇒ Datenbank sichern
+ *   (`sicherungen/vor-update/`, lib/sicherungen.ts; scheitert das, wird NICHT installiert) ⇒ laden und installieren mit
  *   Fortschritt (man kann weiterarbeiten) ⇒ Toast „Update bereit“ · „Jetzt neu starten“ · „Später“.
  *   Neu gestartet wird nur auf Klick; „Später“ ⇒ die neue Version ist beim nächsten Start einfach da.
  * - Entwicklerversion (`npm run tauri dev`, Debug-Build) installiert nie, sie meldet nur die neue Version.
@@ -14,6 +15,8 @@ import { check, type DownloadEvent, type Update } from '@tauri-apps/plugin-updat
 import { create } from 'zustand';
 import { version as PAKET_VERSION } from '../../package.json';
 import type { KeyValueStore } from './settings';
+import { fehlerText } from './fehler';
+import { sicherungAnlegen } from './sicherungen';
 import { useUi } from '../store/ui';
 
 export const UPDATES_KEY = 'kladdy.updates.v1';
@@ -66,6 +69,10 @@ export function fortschritt(geladen: number, gesamt: number | undefined): number
 /* ---------- Zustand ---------- */
 /** `ready`: geladen und installiert, wartet auf den Neustart. */
 export type UpdateStatus = 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'restarting' | 'error';
+
+/** Meldung, wenn die Sicherung vor dem Update fehlschlägt (dann wird nicht installiert). */
+export const ohneSicherungText = (grund: string): string =>
+  `Sicherung vor dem Update fehlgeschlagen: ${grund.replace(/[.\s]+$/, '')}. Darum wurde das Update nicht installiert. Kladdy läuft in der bisherigen Version weiter, deine Daten sind unberührt.`;
 
 /** Darf „Jetzt aktualisieren“ laden und installieren? Nie in der Entwicklerversion, nur bei gefundener Version. */
 export function kannInstallieren(status: UpdateStatus, entwickler: boolean): boolean {
@@ -234,12 +241,25 @@ export async function installUpdate(): Promise<void> {
   const zeige = (text: string, progress: number | null) =>
     useUi.getState().showToast({ key: UPDATE_TOAST, text, icon: 'download', sticky: true, progress, actions: [] });
 
+  // Erst die Datenbank sichern (§3.2 Punkt 5), dann laden und installieren. Ohne Sicherung kein Update.
+  useUpdates.setState({ status: 'downloading', progress: null });
+  zeige('Datenbank wird gesichert …', null);
   try {
-    // TODO(Phase 5): Vor dem Laden eine Datensicherung anlegen (§3.2 Punkt 5, §6.10): Rust-Command `backup_erstellen`
-    // (VACUUM INTO + Belege als ZIP) aufrufen und bei Fehler abbrechen. Bis dahin wird hier bewusst keine
-    // „Sicherung …“-Meldung gezeigt – es gibt noch keine.
-    useUpdates.setState({ status: 'downloading', progress: null });
+    await sicherungAnlegen('vor-update');
+  } catch (err) {
+    console.error('Sicherung vor dem Update fehlgeschlagen', err);
+    useUpdates.setState({ status: 'available', progress: null });
+    ui.showToast({
+      key: UPDATE_TOAST,
+      text: ohneSicherungText(fehlerText(err)),
+      icon: 'warn',
+      sticky: true,
+      actions: [{ label: 'Erneut versuchen', run: () => void installUpdate() }],
+    });
+    return;
+  }
 
+  try {
     let gesamt: number | undefined;
     let geladen = 0;
     zeige(`Version ${update.version} wird geladen …`, null);

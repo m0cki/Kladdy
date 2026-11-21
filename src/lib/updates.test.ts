@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TAG_MS, defaultPrefs, fortschritt, kannInstallieren, loadPrefs, savePrefs, shouldAutoCheck, UPDATES_KEY } from './updates';
+import { TAG_MS, defaultPrefs, fortschritt, kannInstallieren, loadPrefs, ohneSicherungText, savePrefs, shouldAutoCheck, UPDATES_KEY } from './updates';
 
 const mem = (init: Record<string, string> = {}) => {
   const data = { ...init };
@@ -55,5 +55,14 @@ describe('kannInstallieren', () => {
   });
   it('nie in der Entwicklerversion', () => {
     expect(kannInstallieren('available', true)).toBe(false);
+  });
+});
+
+describe('ohneSicherungText', () => {
+  it('nennt den Grund und dass nicht installiert wurde', () => {
+    const t = ohneSicherungText('Kopie schreiben (/x/y.db): disk full. ');
+    expect(t).toBe(
+      'Sicherung vor dem Update fehlgeschlagen: Kopie schreiben (/x/y.db): disk full. Darum wurde das Update nicht installiert. Kladdy läuft in der bisherigen Version weiter, deine Daten sind unberührt.',
+    );
   });
 });
