@@ -745,7 +745,21 @@ Nummer ausgestellt statt ein neuer angelegt – im Prototyp heißt der Kunden-Pa
      (Vorauswahl aus Einstellungen → Belege, Standard Quittung; bei Rechnung zusätzlich „bereits bezahlt | noch offen“),
      dazu eine **Vorlage** (Standard oder eigene aus dem Baukasten §7); angezeigt wird die Nummer, die vergeben wird
      („erhält Nr. QU-2026-105“). Ein dezenter Hinweis bei Quittung + Bar: „Will der Kunde die Arbeitskosten absetzen
-     (§ 35a)? Dann Rechnung – absetzbar nur bei Überweisung.“ Speichern legt Beleg **und** Einnahme in einer Transaktion an
+     (§ 35a)? Dann Rechnung – absetzbar nur bei Überweisung.“
+     **Positionen statt Beschreibung:** Bei „Beleg erstellen“ steht im Kasten eine Positionen-Liste wie in der Maske
+     (Beschreibung, Menge, Einzelpreis; Zeilen hinzufügen/entfernen, z. B. jedes Kfz einer Autoreinigung einzeln). Das Feld
+     „Beschreibung“ links entfällt; der Betrag oben ist die Summe der Positionen (bei genau einer Position mit Menge 1 direkt
+     eingebbar, er füllt deren Preis). Die Einnahme heißt wie die Positionen („Autoreinigung VW Golf und 2 weitere“, wie Rust
+     `buchungstext`). Bei „Offene Rechnung zuordnen“ und „Ohne eigenen Beleg“ bleibt die Beschreibung.
+     **Daten:** Bei Rechnung heißt das Datum „Rechnungsdatum“, darunter **Leistungsdatum** (Standard = Rechnungsdatum,
+     umschaltbar auf einen Zeitraum „von – bis“) und **Zahlungsziel** in Tagen (Standard aus Einstellungen → Belege) mit
+     „fällig am …“; bei „bereits bezahlt“ der Hinweis Zahlungsdatum = Rechnungsdatum. Bei Quittung bleibt „Zahlungsdatum“
+     mit dem dezenten Schalter „Leistung an einem anderen Tag?“. Zu einem Termin ist dessen Tag das Leistungsdatum.
+     **Bankverbindung:** Bei „Rechnung · noch offen“ Warnung, wenn in den Firmendaten die IBAN fehlt oder die Vorlage keinen
+     aktiven Baustein „Zahlung & GiroCode“ hat bzw. dort die Bankverbindung aus ist; bei „bereits bezahlt“ der Hinweis, dass
+     statt der Bankverbindung „Betrag … dankend erhalten“ gedruckt wird (der BIC ist freiwillig, die IBAN genügt).
+     **Live-Vorschau:** Umschalter (Auge) im Kasten zeigt den Beleg skaliert als dritte Spalte (schmaler Bildschirm: darunter),
+     samt „Für den Beleg fehlt noch: …“; der Zustand wird je Mac gemerkt. Speichern legt Beleg **und** Einnahme in einer Transaktion an
      und verknüpft beide (Toast „Einnahme gespeichert · QU-2026-105 erstellt“ mit „Beleg öffnen“). Eine „noch offene“
      Rechnung erscheint unter Belege → Offen; die Einnahme entsteht erst beim Zahlungseingang.
    - **Schritt 2 (optional):** „Unterschriebenes Exemplar anhängen“ – Scan/Foto ergänzt den Beleg (`scan_beleg_id`), ersetzt ihn nicht.
