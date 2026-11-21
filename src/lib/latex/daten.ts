@@ -7,6 +7,7 @@
  * \QuittungFuer, \Quittiert, \EigenbelegGrund, \GebuchtAls, \UnterschriftDatum, \Storniert (1 oder leer),
  * \ZahlungswegKurz (bar, bank, paypal oder leer – für die Ankreuzfelder der Quittung „Formular“),
  * \GiroCode (`girocode.png` bei offener Rechnung mit gültigen EPC-Daten, sonst leer; die Datei liefert belegAssets).
+ * \DatumLang, \LeistungsdatumLang, \FaelligLang: dieselben Daten ausgeschrieben („21. November 2026“) für die Belegdaten.
  * \LogoDatei ist `logo.png`, wenn der Beleg ein Firmenlogo hat (`doc.logo`), sonst leer (§7.4).
  * Tests: latex.test.ts */
 import { formatBetrag } from '../money';
@@ -18,6 +19,7 @@ import {
   HINWEIS_19,
   belegSumme,
   belegTitel,
+  datumLang,
   datumText,
   eigenbelegGrundText,
   empfaenger,
@@ -52,7 +54,7 @@ export const MAKRO_NAMEN = [
   'Schlusstext', 'Gruss',
   'KundeAnzeige', 'KundeAdresseEinzeilig', 'FirmaPLZ', 'FirmaStadt', 'LeistungsdatumLabel', 'Zahlungsziel', 'AnzahlPositionen',
   'QuittungFuer', 'Quittiert', 'EigenbelegGrund', 'GebuchtAls', 'BuchungsNr', 'UnterschriftDatum', 'Storniert', 'GiroCode',
-  'ZahlungswegKurz',
+  'ZahlungswegKurz', 'DatumLang', 'LeistungsdatumLang', 'FaelligLang',
 ] as const;
 
 export type MakroName = (typeof MAKRO_NAMEN)[number];
@@ -130,6 +132,10 @@ export function makroWerte(doc: BelegDokument): Record<MakroName, string> {
     GiroCode: girocodeDatei(doc),
     // fester Schlüssel (kein Nutzerwert): welches Kästchen angekreuzt wird
     ZahlungswegKurz: gedruckterZahlungsweg(doc) ?? '',
+    // Belegdaten mit Datumsformat „lang“ (Baustein „Anschrift & Belegdaten“, meta.ts): „21. November 2026“
+    DatumLang: e1(datumLang(doc.datum)),
+    LeistungsdatumLang: e1(leistungText(doc, 'lang')),
+    FaelligLang: e1(datumLang(doc.faellig_am)),
   };
 }
 

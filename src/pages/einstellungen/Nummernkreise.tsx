@@ -1,4 +1,5 @@
-/* Einstellungen › Nummernkreise (§5, §6.10 „Muster mit Vorschau“). Pro Kreis: Muster mit Live-Vorschau der nächsten
+/* Einstellungen › Nummernkreise (§5, §6.10 „Muster mit Vorschau“). `NummernkreisEinzeln` bettet einen Kreis ein
+ * (Seite Vorlagen, Schublade „Nummernformat“). Pro Kreis: Muster mit Live-Vorschau der nächsten
  * Nummer und „Nächste laufende Nummer“ nur erhöhen (nie senken, GoBD: Nummern nie wiederverwenden).
  * Prüfungen in lib/numbering.ts, Speichern samt Protokoll in lib/queries/nummernkreise.ts. Vergeben wird hier nichts. */
 import { useEffect, useState, type KeyboardEvent } from 'react';
@@ -16,6 +17,7 @@ import {
   musterWechselFehler,
   zaehlerErhoehen,
   type Nummernkreis,
+  type NummernkreisId,
 } from '../../lib/numbering';
 import { ladeNummernkreise, nachbarn, speichereMuster, speichereZaehler, vergebeneNummern } from '../../lib/queries/nummernkreise';
 import { useUi } from '../../store/ui';
@@ -35,32 +37,7 @@ export default function Nummernkreise() {
     <>
       <SetCard title="Nummernkreise" i={1}>
         <div className="set-row" data-setting="nummernkreise">
-          <dl className="facts">
-            <div className="fact">
-              <dt className="mono">{'{JJJJ}'}</dt>
-              <dd>Jahr, z. B. {jahr}</dd>
-            </div>
-            <div className="fact">
-              <dt className="mono">{'{JJ}'}</dt>
-              <dd>Jahr zweistellig, z. B. {String(jahr % 100).padStart(2, '0')}</dd>
-            </div>
-            <div className="fact">
-              <dt className="mono">{'{NNN}'}</dt>
-              <dd>laufende Nummer, mit Nullen auf so viele Stellen, wie N dastehen (1 bis 8), z. B. 001</dd>
-            </div>
-            <div className="fact">
-              <dt>Übrige Zeichen</dt>
-              <dd>Buchstaben, Ziffern und - _ / . (keine Leerzeichen)</dd>
-            </div>
-          </dl>
-          <div className="set-note">
-            <Info />
-            <span>
-              <b>Nummern werden erst beim Ausstellen vergeben und nie wiederverwendet.</b> Mit Jahr im Muster beginnt ein Kreis
-              jedes Jahr wieder bei 1, ohne Jahr (Kundennummer) läuft er immer weiter. Die nächste Nummer lässt sich nur
-              erhöhen, etwa beim Umstieg aus einem anderen Programm.
-            </span>
-          </div>
+          <MusterLegende jahr={jahr} />
         </div>
       </SetCard>
 
@@ -72,6 +49,68 @@ export default function Nummernkreise() {
           <p className="hint warn">Nicht alle Nummernkreise wurden gefunden. Bitte die App neu starten.</p>
         ) : null}
       </SetCard>
+    </>
+  );
+}
+
+/** Ein Nummernkreis allein, z. B. in der Schublade „Nummernformat“ der Seite Vorlagen: dieselbe Zeile (Prüfung,
+ *  Speichern, Protokoll) wie oben, darunter die Legende. `onGeaendert` nach jedem Speichern. */
+export function NummernkreisEinzeln({ id, onGeaendert }: { id: NummernkreisId; onGeaendert?: () => void }) {
+  const { zustand, neuLaden, erneut } = useLaden(ladeNummernkreise);
+  if (zustand.status !== 'ok') return <Ladeansicht zustand={zustand} icon={Hash} was="Die Nummernkreise" erneut={erneut} />;
+  const kreis = zustand.daten.find((k) => k.id === id);
+  const jahr = diesesJahr();
+  const nachSpeichern = async () => {
+    await neuLaden();
+    onGeaendert?.();
+  };
+  return (
+    <>
+      <section>
+        {kreis ? (
+          <KreisZeile kreis={kreis} alle={zustand.daten} jahr={jahr} neuLaden={nachSpeichern} />
+        ) : (
+          <p className="hint warn">Der Nummernkreis wurde nicht gefunden. Bitte die App neu starten.</p>
+        )}
+      </section>
+      <section>
+        <h3>So ist ein Muster aufgebaut</h3>
+        <MusterLegende jahr={jahr} />
+      </section>
+    </>
+  );
+}
+
+/** Platzhalter im Muster und die Regeln der Vergabe */
+function MusterLegende({ jahr }: { jahr: number }) {
+  return (
+    <>
+      <dl className="facts">
+        <div className="fact">
+          <dt className="mono">{'{JJJJ}'}</dt>
+          <dd>Jahr, z. B. {jahr}</dd>
+        </div>
+        <div className="fact">
+          <dt className="mono">{'{JJ}'}</dt>
+          <dd>Jahr zweistellig, z. B. {String(jahr % 100).padStart(2, '0')}</dd>
+        </div>
+        <div className="fact">
+          <dt className="mono">{'{NNN}'}</dt>
+          <dd>laufende Nummer, mit Nullen auf so viele Stellen, wie N dastehen (1 bis 8), z. B. 001</dd>
+        </div>
+        <div className="fact">
+          <dt>Übrige Zeichen</dt>
+          <dd>Buchstaben, Ziffern und - _ / . (keine Leerzeichen)</dd>
+        </div>
+      </dl>
+      <div className="set-note">
+        <Info />
+        <span>
+          <b>Nummern werden erst beim Ausstellen vergeben und nie wiederverwendet.</b> Mit Jahr im Muster beginnt ein Kreis
+          jedes Jahr wieder bei 1, ohne Jahr (Kundennummer) läuft er immer weiter. Die nächste Nummer lässt sich nur
+          erhöhen, etwa beim Umstieg aus einem anderen Programm.
+        </span>
+      </div>
     </>
   );
 }

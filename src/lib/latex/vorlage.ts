@@ -19,6 +19,9 @@
  * Tests: latex.test.ts */
 import {
   BAUSTEINE,
+  logoBreiteMm,
+  logoHoeheMm,
+  logoPosition,
   istUmrandet,
   istUnten,
   quittungAngaben,
@@ -28,6 +31,7 @@ import {
   type BausteinTyp,
   type QuittungAngaben,
 } from '../vorlagen/bausteine';
+import { metaAngaben, metaDatumsformat, metaStandardLabel, type MetaAngabe } from '../vorlagen/meta';
 import { ARTEN, BELEG_PLATZHALTER, formatVon, type Belegart, type Blattformat, type PlatzhalterName } from '../vorlagen/dokument';
 import { parsen, type Stil } from '../vorlagen/formatierung';
 import { firmenZeilen } from '../vorlagen/firmenblock';
@@ -250,20 +254,33 @@ function quittungBlanko(a: QuittungAngaben, von: string, fuer: string): string {
 
 const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => Schnipsel>> = {
   kopf(b, x) {
-    const h = x.a4 ? 16 : 10;
+    // Höhe und Lage des Logos wie die Vorschau (bausteine.ts logoHoeheMm/logoPosition); ohne Logo-Schalter wie bisher
+    const h = logoHoeheMm(b.text('logogroesse'), x.a4);
+    const mitLogo = b.an('logo');
+    const pos = mitLogo ? logoPosition(b.text('logopos')) : 'rechts';
     const claim = textTex(b.text('claim'), true, x.blanko);
-    return fest(
-      zeilen(
-        L`\noindent\rule[-${h}mm]{0pt}{${h}mm}%`,
-        L`\begin{minipage}[t]{\dimexpr\linewidth-68mm\relax}\vspace{0pt}\raggedright`,
-        L`{${fs(15, 1.15)}\bfseries\color{akzent}\Firma\par}`,
-        wennNichtLeer(claim.leer, L`\vspace{1mm}{${fs(8.5)}\color{grau}${claim.tex}\par}`),
-        L`\end{minipage}\hfill`,
-        L`\begin{minipage}[t]{60mm}\vspace{0pt}\raggedleft`,
-        b.an('logo') && L`\ifdefempty{\LogoDatei}{}{\includegraphics[height=${h}mm,width=60mm,keepaspectratio]{\LogoDatei}}`,
-        L`\end{minipage}\par`,
-      ),
-    );
+    const name = L`{${fs(15, 1.15)}\bfseries\color{akzent}\Firma\par}`;
+    const untertitel = wennNichtLeer(claim.leer, L`\vspace{1mm}{${fs(8.5)}\color{grau}${claim.tex}\par}`);
+    const bild = (breite: number) => L`\includegraphics[height=${String(h)}mm,width=${String(breite)}mm,keepaspectratio]{\LogoDatei}`;
+    if (pos === 'mitte') {
+      // Logo mittig über Firmenname und Untertitel (Vorschau: .blk-kopf.mitte, 2 mm Abstand)
+      return fest(
+        zeilen(
+          L`{\centering`,
+          L`\ifdefempty{\LogoDatei}{}{${bild(logoBreiteMm('mitte'))}\par\vspace{2mm}}`,
+          name,
+          untertitel,
+          L`\par}`,
+        ),
+      );
+    }
+    const text = (ausrichtung: string) =>
+      zeilen(L`\begin{minipage}[t]{\dimexpr\linewidth-68mm\relax}\vspace{0pt}${ausrichtung}`, name, untertitel, L`\end{minipage}`);
+    const logo = (ausrichtung: string) =>
+      zeilen(L`\begin{minipage}[t]{60mm}\vspace{0pt}${ausrichtung}`, mitLogo && L`\ifdefempty{\LogoDatei}{}{${bild(logoBreiteMm(pos))}}`, L`\end{minipage}`);
+    // links: Logo links, Firmenname rechtsbündig rechts (Vorschau: .blk-kopf.links)
+    const [a, c] = pos === 'links' ? [logo(L`\raggedright`), text(L`\raggedleft`)] : [text(L`\raggedright`), logo(L`\raggedleft`)];
+    return fest(zeilen(L`\noindent\rule[-${String(h)}mm]{0pt}{${String(h)}mm}%`, a + L`\hfill`, c + L`\par`));
   },
   firmenblock(b, x) {
     const name = textTex(b.text('name'), true, x.blanko);
@@ -306,43 +323,38 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => Schnipsel>>
     };
   },
   anschrift_meta(b, x) {
-    const A = ARTEN[x.art];
-    if (x.blanko) {
-      // drei Zeilen für den Empfänger, rechts kurze Linien (wie die Vorschau)
-      const meta = [
-        b.an('nr') && L`\KMeta{${A.nrLabel}}{\KLuecke}`,
-        b.an('datum') && L`\KMeta{Datum}{\KLuecke}`,
-        b.an('leistung') && x.art !== 'angebot' && L`\KMeta{Leistungsdatum}{\KLuecke}`,
-        b.an('kundennr') && L`\KMeta{Kunden-Nr.}{\KLuecke}`,
-        b.an('steuernr') && L`\ifdefempty{\Steuernummer}{}{\KMeta{Steuernummer}{\Steuernummer}}`,
-        b.an('faellig') && L`\KMeta{${x.art === 'angebot' ? 'Gültig bis' : 'Fällig am'}}{\KLuecke}`,
-      ];
-      return fest(
-        zeilen(
-          x.a4 ? L`\noindent\rule[-34mm]{0pt}{34mm}%` : L`\noindent`,
-          L`\begin{minipage}[t]{85mm}\vspace{0pt}\raggedright`,
-          L`\noindent\KSchreib\par`.repeat(3),
-          L`\end{minipage}\hfill`,
-          L`\begin{minipage}[t]{64mm}\vspace{0pt}${fs(9)}`,
-          ...meta,
-          L`\end{minipage}\par`,
-        ),
-      );
-    }
+    // Angaben in der Reihenfolge der Vorlage, mit eigener Beschriftung und Datumsformat (meta.ts, wie die Vorschau)
+    const lang = metaDatumsformat(b) === 'lang';
+    const zeile = (key: MetaAngabe, eigen: string): string => {
+      const label = eigen ? textTex(eigen, true, x.blanko).tex : metaStandardLabel(key, x.art);
+      const meta = (wert: string, l = label) => L`\KMeta{${l}}{${wert}}`;
+      if (key === 'steuernr') return L`\ifdefempty{\Steuernummer}{}{${meta(L`\Steuernummer`)}}`;
+      // Blanko: rechts kurze Linien (wie die Vorschau)
+      if (x.blanko) return meta(L`\KLuecke`);
+      switch (key) {
+        case 'nr':
+          return meta(L`\ifdefempty{\Nummer}{\textcolor{leer}{\itshape Entwurf}}{\textbf{\Nummer}}`);
+        case 'datum':
+          return meta(lang ? L`\DatumLang` : L`\Datum`);
+        case 'leistung':
+          return L`\ifdefempty{\Leistungsdatum}{}{${meta(lang ? L`\LeistungsdatumLang` : L`\Leistungsdatum`, eigen ? label : L`\LeistungsdatumLabel`)}}`;
+        case 'kundennr':
+          return L`\ifdefempty{\Kundennummer}{}{${meta(L`\Kundennummer`)}}`;
+        case 'faellig':
+          return L`\ifdefempty{\Faellig}{}{${meta(lang ? L`\FaelligLang` : L`\Faellig`)}}`;
+      }
+    };
+    const meta = metaAngaben(b, x.art).map((m) => zeile(m.key, m.eigen));
     const leerTest = ['KundeAnzeige', 'KundeZusatz', 'KundeStrasse', 'KundeOrt'].map((m) => 'test {\\ifdefempty{\\' + m + '}}').join(' and ');
-    const meta = [
-      b.an('nr') && L`\KMeta{${A.nrLabel}}{\ifdefempty{\Nummer}{\textcolor{leer}{\itshape Entwurf}}{\textbf{\Nummer}}}`,
-      b.an('datum') && L`\KMeta{Datum}{\Datum}`,
-      b.an('leistung') && x.art !== 'angebot' && L`\ifdefempty{\Leistungsdatum}{}{\KMeta{\LeistungsdatumLabel}{\Leistungsdatum}}`,
-      b.an('kundennr') && L`\ifdefempty{\Kundennummer}{}{\KMeta{Kunden-Nr.}{\Kundennummer}}`,
-      b.an('steuernr') && L`\ifdefempty{\Steuernummer}{}{\KMeta{Steuernummer}{\Steuernummer}}`,
-      b.an('faellig') && L`\ifdefempty{\Faellig}{}{\KMeta{${x.art === 'angebot' ? 'Gültig bis' : 'Fällig am'}}{\Faellig}}`,
-    ];
+    // Blanko: drei Zeilen für den Empfänger
+    const empfaenger = x.blanko
+      ? L`\noindent\KSchreib\par`.repeat(3)
+      : L`\ifboolexpr{${leerTest}}{\textcolor{leer}{\itshape Empfänger}\par}{\KZeile{\KundeAnzeige}\KZeile{\KundeZusatz}\KZeile{\KundeStrasse}\KZeile{\KundeOrt}}`;
     return fest(
       zeilen(
         x.a4 ? L`\noindent\rule[-34mm]{0pt}{34mm}%` : L`\noindent`,
         L`\begin{minipage}[t]{85mm}\vspace{0pt}\raggedright`,
-        L`\ifboolexpr{${leerTest}}{\textcolor{leer}{\itshape Empfänger}\par}{\KZeile{\KundeAnzeige}\KZeile{\KundeZusatz}\KZeile{\KundeStrasse}\KZeile{\KundeOrt}}`,
+        empfaenger,
         L`\end{minipage}\hfill`,
         L`\begin{minipage}[t]{64mm}\vspace{0pt}${fs(9)}`,
         ...meta,
@@ -435,7 +447,8 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => Schnipsel>>
         L`\begin{tabular}{@{}l@{\hspace{5mm}}l@{}}`,
         L`\textcolor{grau}{Empfänger} & \Firma\\`,
         L`\textcolor{grau}{IBAN} & \IBAN\\`,
-        L`\textcolor{grau}{BIC} & \BIC\ifdefempty{\Bank}{}{ · \Bank}\\`,
+        // BIC nur, wenn hinterlegt (IBAN allein genügt, SEPA); ohne BIC steht die Bank allein, ohne beides keine Zeile
+        L`\ifdefempty{\BIC}{\ifdefempty{\Bank}{}{\textcolor{grau}{Bank} & \Bank\\}}{\textcolor{grau}{BIC} & \BIC\ifdefempty{\Bank}{}{ · \Bank}\\}`,
         // Blanko: Betrag und Rechnungsnummer schreibt man von Hand (wie die Vorschau)
         x.blanko ? L`\textcolor{grau}{Betrag} & \KLuecke\ €\\` : L`\textcolor{grau}{Betrag} & \textbf{\Gesamt}\\`,
         x.blanko

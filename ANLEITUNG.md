@@ -1016,8 +1016,12 @@ Firmenkopf mit großem fettem Namen in Versalien, „QUITTUNG“ in Versalien, �
   „Neue Quittungen verwenden „…“ · Diese verwenden“. Zeigen und Bearbeiten ändern nie die aktive Vorlage (außer bei der
   automatischen Kopie des aktiven Designs, s. o.). „Zurücksetzen“ gibt es nur bei eigenen Vorlagen (Bausteine ihres
   Designs, mit Rückgängig). Zuletzt gezeigte Vorlage je Art in localStorage (`kladdy.vorlagen.v1`), Adresse
-  `?art=quittung&design=formular` bzw. `&design=eigen:12`. Unter den Bausteinen ein Hinweis, dass Firmendaten unter
-  Einstellungen › Firma stehen (Link).
+  `?art=quittung&design=formular` bzw. `&design=eigen:12`. Knopf **„Firmendaten“** in der Leiste über dem Blatt (ebenso
+  Klick auf den Firmennamen im Kopf mit Logo und der Hinweis in den Bausteinen mit Firmendaten) öffnet eine Schublade mit
+  demselben Formular wie Einstellungen › Firma (`FirmaFormular.tsx`: gleiche Prüfung, Speichern beim Verlassen, Protokoll,
+  Logo); die Vorschau zeigt den neuen Stand sofort. Unter den Bausteinen „Nächste Rechnungsnummer: … · Nummernformat
+  ändern …“ (auch im Baustein „Anschrift & Belegdaten“) öffnet den Nummernkreis der Art aus Einstellungen › Nummernkreise
+  in einer Schublade (`NummernkreisEinzeln`). Kein weiterer Menüpunkt.
 - **Beleg-Maske und Erfassen-Schublade:** Auswahl „Vorlage“ = Designs und eigene Vorlagen der Art, vorbelegt die aktive.
   Ein Entwurf merkt sich `vorlage_id` (eigene Vorlage, sonst NULL) und das Design (`entwurf_json.vorlage_design`, nur
   wenn ≠ `klassisch`); gesucht wird zuerst über die ID, sonst über das Design. Alte Entwürfe ohne Schlüssel ⇒ `klassisch`.
@@ -1039,6 +1043,15 @@ Firmenkopf mit großem fettem Namen in Versalien, „QUITTUNG“ in Versalien, �
   „Alle Angaben abgeschaltet – druckt nichts“. Vorschau und PDF gleich.
   **Unterschrift:** Stil „Zwei Linien“ (bisher) oder „Eine Linie“ (Beschriftung darüber, Linie über die ganze Breite).
   **Freitext/Steuerhinweis:** Größe „Sehr klein, grau“ (6,5 pt).
+- **Kopf mit Logo:** Lage des Logos links, Mitte (über dem zentrierten Namen, bis 100 mm breit) oder rechts (Standard) und
+  Höhe „Standard“ (16 mm A4, 10 mm A5 quer) oder 8–40 mm (`logoPosition`, `logoHoeheMm` in `bausteine.ts`).
+- **Anschrift & Belegdaten:** je Angabe (Nr., Datum, Leistungsdatum, Kunden-Nr., Steuernummer, Fällig am/Gültig bis)
+  anzeigen, eigene Beschriftung (leer = Standard der Art; formatierbar, im PDF über `textTex`/`escape.ts`) und Reihenfolge
+  (↑/↓, gespeichert als `reihenfolge` = Schlüsselliste, unbekannte fallen weg, fehlende hinten an). Datumsformat
+  „21.11.2026“ (Standard) oder „21. November 2026“ (`\DatumLang`, `\LeistungsdatumLang`, `\FaelligLang`). Logik:
+  `src/lib/vorlagen/meta.ts`. Der Pflichtangaben-Check sieht nur, ob die Angabe an ist (Beschriftung und Reihenfolge
+  zählen nicht).
+- **Zahlung:** Die Zeile „BIC“ fällt weg, wenn keine BIC hinterlegt ist (dann ggf. „Bank“ allein), in Vorschau und PDF.
 - Pflichtangaben-Check: Der Firmenkopf zählt für Anschrift, Inhaber und Steuernummer, Quittungsangaben im Stil „Formular“
   für die Nummer. Abgeschaltete Quittungsangaben zählen nicht (Hinweis „Quittungsangaben: „Datum“ ist abgeschaltet“).
 

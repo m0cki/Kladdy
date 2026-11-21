@@ -121,6 +121,18 @@
 .vl-firma > .ic { width: 14px; height: 14px; flex: none; margin-top: 2px; }
 .vl-firma a { color: var(--accent-text); }
 .vl-firma code { font-family: var(--mono); font-size: .7rem; }
+.vl-firma .vl-firma-link { display: inline; font-size: inherit; }
+.vl-firma .mono { font-family: var(--mono); color: var(--text); }
+/* Nächste Nummer unter der Bausteinliste */
+.vl-nummer { margin: 0 0 10px; }
+
+/* Einstellungen „Anschrift & Belegdaten“: je Angabe Schalter, Beschriftung, ↑/↓ */
+.vl-meta-titel { font-size: .76rem; font-weight: 600; color: var(--muted); }
+.vl-meta-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.vl-meta-liste li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+.vl-meta-liste li.aus .input { color: var(--muted); }
+.vl-meta-liste .input { height: 34px; font-size: .86rem; }
+.vl-meta-liste .vl-reihe { padding: 2px; }
 
 @media (max-width: 1100px) {
   .vl-layout { grid-template-columns: minmax(0, 1fr); }

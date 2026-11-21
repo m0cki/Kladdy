@@ -16,11 +16,23 @@
  * Stile: src/styles/blatt.css */
 import { Fragment, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react';
 import { formatBetrag } from '../../lib/money';
-import { BAUSTEINE, istTextFeld, istUmrandet, istUnten, quittungAngaben, sichtbare, type Aufgeloest, type Baustein, type BausteinTyp } from '../../lib/vorlagen/bausteine';
+import {
+  BAUSTEINE,
+  istTextFeld,
+  istUmrandet,
+  istUnten,
+  logoHoeheMm,
+  logoPosition,
+  quittungAngaben,
+  sichtbare,
+  type Aufgeloest,
+  type Baustein,
+  type BausteinTyp,
+} from '../../lib/vorlagen/bausteine';
+import { labelKey, metaZeilen } from '../../lib/vorlagen/meta';
 import { ersetzteZeilen, type Segment } from '../../lib/vorlagen/formatierung';
 import { FormatEditor } from './FormatEditor';
 import {
-  ARTEN,
   belegSumme,
   datumText,
   eigenbelegGrundText,
@@ -29,9 +41,7 @@ import {
   gebuchtText,
   gedruckterZahlungsweg,
   istEntwurf,
-  leistungLabel,
   luecken,
-  leistungText,
   mengeText,
   platzhalterWerte,
   positionBetrag,
@@ -81,6 +91,8 @@ export interface BlattBearbeitung {
   starten: (index: number, key: string, klick: { x: number; y: number }) => void;
   ende: () => void;
   setze: (index: number, key: string, wert: string) => void;
+  /** Klick auf den Firmennamen im Kopf: Firmendaten bearbeiten (Vorlagen-Seite) */
+  firmendaten?: () => void;
 }
 
 interface Ctx {
@@ -113,16 +125,17 @@ function ph(text: string, x: Ctx): ReactNode | null {
 /**
  * Text einer Einstellung. Ohne Bearbeitung wie `ph`; auf der Vorlagen-Seite anklickbar (.blk-tx) bzw. – wenn gerade
  * dieser bearbeitet wird – der Editor an derselben Stelle (auch bei leerem Text, damit er beim Tippen nicht verschwindet).
- * `inhalt`: eigene Darstellung (Firmenkopf: nur sichtbare Zeilen), `block`: als div statt span.
+ * `inhalt`: eigene Darstellung (Firmenkopf: nur sichtbare Zeilen), `block`: als div statt span, `vorgabe`: Text im Editor,
+ * solange die Einstellung leer ist (Beschriftung der Belegdaten: der Standard „Rechnungs-Nr.“ zum Abändern).
  */
-function feld(b: Aufgeloest, x: Ctx, key: string, inhalt: ReactNode | null = ph(b.text(key), x), block = false): ReactNode | null {
+function feld(b: Aufgeloest, x: Ctx, key: string, inhalt: ReactNode | null = ph(b.text(key), x), block = false, vorgabe = ''): ReactNode | null {
   const bt = x.bearbeitung;
   const f = bt ? istTextFeld(b.typ, key) : null;
   if (!bt || !f) return inhalt;
   if (bt.aktiv?.index === x.index && bt.aktiv.key === key) {
     return (
       <FormatEditor
-        wert={b.text(key)}
+        wert={b.text(key) || vorgabe}
         onChange={(w) => bt.setze(x.index, key, w)}
         mehrzeilig={f.typ === 'textarea'}
         leiste="schwebend"
@@ -199,12 +212,13 @@ function FormZeile({ label, children, schreib = false }: { label: ReactNode; chi
   );
 }
 
-function MetaTabelle({ rows }: { rows: readonly [string, ReactNode][] }) {
+/** Belegdaten rechts: [Schlüssel, Beschriftung, Wert] */
+function MetaTabelle({ rows }: { rows: readonly [string, ReactNode, ReactNode][] }) {
   return (
     <table className="blk-meta">
       <tbody>
-        {rows.map(([l, v]) => (
-          <tr key={l}>
+        {rows.map(([k, l, v]) => (
+          <tr key={k}>
             <td>{l}</td>
             <td>{v}</td>
           </tr>
@@ -331,10 +345,20 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
     const claim = feld(b, x, 'claim');
     // Firmenlogo wie \LogoDatei im PDF; ohne Logo im Editor nur der Platzhalter
     const logo = !b.an('logo') ? null : x.logoUrl ? <img src={x.logoUrl} alt="" /> : x.editable ? <span className="blk-logo-slot">Logo</span> : null;
+    // Lage und Höhe wie im PDF (bausteine.ts); die Höhe ist Geometrie, keine Farbe: als Variable --logo-h (blatt.css)
+    const pos = b.an('logo') ? logoPosition(b.text('logopos')) : 'rechts';
+    const mm = logoHoeheMm(b.text('logogroesse'), formatVon(x.doc.art) === 'a4');
+    const firmendaten = x.bearbeitung?.firmendaten;
     return (
-      <div className="blk-kopf">
+      <div className={`blk-kopf ${pos}`} style={{ ['--logo-h' as string]: `${mm}mm` }}>
         <div className="blk-kopf-l">
-          <div className="blk-firma">{x.doc.firma.name}</div>
+          {firmendaten ? (
+            <div className="blk-firma blk-fd" title="Firmendaten bearbeiten" onClick={firmendaten}>
+              {x.doc.firma.name}
+            </div>
+          ) : (
+            <div className="blk-firma">{x.doc.firma.name}</div>
+          )}
           {claim && <div className="blk-claim">{claim}</div>}
         </div>
         {logo && <div className="blk-logo">{logo}</div>}
@@ -368,37 +392,30 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
   },
   anschrift_meta(b, x) {
     const { doc, empf: e } = x;
-    const A = ARTEN[doc.art];
-    const rows: [string, ReactNode][] = [];
-    if (doc.blanko) {
-      // Blanko: drei Zeilen für den Empfänger, rechts kurze Linien für Nummer, Datum usw.
-      if (b.an('nr')) rows.push([A.nrLabel, <Luecke />]);
-      if (b.an('datum')) rows.push(['Datum', <Luecke />]);
-      if (b.an('leistung') && doc.art !== 'angebot') rows.push(['Leistungsdatum', <Luecke />]);
-      if (b.an('kundennr')) rows.push(['Kunden-Nr.', <Luecke />]);
-      if (b.an('steuernr') && doc.firma.steuernummer.trim()) rows.push(['Steuernummer', doc.firma.steuernummer]);
-      if (b.an('faellig')) rows.push([doc.art === 'angebot' ? 'Gültig bis' : 'Fällig am', <Luecke />]);
-      return (
-        <>
-          <div className="blk-adr">
-            <Schreiben />
-            <Schreiben />
-            <Schreiben />
-          </div>
-          {rows.length > 0 && <MetaTabelle rows={rows} />}
-        </>
-      );
-    }
-    if (b.an('nr')) rows.push([A.nrLabel, doc.nummer ? <b>{doc.nummer}</b> : <span className="blk-leer">Entwurf</span>]);
-    if (b.an('datum')) rows.push(['Datum', datumText(doc.datum)]);
-    if (b.an('leistung') && doc.art !== 'angebot' && doc.leistung_von) rows.push([leistungLabel(doc), leistungText(doc)]);
-    if (b.an('kundennr') && e.nummer) rows.push(['Kunden-Nr.', e.nummer]);
-    if (b.an('steuernr') && doc.firma.steuernummer.trim()) rows.push(['Steuernummer', doc.firma.steuernummer]);
-    if (b.an('faellig') && doc.faellig_am) rows.push([doc.art === 'angebot' ? 'Gültig bis' : 'Fällig am', datumText(doc.faellig_am)]);
+    // Angaben in der Reihenfolge der Vorlage, mit eigener Beschriftung und Datumsformat (meta.ts, wie das PDF).
+    // Die Beschriftung ist im Blatt bearbeitbar (leer = Standard, im Editor vorbelegt).
+    const rows: [string, ReactNode, ReactNode][] = metaZeilen(b, doc).map((z) => {
+      const w = z.wert;
+      const wert = w.art === 'luecke' ? <Luecke /> : w.art === 'entwurf' ? <span className="blk-leer">Entwurf</span> : w.art === 'nummer' ? <b>{w.text}</b> : w.text;
+      return [z.key, feld(b, x, labelKey(z.key), ph(z.label, x), false, z.eigen ? '' : z.label), wert];
+    });
+    // Blanko: drei Zeilen für den Empfänger, rechts kurze Linien für Nummer, Datum usw.
     const adr = [e.anzeige, ...e.zeilen].filter(Boolean);
     return (
       <>
-        <div className="blk-adr">{adr.length ? adr.map((l, i) => <div key={i}>{l}</div>) : <div className="blk-leer">Empfänger</div>}</div>
+        <div className="blk-adr">
+          {doc.blanko ? (
+            <>
+              <Schreiben />
+              <Schreiben />
+              <Schreiben />
+            </>
+          ) : adr.length ? (
+            adr.map((l, i) => <div key={i}>{l}</div>)
+          ) : (
+            <div className="blk-leer">Empfänger</div>
+          )}
+        </div>
         {rows.length > 0 && <MetaTabelle rows={rows} />}
       </>
     );
@@ -533,11 +550,21 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => ReactNode |
           <dd>{F.name}</dd>
           <dt>IBAN</dt>
           <dd className="blk-iban">{F.iban ? ibanFormat(F.iban) : ''}</dd>
-          <dt>BIC</dt>
-          <dd>
-            {F.bic}
-            {F.bank ? ` · ${F.bank}` : ''}
-          </dd>
+          {/* BIC nur, wenn hinterlegt (IBAN allein genügt); ohne BIC die Bank allein, ohne beides keine Zeile – wie im PDF */}
+          {F.bic.trim() ? (
+            <>
+              <dt>BIC</dt>
+              <dd>
+                {F.bic}
+                {F.bank.trim() ? ` · ${F.bank}` : ''}
+              </dd>
+            </>
+          ) : F.bank.trim() ? (
+            <>
+              <dt>Bank</dt>
+              <dd>{F.bank}</dd>
+            </>
+          ) : null}
           <dt>Betrag</dt>
           <dd>
             {/* Blanko: Betrag und Rechnungsnummer schreibt man von Hand */}

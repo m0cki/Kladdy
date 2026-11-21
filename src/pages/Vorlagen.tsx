@@ -22,14 +22,17 @@
  * - Speichern: Mitgelieferte Designs bleiben unverändert. Die erste Änderung an einem Design legt sofort eine eigene
  *   Vorlage an („Meine Quittung“, bei Bedarf mit Nummer; war das Design aktiv, wird sie es auch), der Baukasten bleibt
  *   dabei offen. Danach automatisch (entprellt, beim Verlassen sofort). „Zurücksetzen“ (nur eigene) holt die Bausteine
- *   des Designs, von dem sie stammt (mit Rückgängig). Unter den Einstellungen ein Hinweis auf Einstellungen › Firma.
+ *   des Designs, von dem sie stammt (mit Rückgängig).
+ * - Firmendaten und Nummernformat ohne Umweg: Knopf „Firmendaten“ (bzw. Klick auf den Firmennamen im Kopf) öffnet eine
+ *   Schublade mit dem Formular aus Einstellungen › Firma (FirmaFormular.tsx), „Nummernformat ändern …“ eine mit dem
+ *   Nummernkreis der Art (NummernkreisEinzeln); gespeichert wird dort wie in den Einstellungen.
  *   Bedeutung der Tabelle `vorlagen`: lib/queries/vorlagen.ts. Im Browser ohne Datenbank: nur die Designs,
  *   Änderungen nur auf dieser Seite.
  * Logik in lib/vorlagen/baukasten.ts, Stile in styles/vorlagen.css. */
 import { Fragment, useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
-import { Link, useSearchParams } from 'react-router-dom';
-import { ArrowDown, ArrowUp, Asterisk, Blocks, Building2, Check, CircleCheck, Clock, Eye, EyeOff, FileText, GripVertical, Heading, Info, Landmark, List, LoaderCircle, Lock, Mail, Minus, MoveVertical, Package, PanelTop, Pencil, Plus, Printer, QrCode, ReceiptEuro, RotateCcw, Send, Sigma, Signature, SquareDashed, Stamp, Trash2, TriangleAlert, Type, Users, X, type LucideIcon } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { ArrowDown, ArrowUp, Asterisk, Blocks, Building2, Check, CircleCheck, Clock, Eye, EyeOff, FileText, GripVertical, Hash, Heading, Info, Landmark, List, LoaderCircle, Lock, Mail, Minus, MoveVertical, Package, PanelTop, Pencil, Plus, Printer, QrCode, ReceiptEuro, RotateCcw, Send, Sigma, Signature, SquareDashed, Stamp, Trash2, TriangleAlert, Type, Users, X, type LucideIcon } from 'lucide-react';
 import { BlattVorschau, type BlattBearbeitung } from '../components/belege/Blatt';
 import { FormatEditor, type FormatEditorHandle } from '../components/belege/FormatEditor';
 import { Drawer } from '../components/ui/Drawer';
@@ -37,7 +40,6 @@ import { PageHead, reveal } from '../components/ui/PageHead';
 import { Seg, type SegOption } from '../components/ui/Seg';
 import { Switch } from '../components/ui/Switch';
 import { datenbankVerfuegbar } from '../lib/db';
-import { bereichPfad } from '../lib/einstellungen-index';
 import { fehlerText } from '../lib/fehler';
 import type { Firma } from '../lib/firma';
 import { texTeile, type TexTeilArt } from '../lib/latex/hervorheben';
@@ -59,7 +61,13 @@ import {
   type EigeneVorlage,
 } from '../lib/queries/vorlagen';
 import type { BelegZeile } from '../lib/rechnungen';
-import { BAUSTEINE, aufloesen, type Baustein, type BausteinTyp, type Einstellung } from '../lib/vorlagen/bausteine';
+import { BAUSTEINE, aufloesen, type Aufgeloest, type Baustein, type BausteinTyp, type Einstellung } from '../lib/vorlagen/bausteine';
+import { META_NAME, labelKey, metaReihenfolge, metaStandardLabel, metaVerschieben, type MetaAngabe } from '../lib/vorlagen/meta';
+import { klartext } from '../lib/vorlagen/formatierung';
+import { kreisVorschau, NUMMER_NAMEN } from '../lib/numbering';
+import { ladeNummernkreise } from '../lib/queries/nummernkreise';
+import { FirmaBearbeiten } from './einstellungen/FirmaFormular';
+import { NummernkreisEinzeln } from './einstellungen/Nummernkreise';
 import {
   einfuegen,
   einstellen,
@@ -208,6 +216,11 @@ export default function Vorlagen() {
   const [uebernommen, setUebernommen] = useState<{ zu: string; key: string } | null>(null);
   /** Bausteine des Baukastens (für „Neue Vorlage“: startet mit der gerade gezeigten) */
   const aktuelleBausteine = useRef<Baustein[]>([]);
+  /** Schublade „Firmendaten“ bzw. „Nummernformat“ (dieselben Formulare wie in den Einstellungen) */
+  const [schublade, setSchublade] = useState<'firma' | 'nummer' | null>(null);
+  /** nächste Nummer je Art (nur gelesen, vergeben wird erst beim Ausstellen); neu gelesen nach jeder Änderung des Formats */
+  const [naechste, setNaechste] = useState<Partial<Record<Belegart, string>>>({});
+  const [nkStand, setNkStand] = useState(0);
 
   useEffect(() => {
     zuletzt = art;
@@ -246,6 +259,34 @@ export default function Vorlagen() {
       weg = true;
     };
   }, []);
+
+  // Nächste Nummer je Art für den Hinweis „Nummernformat“ (ohne Datenbank oder bei Fehler: kein Hinweis)
+  useEffect(() => {
+    void nkStand;
+    if (!datenbankVerfuegbar()) return;
+    let weg = false;
+    ladeNummernkreise().then(
+      (kreise) => {
+        if (weg) return;
+        const jahr = new Date().getFullYear();
+        const m: Partial<Record<Belegart, string>> = {};
+        for (const k of kreise) {
+          if (!istBelegart(k.id)) continue;
+          const v = kreisVorschau(k, k.muster, jahr);
+          if ('nummer' in v) m[k.id] = v.nummer;
+        }
+        setNaechste(m);
+      },
+      () => {},
+    );
+    return () => {
+      weg = true;
+    };
+  }, [nkStand]);
+
+  /** Firmendaten in der Schublade gespeichert: Vorschau und Pflichtangaben-Check sofort mit dem neuen Stand */
+  const firmaGespeichert = (f: Firma) => setBasis((b) => (b ? { ...b, firma: firmaOderBeispiel(f) } : b));
+  const schubladeZu = () => setSchublade(null);
 
   // Eigene Vorlagen und aktive Vorlage der Art, erst nach dem letzten Schreibauftrag dieser Seite gelesen, damit ein
   // eben (beim Verlassen der Art) gespeicherter Stand nicht veraltet zurückkommt. Danach hält die Seite den Stand selbst.
@@ -464,9 +505,37 @@ export default function Vorlagen() {
               aktuell={aktuelleBausteine}
               angelegt={(v, aktiviert) => kopieAngelegt(v, baukastenKey, aktiviert)}
               gespeichert={eigeneSetzen}
+              naechsteNummer={naechste[art] ?? null}
+              firmaOeffnen={() => setSchublade('firma')}
+              nummerOeffnen={() => setSchublade('nummer')}
             />
           </>
         )
+      )}
+      {createPortal(
+        <>
+          <Drawer
+            open={schublade === 'firma'}
+            onClose={schubladeZu}
+            title="Firmendaten"
+            sub="Gelten für alle Vorlagen und neuen Belege – ausgestellte behalten ihren Stand"
+            icon={Building2}
+            width={720}
+          >
+            <FirmaBearbeiten schublade onGespeichert={firmaGespeichert} />
+          </Drawer>
+          <Drawer
+            open={schublade === 'nummer'}
+            onClose={schubladeZu}
+            title={`Nummernformat: ${NUMMER_NAMEN[art]}`}
+            sub="Dieselbe Einstellung wie unter Einstellungen › Nummernkreise"
+            icon={Hash}
+            width={640}
+          >
+            <NummernkreisEinzeln id={art} onGeaendert={() => setNkStand((n) => n + 1)} />
+          </Drawer>
+        </>,
+        document.body,
       )}
     </div>
   );
@@ -703,9 +772,27 @@ interface BaukastenProps {
   angelegt: (v: EigeneVorlage, aktiviert: boolean) => void;
   /** eigene Vorlage gespeichert */
   gespeichert: (v: EigeneVorlage) => void;
+  /** nächste Nummer der Art (null = unbekannt, z. B. ohne Datenbank) */
+  naechsteNummer: string | null;
+  /** Schublade „Firmendaten“ öffnen */
+  firmaOeffnen: () => void;
+  /** Schublade „Nummernformat“ der Art öffnen */
+  nummerOeffnen: () => void;
 }
 
-function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, angelegt, gespeichert: seiteGespeichert }: BaukastenProps) {
+function Baukasten({
+  art,
+  wahl,
+  aktiv,
+  basis,
+  letzter,
+  aktuell: seiteAktuell,
+  angelegt,
+  gespeichert: seiteGespeichert,
+  naechsteNummer,
+  firmaOeffnen,
+  nummerOeffnen,
+}: BaukastenProps) {
   const accent = useUi((s) => akzentPapier(s.settings));
   const motion = useUi((s) => s.settings.motion);
   const showToast = useUi((s) => s.showToast);
@@ -964,6 +1051,7 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
     starten: (index, key, klick) => setImBlatt({ index, key, klick }),
     ende: () => setImBlatt(null),
     setze: setzen,
+    firmendaten: firmaOeffnen,
   };
 
   const imBlattWaehlen = (i: number) => {
@@ -1133,6 +1221,10 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
                     <li className="vl-inline" onClick={(e) => e.stopPropagation()}>
                       <BausteinKarte
                         key={`${sel}-${b.typ}`}
+                        art={art}
+                        naechsteNummer={naechsteNummer}
+                        firmaOeffnen={firmaOeffnen}
+                        nummerOeffnen={nummerOeffnen}
                         b={b}
                         index={sel}
                         anzahl={bausteine.length}
@@ -1154,6 +1246,7 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
           <p className="vl-legende vl-legende-unten">
             Angaben in ‹ › füllt Kladdy beim Ausstellen aus · <Asterisk className="ic vl-leg-ic" /> enthält eine Pflichtangabe – nur ein Hinweis, entfernen geht trotzdem.
           </p>
+          <NummerHinweis art={art} naechste={naechsteNummer} oeffnen={nummerOeffnen} />
           <div className="vl-add">
             <button type="button" className="btn subtle" aria-haspopup="dialog" onClick={() => setPalette(true)}>
               <Plus />
@@ -1200,6 +1293,15 @@ function Baukasten({ art, wahl, aktiv, basis, letzter, aktuell: seiteAktuell, an
             </div>
           )}
           <span className="spacer" />
+          <button
+            type="button"
+            className="btn ghost"
+            title="Name, Anschrift, Steuernummer, Bankverbindung und Logo – gelten für alle Vorlagen"
+            onClick={firmaOeffnen}
+          >
+            <Building2 />
+            Firmendaten
+          </button>
           {blanko ? null : mitBeleg ? (
             <span className="vl-doc" title="Gezeigt als Entwurf ohne Nummer in den aktuellen Bausteinen – der Beleg selbst bleibt unverändert">
               {laedt ? <LoaderCircle className="ic spin" /> : <FileText />}
@@ -1272,6 +1374,10 @@ function nurPlatzhalter(teile: Textteil[]): Textteil[] {
 }
 
 interface KarteProps {
+  art: Belegart;
+  naechsteNummer: string | null;
+  firmaOeffnen: () => void;
+  nummerOeffnen: () => void;
   b: Baustein | undefined;
   index: number;
   anzahl: number;
@@ -1283,7 +1389,7 @@ interface KarteProps {
   entfernen: () => void;
 }
 
-function BausteinKarte({ b, index, anzahl, pflicht, setze, schieben, umschalten: ausEin, entfernen: weg }: KarteProps) {
+function BausteinKarte({ art, naechsteNummer, firmaOeffnen, nummerOeffnen, b, index, anzahl, pflicht, setze, schieben, umschalten: ausEin, entfernen: weg }: KarteProps) {
   const felder = useRef<Record<string, FormatEditorHandle | null>>({});
   if (!b) return null;
   const def = BAUSTEINE[b.typ];
@@ -1336,7 +1442,9 @@ function BausteinKarte({ b, index, anzahl, pflicht, setze, schieben, umschalten:
           </span>
         </p>
       ) : null}
-      {def.felder.length ? (
+      {b.typ === 'anschrift_meta' ? (
+        <MetaEinstellungen r={r} art={art} setze={setze} naechste={naechsteNummer} nummerOeffnen={nummerOeffnen} />
+      ) : def.felder.length ? (
         <div className="form">
           {def.felder.map((f) => {
             const id = `vl-feld-${f.key}`;
@@ -1407,14 +1515,126 @@ function BausteinKarte({ b, index, anzahl, pflicht, setze, schieben, umschalten:
       ) : (
         <p className="hint">Dieser Baustein hat keine Einstellungen – er übernimmt die Daten aus dem Beleg und den Firmendaten.</p>
       )}
-      {def.felder.some((f) => f.typ === 'text' || f.typ === 'textarea') ? (
-      <p className="hint vl-firma">
-        <Building2 />
-        <span>
-          Steuernummer, Anschrift und Bankverbindung trägst du einmal unter <Link to={bereichPfad('firma')}>Einstellungen › Firma</Link> ein; Marken wie{' '}
-          <span className="vl-ph-mini">Steuernummer</span> setzen sie in jeden Beleg ein.
+      {def.felder.some((f) => f.typ === 'text' || f.typ === 'textarea') || b.typ === 'fusszeile' ? (
+        <p className="hint vl-firma">
+          <Building2 />
+          <span>
+            Name, Steuernummer, Anschrift, Bankverbindung und Logo trägst du einmal in den{' '}
+            <button type="button" className="link vl-firma-link" onClick={firmaOeffnen}>
+              Firmendaten
+            </button>{' '}
+            ein (dieselben wie unter Einstellungen › Firma); Marken wie <span className="vl-ph-mini">Steuernummer</span> setzen sie in
+            jeden Beleg ein.
+          </span>
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/** Nächste Nummer der Art und der Weg zum Nummernformat (Schublade mit dem Nummernkreis aus den Einstellungen). */
+function NummerHinweis({ art, naechste, oeffnen }: { art: Belegart; naechste: string | null; oeffnen: () => void }) {
+  if (!naechste) return null;
+  return (
+    <p className="hint vl-firma vl-nummer">
+      <Hash />
+      <span>
+        Nächste {NUMMER_NAMEN[art]}: <span className="mono">{naechste}</span> – vergeben beim Ausstellen.{' '}
+        <button type="button" className="link vl-firma-link" onClick={oeffnen}>
+          Nummernformat ändern …
+        </button>
+      </span>
+    </p>
+  );
+}
+
+/** Einstellungen „Anschrift & Belegdaten“: je Angabe anzeigen, eigene Beschriftung (leer = Standard der Art),
+ *  Reihenfolge (↑/↓), dazu das Datumsformat. Gespeichert wie jede Einstellung (meta.ts, Autosave, Protokoll). */
+function MetaEinstellungen({
+  r,
+  art,
+  setze,
+  naechste,
+  nummerOeffnen,
+}: {
+  r: Aufgeloest;
+  art: Belegart;
+  setze: (key: string, wert: Einstellung) => void;
+  naechste: string | null;
+  nummerOeffnen: () => void;
+}) {
+  const reihenfolge = metaReihenfolge(r.text('reihenfolge'));
+  const schieben = (k: MetaAngabe, richtung: -1 | 1) => setze('reihenfolge', metaVerschieben(r.text('reihenfolge'), k, richtung));
+  const datum = BAUSTEINE.anschrift_meta.felder.find((f) => f.key === 'datumsformat');
+  return (
+    <div className="form">
+      <div className="field">
+        <span className="vl-meta-titel" id="vl-meta-titel">
+          Angaben rechts neben dem Empfänger
         </span>
-      </p>
+        <ul className="vl-meta-liste" aria-labelledby="vl-meta-titel">
+          {reihenfolge.map((k, i) => {
+            const nie = k === 'leistung' && art === 'angebot';
+            const name = META_NAME[k];
+            const standard = metaStandardLabel(k, art);
+            return (
+              <li key={k} className={r.an(k) && !nie ? undefined : 'aus'}>
+                <Switch checked={r.an(k)} onChange={(an) => setze(k, an)} label={`${name} drucken`} />
+                <input
+                  className="input"
+                  value={klartext(r.text(labelKey(k)))}
+                  placeholder={standard}
+                  aria-label={`Beschriftung „${name}“ (leer = ${standard})`}
+                  title={nie ? 'Steht nicht auf Angeboten' : `${name}: eigene Beschriftung, leer = „${standard}“`}
+                  spellCheck={false}
+                  onChange={(e) => setze(labelKey(k), e.target.value)}
+                />
+                <span className="vl-reihe" role="group" aria-label={`Reihenfolge „${name}“`}>
+                  <button type="button" className="icon-btn sm" title="Nach oben" aria-label={`„${name}“ nach oben`} disabled={i === 0} onClick={() => schieben(k, -1)}>
+                    <ArrowUp />
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-btn sm"
+                    title="Nach unten"
+                    aria-label={`„${name}“ nach unten`}
+                    disabled={i === reihenfolge.length - 1}
+                    onClick={() => schieben(k, 1)}
+                  >
+                    <ArrowDown />
+                  </button>
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+        <p className="hint">
+          Leere Beschriftung = Standard (z. B. „{metaStandardLabel('nr', art)}“). Fett oder kursiv: im Blatt auf die Beschriftung
+          klicken.{art === 'angebot' ? ' Das Leistungsdatum steht nicht auf Angeboten.' : ''}
+        </p>
+      </div>
+      {datum ? (
+        <div className="field">
+          <label htmlFor="vl-feld-datumsformat">{datum.label}</label>
+          <select id="vl-feld-datumsformat" className="select" value={r.text('datumsformat')} onChange={(e) => setze('datumsformat', e.target.value)}>
+            {(datum.optionen ?? KEINE_OPTIONEN).map(([wert, text]) => (
+              <option key={wert} value={wert}>
+                {text}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
+      {naechste ? (
+        <p className="hint vl-firma">
+          <Hash />
+          <span>
+            Nächste {NUMMER_NAMEN[art]}: <span className="mono">{naechste}</span> ·{' '}
+            <button type="button" className="link vl-firma-link" onClick={nummerOeffnen}>
+              Nummernformat ändern …
+            </button>
+          </span>
+        </p>
       ) : null}
     </div>
   );
