@@ -250,8 +250,8 @@ function SicherungenKarte({ liste, neuLaden }: { liste: Sicherung[]; neuLaden: (
           </div>
         ) : null}
         <p className="hint">
-          Kladdy sichert die Datenbank bei jedem Start (die letzten 10 und für ein Jahr je Monat eine), vor jedem Update und vor
-          jeder Umstellung der Datenbank. Die Kopien liegen auf diesem Mac neben der Datenbank; abgelegte Belegdateien und das
+          Kladdy sichert die Datenbank bei jedem Start (die letzten 10, für 30 Tage je Tag eine und für ein Jahr je Monat eine),
+          vor jedem Update und vor jeder Umstellung der Datenbank. Die Kopien liegen auf diesem Mac neben der Datenbank; abgelegte Belegdateien und das
           Logo sind nicht enthalten. Kopiere den Ordner ab und zu auf einen USB-Stick oder eine externe Platte.
         </p>
       </SetRow>

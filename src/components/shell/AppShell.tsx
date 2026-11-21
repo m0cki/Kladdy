@@ -14,7 +14,7 @@ import { runCommand } from '../../lib/commands';
 import { watchFenster } from '../../lib/fenster';
 import { inTauri, onMenu, type MenuId } from '../../lib/menu';
 import { bereichPfad, isEinstellungen } from '../../lib/einstellungen-index';
-import { startBericht, wiederhergestelltText } from '../../lib/sicherungen';
+import { startBericht, wenigerDatenText, wiederhergestelltText } from '../../lib/sicherungen';
 import { autoCheckOnStart } from '../../lib/updates';
 import { useUi } from '../../store/ui';
 import { Toasts } from '../ui/Toasts';
@@ -62,7 +62,8 @@ export function AppShell() {
       .catch(() => undefined);
   }, []);
   // Was beim Start mit den Sicherungen passiert ist (einmal abholbar): Wiederherstellen erledigt oder fehlgeschlagen,
-  // automatische Sicherung fehlgeschlagen. Die App läuft in jedem Fall normal weiter.
+  // automatische Sicherung fehlgeschlagen, deutlich weniger Daten als in einer Sicherung der letzten 30 Tage.
+  // Die App läuft in jedem Fall normal weiter.
   useEffect(() => {
     void startBericht()
       .then((b) => {
@@ -70,6 +71,9 @@ export function AppShell() {
         const ansehen = { label: 'Sicherungen ansehen', run: () => navRef.current(bereichPfad('daten', 'sicherungen')) };
         if (b.wiederhergestellt) {
           ui.showToast({ key: 'wiederhergestellt', text: wiederhergestelltText(b.wiederhergestellt), icon: 'check', sticky: true });
+        }
+        if (b.weniger_daten) {
+          ui.showToast({ key: 'sicherung-weniger-daten', text: wenigerDatenText(b.weniger_daten), icon: 'warn', sticky: true, actions: [ansehen] });
         }
         b.fehler.forEach((text, i) => ui.showToast({ key: `sicherung-start-${i}`, text, icon: 'warn', sticky: true, actions: [ansehen] }));
       })

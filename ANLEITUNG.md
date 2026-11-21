@@ -686,8 +686,12 @@ Regeln:
 `kladdy` bzw. `kladdy-dev` trennt Release und Entwicklerversion). Anlässe: `automatisch` (bei jedem Start, ehe die Datenbank
 geöffnet wird; nur wenn die Datei existiert und nicht leer ist), `manuell` („Jetzt sichern“), `vor-update`,
 `vor-migration` (vor offenen Migrationen, wie bisher) und `vor-wiederherstellung`. Nur `automatisch/` rotiert: die 10
-neuesten plus je Kalendermonat die neueste für 12 Monate; alle anderen Ordner werden nie gelöscht. Fehler beim
-automatischen Sichern blockieren den Start nicht, sie erscheinen als Warn-Toast. Einstellungen › Daten › Sicherungen listet
+neuesten, je Kalendertag die neueste für 30 Tage und je Kalendermonat die neueste für 12 Monate; alle anderen Ordner
+werden nie gelöscht. Hat die Datenbank (Buchungen + Belege + Kunden + Belegdateien) weniger als die Hälfte der Zeilen der
+zeilenreichsten automatischen Kopie der letzten 30 Tage (oder fehlt sie), wird in diesem Start **nicht** aufgeräumt
+und ein bleibender Warn-Toast nennt die Sicherung („Deine Daten sind deutlich weniger als in der Sicherung vom …“,
+Aktion „Sicherungen ansehen“; Issue #52). Fehler beim automatischen Sichern blockieren den Start nicht, sie erscheinen
+als Warn-Toast. Einstellungen › Daten › Sicherungen listet
 alle Kopien (Zeitpunkt, Anlass, Größe, Buchungen/Belege/Kunden, schreibgeschützt aus der Kopie gelesen; fremde oder neuere
 Kopien „nicht nutzbar“). **Wiederherstellen:** Pfad geprüft (nur `sicherungen/<anlass>/<datei>`, kein `..`, keine
 Symlinks), Kopie geprüft (`quick_check`, bekannte Migrationen mit passender Prüfsumme), Merkdatei `<db>.wiederherstellen`,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ART_TEXT, anzahlText, groesseText, inhaltText, wiederhergestelltText, zeitpunktText } from './sicherungen';
+import { ART_TEXT, anzahlText, groesseText, inhaltText, wenigerDatenText, wiederhergestelltText, zeitpunktText } from './sicherungen';
 
 describe('Sicherungen: Anzeige', () => {
   it('Größe wie im Finder, deutsches Komma', () => {
@@ -37,5 +37,13 @@ describe('Sicherungen: Anzeige', () => {
     const iso = '2026-10-13T22:15:00Z';
     expect(wiederhergestelltText({ zeitpunkt: iso, vorher: null })).toBe(`Sicherung vom ${zeitpunktText(iso)} wiederhergestellt.`);
     expect(wiederhergestelltText({ zeitpunkt: iso, vorher: '/x/vor-wiederherstellung/k.db' })).toContain('Stand davor ist gesichert');
+  });
+
+  it('Warnung bei deutlich weniger Daten als in einer Sicherung', () => {
+    const iso = '2026-10-13T22:15:00Z';
+    expect(wenigerDatenText({ zeitpunkt: iso, buchungen: 1234, zeilen: 1500 })).toBe(
+      `Deine Daten sind deutlich weniger als in der Sicherung vom ${zeitpunktText(iso)} (1.234 Buchungen). Falls etwas fehlt: Einstellungen › Daten › Sicherungen.`,
+    );
+    expect(wenigerDatenText({ zeitpunkt: iso, buchungen: 1, zeilen: 3 })).toContain('(1 Buchung)');
   });
 });

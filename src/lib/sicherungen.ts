@@ -1,5 +1,6 @@
 /* Sicherungen der Datenbank (ANLEITUNG §3.2, §5, §6.10). Die Arbeit macht Rust (src-tauri/src/sicherungen.rs):
- * - automatisch bei jedem Start (`sicherungen/automatisch/`, rotierend: die letzten 10 + je Monat eine für ein Jahr),
+ * - automatisch bei jedem Start (`sicherungen/automatisch/`, rotierend: die letzten 10, je Tag eine für 30 Tage und je
+ *   Monat eine für ein Jahr; nicht aufgeräumt und Warnung beim Start, wenn die Datenbank deutlich weniger Daten hat),
  *   vor jedem Update-Install (`vor-update/`, aus lib/updates.ts), von Hand (`manuell/`, „Jetzt sichern“), vor offenen
  *   Migrationen (`vor-migration/`) und vor dem Wiederherstellen (`vor-wiederherstellung/`).
  * - Wiederherstellen: `wiederherstellenVormerken(name)` und danach Neustart; beim Start wird erst der aktuelle Stand
@@ -37,10 +38,20 @@ export interface Wiederhergestellt {
   vorher: string | null;
 }
 
+/** Automatische Kopie der letzten 30 Tage mit deutlich mehr Daten als die Datenbank jetzt (Issue #52). */
+export interface MehrDaten {
+  zeitpunkt: string;
+  buchungen: number;
+  /** Buchungen + Belege + Kunden + Belegdateien */
+  zeilen: number;
+}
+
 export interface StartBericht {
   wiederhergestellt: Wiederhergestellt | null;
   /** fertige Sätze (Wiederherstellen fehlgeschlagen, automatische Sicherung fehlgeschlagen) */
   fehler: string[];
+  /** gesetzt, wenn die Datenbank weniger als die Hälfte der Daten dieser Kopie hat (dann wird auch nicht aufgeräumt) */
+  weniger_daten: MehrDaten | null;
 }
 
 export const ART_TEXT: Record<SicherungsArt, string> = {
@@ -78,6 +89,12 @@ export function wiederhergestelltText(w: Wiederhergestellt): string {
   return `Sicherung vom ${zeitpunktText(w.zeitpunkt)} wiederhergestellt.${davor}`;
 }
 
+/** Warnung beim Start, wenn die Datenbank deutlich weniger Daten hat als eine Sicherung der letzten 30 Tage. */
+export function wenigerDatenText(m: MehrDaten): string {
+  const buchungen = `${anzahlText(m.buchungen)} ${m.buchungen === 1 ? 'Buchung' : 'Buchungen'}`;
+  return `Deine Daten sind deutlich weniger als in der Sicherung vom ${zeitpunktText(m.zeitpunkt)} (${buchungen}). Falls etwas fehlt: Einstellungen › Daten › Sicherungen.`;
+}
+
 /** Inhalt einer Sicherung in einem Satzteil, z. B. „12 Buchungen, 3 Belege, 5 Kunden“. */
 export function inhaltText(s: Pick<Sicherung, 'buchungen' | 'rechnungen' | 'kunden'>): string {
   const teil = (n: number | null, eins: string, viele: string) => `${anzahlText(n)} ${n === 1 ? eins : viele}`;
@@ -99,4 +116,4 @@ export const wiederherstellenVormerken = (name: string): Promise<void> => invoke
 
 /** Einmal nach dem Start: Wiederherstellen erledigt? Fehler beim automatischen Sichern? */
 export const startBericht = (): Promise<StartBericht> =>
-  isTauri() ? invoke<StartBericht>('sicherungen_start_bericht') : Promise.resolve({ wiederhergestellt: null, fehler: [] });
+  isTauri() ? invoke<StartBericht>('sicherungen_start_bericht') : Promise.resolve({ wiederhergestellt: null, fehler: [], weniger_daten: null });

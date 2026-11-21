@@ -2,8 +2,12 @@
 //! `sicherungen/<art>/`, eine Liste für Einstellungen › Daten und das Wiederherstellen beim nächsten Start.
 //!
 //! - `automatisch/`: bei JEDEM Start der echten Datei (`DB_DATEI`, nie die Demo-Datei), wenn sie existiert und nicht
-//!   leer ist. Rotation: die `NEUESTE_BEHALTEN` neuesten und je Kalendermonat die neueste der letzten `MONATE_BEHALTEN`
-//!   Monate. Gelöscht wird nur dort und nur, was dem Namensschema entspricht; alle anderen Ordner bleiben unberührt.
+//!   leer ist. Rotation: die `NEUESTE_BEHALTEN` neuesten, je Kalendertag die neueste der letzten `TAGE_BEHALTEN` Tage
+//!   und je Kalendermonat die neueste der letzten `MONATE_BEHALTEN` Monate. Gelöscht wird nur dort und nur, was dem
+//!   Namensschema entspricht; alle anderen Ordner bleiben unberührt. Hat die Datenbank deutlich weniger Daten als eine
+//!   automatische Kopie der letzten `TAGE_BEHALTEN` Tage (`deutlich_weniger`: weniger als die Hälfte der Zeilen in
+//!   buchungen + rechnungen + kunden + belege), wird in diesem Start NICHT rotiert und der `StartBericht` warnt
+//!   (Issue #52: leere oder kaputte Datenbank, mehrere Neustarts dürfen die guten Kopien nicht verdrängen).
 //!   Ein Fehler blockiert das Öffnen NICHT (anders als die Sicherung vor Migration), er steht im `StartBericht`.
 //! - `manuell/` („Jetzt sichern“) und `vor-update/` (src/lib/updates.ts vor dem Installieren): `sicherung_anlegen`,
 //!   über den Pool des SQL-Plugins (sieht auch noch nicht zurückgeschriebene Änderungen), sonst direkt aus der Datei.
@@ -34,6 +38,8 @@ use crate::datenbank::{self, DB_DATEI, MIGRATIONEN};
 pub const ORDNER: &str = "sicherungen";
 /// Rotation in `automatisch/`: so viele neueste bleiben immer …
 pub const NEUESTE_BEHALTEN: usize = 10;
+/// … je Kalendertag die neueste, für so viele Tage (heute zählt mit) …
+pub const TAGE_BEHALTEN: u64 = 30;
 /// … und je Kalendermonat die neueste, für so viele Monate (der laufende zählt mit).
 pub const MONATE_BEHALTEN: i64 = 12;
 /// Tabellen, deren Zeilen die Liste zeigt.
@@ -98,6 +104,11 @@ impl Stempel {
         let jahr: i64 = self.text[0..4].parse().unwrap_or(0);
         let monat: i64 = self.text[4..6].parse().unwrap_or(1);
         jahr * 12 + monat - 1
+    }
+
+    /// Kalendertag `JJJJMMTT` (UTC).
+    fn tag(&self) -> &str {
+        &self.text[0..8]
     }
 
     /// `JJJJ-MM-TTThh:mm:ssZ` wie `datenbank::utc_iso`.
@@ -232,20 +243,33 @@ pub async fn datei_sichern(
 
 /* ---------- Rotation ---------- */
 
-/// Welche automatischen Sicherungen weg dürfen: alle außer den `NEUESTE_BEHALTEN` neuesten und der neuesten je
-/// Kalendermonat der letzten `MONATE_BEHALTEN` Monate (bezogen auf `jetzt`, UTC).
+/// Erster Kalendertag (`JJJJMMTT`, UTC) der letzten `TAGE_BEHALTEN` Tage bis `jetzt` (heute zählt mit).
+fn erster_tag(jetzt: u64) -> String {
+    datenbank::utc_stempel(jetzt.saturating_sub((TAGE_BEHALTEN - 1) * 86_400))[..8].to_string()
+}
+
+/// Welche automatischen Sicherungen weg dürfen: alle außer den `NEUESTE_BEHALTEN` neuesten, der neuesten je
+/// Kalendertag der letzten `TAGE_BEHALTEN` Tage und der neuesten je Kalendermonat der letzten `MONATE_BEHALTEN`
+/// Monate (bezogen auf `jetzt`, UTC).
 pub fn zu_loeschen(dateien: &[(String, Stempel)], jetzt: u64) -> Vec<String> {
     let mut sortiert: Vec<&(String, Stempel)> = dateien.iter().collect();
     sortiert.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| b.0.cmp(&a.0)));
     let (jahr, monat, ..) = datenbank::utc_teile(jetzt);
     let aktuell = jahr * 12 + monat - 1;
+    let erster = erster_tag(jetzt);
+    let mut tage_gesehen = std::collections::HashSet::new();
     let mut monate_gesehen = std::collections::HashSet::new();
     let mut weg = Vec::new();
     for (i, (name, stempel)) in sortiert.into_iter().enumerate() {
+        let neueste_am_tag = tage_gesehen.insert(stempel.tag().to_string());
+        let tag_im_fenster = stempel.tag() >= erster.as_str();
         let monat = stempel.monat();
         let neueste_im_monat = monate_gesehen.insert(monat);
-        let im_fenster = monat > aktuell - MONATE_BEHALTEN;
-        if i < NEUESTE_BEHALTEN || (neueste_im_monat && im_fenster) {
+        let monat_im_fenster = monat > aktuell - MONATE_BEHALTEN;
+        if i < NEUESTE_BEHALTEN
+            || (neueste_am_tag && tag_im_fenster)
+            || (neueste_im_monat && monat_im_fenster)
+        {
             continue;
         }
         weg.push(name.clone());
@@ -253,13 +277,13 @@ pub fn zu_loeschen(dateien: &[(String, Stempel)], jetzt: u64) -> Vec<String> {
     weg
 }
 
-/// Räumt `sicherungen/automatisch/` auf (nur echte Dateien mit passendem Namen). Gibt Fehler als Text zurück.
-pub fn rotieren(sicherungen: &Path, stamm: &str, jetzt: u64) -> Vec<String> {
+/// Automatische Sicherungen von `stamm` (nur echte Dateien mit passendem Namen). Fehlt der Ordner: leer.
+fn automatische_dateien(sicherungen: &Path, stamm: &str) -> Result<Vec<(String, Stempel)>, String> {
     let ordner = sicherungen.join(Art::Automatisch.ordner());
     let eintraege = match fs::read_dir(&ordner) {
         Ok(e) => e,
-        Err(e) if e.kind() == ErrorKind::NotFound => return Vec::new(),
-        Err(e) => return vec![format!("Ordner lesen ({}): {e}", ordner.display())],
+        Err(e) if e.kind() == ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(e) => return Err(format!("Ordner lesen ({}): {e}", ordner.display())),
     };
     let mut dateien = Vec::new();
     for eintrag in eintraege.flatten() {
@@ -271,6 +295,16 @@ pub fn rotieren(sicherungen: &Path, stamm: &str, jetzt: u64) -> Vec<String> {
             dateien.push((name, s));
         }
     }
+    Ok(dateien)
+}
+
+/// Räumt `sicherungen/automatisch/` auf (nur echte Dateien mit passendem Namen). Gibt Fehler als Text zurück.
+pub fn rotieren(sicherungen: &Path, stamm: &str, jetzt: u64) -> Vec<String> {
+    let ordner = sicherungen.join(Art::Automatisch.ordner());
+    let dateien = match automatische_dateien(sicherungen, stamm) {
+        Ok(d) => d,
+        Err(e) => return vec![e],
+    };
     zu_loeschen(&dateien, jetzt)
         .into_iter()
         .filter_map(|name| {
@@ -282,30 +316,128 @@ pub fn rotieren(sicherungen: &Path, stamm: &str, jetzt: u64) -> Vec<String> {
         .collect()
 }
 
-/// Automatische Sicherung beim Start samt Rotation. `None` = alles gut (oder nichts zu sichern), sonst die Meldung.
-pub fn automatisch_beim_start(db: &Path, sicherungen: &Path, jetzt: u64) -> Option<String> {
+/* ---------- Vergleich mit den letzten Tagen ---------- */
+
+/// Zeilen in buchungen, rechnungen, kunden und belege zusammen (fehlende Tabellen zählen 0).
+fn summe(zeilen: &[Option<i64>; 4]) -> i64 {
+    zeilen.iter().flatten().sum()
+}
+
+/// Automatische Kopie, die deutlich mehr Daten hatte als die Datenbank jetzt (Warnung im `StartBericht`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct MehrDaten {
+    /// UTC aus dem Dateinamen, `JJJJ-MM-TTThh:mm:ssZ`
+    pub zeitpunkt: String,
+    pub buchungen: i64,
+    /// buchungen + rechnungen + kunden + belege
+    pub zeilen: i64,
+}
+
+/// Reine Vergleichslogik: Hat die Datenbank (`jetzt_zeilen`, Summe wie `summe`) weniger als die Hälfte der Zeilen
+/// der zeilenreichsten automatischen Kopie der letzten `TAGE_BEHALTEN` Tage? Dann diese Kopie (bei Gleichstand die
+/// neueste), sonst `None`. Kopien ohne Daten zählen nicht (frisch eingerichtete Datenbank).
+pub fn deutlich_weniger(
+    jetzt_zeilen: i64,
+    vorhandene: &[(Stempel, [Option<i64>; 4])],
+    jetzt: u64,
+) -> Option<MehrDaten> {
+    let erster = erster_tag(jetzt);
+    let (stempel, zeilen) = vorhandene
+        .iter()
+        .filter(|(s, _)| s.tag() >= erster.as_str())
+        .max_by(|a, b| summe(&a.1).cmp(&summe(&b.1)).then_with(|| a.0.cmp(&b.0)))?;
+    let meiste = summe(zeilen);
+    (meiste > 0 && jetzt_zeilen.saturating_mul(2) < meiste).then(|| MehrDaten {
+        zeitpunkt: stempel.iso(),
+        buchungen: zeilen[0].unwrap_or(0),
+        zeilen: meiste,
+    })
+}
+
+/// Zeilenzahlen der automatischen Kopien der letzten `TAGE_BEHALTEN` Tage. Unlesbare Kopien werden übergangen.
+async fn letzte_inhalte(
+    sicherungen: &Path,
+    stamm: &str,
+    jetzt: u64,
+) -> Vec<(Stempel, [Option<i64>; 4])> {
+    let erster = erster_tag(jetzt);
+    let ordner = sicherungen.join(Art::Automatisch.ordner());
+    let mut inhalte = Vec::new();
+    for (name, stempel) in automatische_dateien(sicherungen, stamm).unwrap_or_default() {
+        if stempel.tag() < erster.as_str() {
+            continue;
+        }
+        if let Ok(zeilen) = zeilen_zaehlen(&ordner.join(&name)).await {
+            inhalte.push((stempel, zeilen));
+        }
+    }
+    inhalte
+}
+
+/// Ergebnis der automatischen Sicherung beim Start.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct Automatisch {
+    /// Meldung, wenn Sichern oder Aufräumen nicht geklappt hat
+    pub fehler: Option<String>,
+    /// gesetzt, wenn die Datenbank deutlich weniger Daten hat als eine Kopie der letzten Tage (dann ohne Rotation)
+    pub weniger: Option<MehrDaten>,
+}
+
+/// Automatische Sicherung beim Start samt Rotation. Vorher werden die Kopien der letzten `TAGE_BEHALTEN` Tage gelesen:
+/// Hat die Datenbank deutlich weniger Daten (oder fehlt sie), wird nicht rotiert und gewarnt.
+pub fn automatisch_beim_start(db: &Path, sicherungen: &Path, jetzt: u64) -> Automatisch {
+    let stamm = stamm_von(db);
+    let vorhandene = tauri::async_runtime::block_on(letzte_inhalte(sicherungen, stamm, jetzt));
     match tauri::async_runtime::block_on(datei_sichern(db, sicherungen, Art::Automatisch, jetzt)) {
         Ok(Some(kopie)) => {
             eprintln!("Automatische Sicherung: {}", kopie.display());
-            let fehler = rotieren(sicherungen, stamm_von(db), jetzt);
+            let weniger = match tauri::async_runtime::block_on(zeilen_zaehlen(&kopie)) {
+                Ok(zeilen) => deutlich_weniger(summe(&zeilen), &vorhandene, jetzt),
+                Err(e) => {
+                    // Inhalt unbekannt: lieber nichts löschen.
+                    eprintln!("Neue Sicherung nicht lesbar, es wird nicht aufgeräumt: {e}");
+                    return Automatisch::default();
+                }
+            };
+            if let Some(m) = &weniger {
+                eprintln!(
+                    "Deutlich weniger Daten als in der Sicherung vom {} ({} Zeilen), es wird nicht aufgeräumt.",
+                    m.zeitpunkt, m.zeilen
+                );
+                return Automatisch {
+                    fehler: None,
+                    weniger,
+                };
+            }
+            let fehler = rotieren(sicherungen, stamm, jetzt);
             for f in &fehler {
                 eprintln!("Rotation der Sicherungen: {f}");
             }
-            (!fehler.is_empty()).then(|| {
-                format!(
-                    "Alte automatische Sicherungen konnten nicht aufgeräumt werden: {}",
-                    fehler.join("; ")
-                )
-            })
+            Automatisch {
+                fehler: (!fehler.is_empty()).then(|| {
+                    format!(
+                        "Alte automatische Sicherungen konnten nicht aufgeräumt werden: {}",
+                        fehler.join("; ")
+                    )
+                }),
+                weniger: None,
+            }
         }
-        Ok(None) => None,
+        // Keine (oder eine leere) Datenbankdatei: gab es in den letzten Tagen Daten, ist das die Warnung wert.
+        Ok(None) => Automatisch {
+            fehler: None,
+            weniger: deutlich_weniger(0, &vorhandene, jetzt),
+        },
         Err(e) => {
             eprintln!("Automatische Sicherung fehlgeschlagen: {e}");
-            Some(format!(
-                "Die automatische Sicherung beim Start ist fehlgeschlagen: {e}. Kladdy arbeitet normal weiter, \
-                 deine Daten sind unverändert. Bitte Speicherplatz und Schreibrechte für {} prüfen.",
-                sicherungen.display()
-            ))
+            Automatisch {
+                fehler: Some(format!(
+                    "Die automatische Sicherung beim Start ist fehlgeschlagen: {e}. Kladdy arbeitet normal weiter, \
+                     deine Daten sind unverändert. Bitte Speicherplatz und Schreibrechte für {} prüfen.",
+                    sicherungen.display()
+                )),
+                weniger: None,
+            }
         }
     }
 }
@@ -360,6 +492,30 @@ async fn tabelle_da(c: &mut SqliteConnection, name: &str) -> Result<bool, sqlx::
     Ok(n > 0)
 }
 
+/// Zeilen je Tabelle aus `GEZAEHLT`; `None`, wenn es die Tabelle (noch) nicht gibt.
+async fn zeilen_lesen(c: &mut SqliteConnection) -> Result<[Option<i64>; 4], sqlx::Error> {
+    let mut zeilen = [None; 4];
+    for (i, tabelle) in GEZAEHLT.iter().enumerate() {
+        if tabelle_da(c, tabelle).await? {
+            let n: i64 = sqlx::query_scalar(&format!("SELECT count(*) FROM {tabelle}"))
+                .fetch_one(&mut *c)
+                .await?;
+            zeilen[i] = Some(n);
+        }
+    }
+    Ok(zeilen)
+}
+
+/// Nur die Zeilenzahlen einer Kopie (ohne Prüfung der Migrationen).
+async fn zeilen_zaehlen(datei: &Path) -> Result<[Option<i64>; 4], String> {
+    let mut c = lesend_oeffnen(datei).await?;
+    let ergebnis = zeilen_lesen(&mut c)
+        .await
+        .map_err(|e| format!("Sicherung lesen: {e}"));
+    let _ = c.close().await;
+    ergebnis
+}
+
 /// Liest Schema-Stand und Zeilenzahlen und prüft, ob die Kopie zu dieser App passt: Kladdy-Datenbank (Migrationen
 /// mit denselben Prüfsummen wie hier, sonst verweigerte das SQL-Plugin später das Öffnen) und nicht neuer als die App.
 /// `gruendlich`: zusätzlich `PRAGMA quick_check` (vor dem Wiederherstellen).
@@ -392,19 +548,10 @@ async fn inhalt_lesen(c: &mut SqliteConnection, gruendlich: bool) -> Result<Inha
             .fetch_all(&mut *c)
             .await
             .map_err(lesefehler)?;
-    let mut inhalt = Inhalt {
+    let inhalt = Inhalt {
         schema: angewendet.iter().map(|(v, _)| *v).max(),
-        zeilen: [None; 4],
+        zeilen: zeilen_lesen(c).await.map_err(lesefehler)?,
     };
-    for (i, tabelle) in GEZAEHLT.iter().enumerate() {
-        if tabelle_da(c, tabelle).await.map_err(lesefehler)? {
-            let n: i64 = sqlx::query_scalar(&format!("SELECT count(*) FROM {tabelle}"))
-                .fetch_one(&mut *c)
-                .await
-                .map_err(lesefehler)?;
-            inhalt.zeilen[i] = Some(n);
-        }
-    }
     for (version, pruefsumme) in &angewendet {
         let Some(m) = MIGRATIONEN.iter().find(|m| m.version == *version) else {
             return Err(format!(
@@ -645,12 +792,14 @@ pub struct Bericht {
     pub wiederhergestellt: Option<Wiederhergestellt>,
     /// Fehler (Wiederherstellen, automatische Sicherung), jeweils als ganzer Satz
     pub fehler: Vec<String>,
+    /// Die Datenbank hat deutlich weniger Daten als diese automatische Kopie der letzten Tage (Issue #52)
+    pub weniger_daten: Option<MehrDaten>,
 }
 
 impl Bericht {
     pub fn aus(
         wiederherstellung: Option<Result<Wiederhergestellt, String>>,
-        automatisch: Option<String>,
+        automatisch: Automatisch,
     ) -> Self {
         let mut b = Bericht::default();
         match wiederherstellung {
@@ -658,7 +807,11 @@ impl Bericht {
             Some(Err(e)) => b.fehler.push(e),
             None => {}
         }
-        b.fehler.extend(automatisch);
+        b.fehler.extend(automatisch.fehler);
+        // Nach einem gewollten Wiederherstellen eines älteren Stands keine Warnung (die Rotation bleibt trotzdem aus).
+        if b.wiederhergestellt.is_none() {
+            b.weniger_daten = automatisch.weniger;
+        }
         b
     }
 }
@@ -900,9 +1053,142 @@ mod tests {
                 .iter()
                 .any(|n| n.contains("-202510") || n.contains("-202509"))
         );
-        assert_eq!(bleibt.len(), NEUESTE_BEHALTEN + 11);
+        // je Tag die neueste der letzten 30 Tage (14.9.–13.10.), davor nur Monatsletzte
+        assert!(bleibt.iter().any(|n| n.contains("-20260914-")));
+        assert!(!bleibt.iter().any(|n| n.contains("-20260913-")));
+        // 30 Tage (13.10. doppelt) + Monatsletzte November 2025 bis August 2026
+        assert_eq!(bleibt.len(), 31 + 10);
         // wenige Sicherungen: nichts weg
         assert!(zu_loeschen(&dateien[..5], jetzt).is_empty());
+    }
+
+    #[test]
+    fn rotation_behaelt_je_tag_eine_der_letzten_30_tage() {
+        // Je Tag eine gute Kopie vom 1.9. bis 12.10., dann 15 Starts am 13.10.: die Starts verdrängen nur ältere
+        // Kopien desselben Tages, nicht die Tageskopien davor.
+        let tag = 86_400;
+        let mut dateien = Vec::new();
+        for d in 1..=42u64 {
+            let s = datenbank::utc_stempel(T0 - d * tag);
+            dateien.push((format!("kladdy-automatisch-{s}.db"), stempel(&s)));
+        }
+        for i in 0..15u64 {
+            let s = datenbank::utc_stempel(T0 + i);
+            dateien.push((format!("kladdy-automatisch-{s}.db"), stempel(&s)));
+        }
+        let weg = zu_loeschen(&dateien, T0 + 20);
+        for d in 1..=29u64 {
+            let name = format!(
+                "kladdy-automatisch-{}.db",
+                datenbank::utc_stempel(T0 - d * tag)
+            );
+            assert!(!weg.contains(&name), "Tageskopie {name} gelöscht");
+        }
+        // 13.10.: die 10 neuesten Starts bleiben (die neueste des Tages ist darunter)
+        assert_eq!(weg.iter().filter(|n| n.contains("-20261013-")).count(), 5);
+        // der 13.9. liegt außerhalb der 30 Tage, der 14.9. nicht
+        assert!(weg.iter().any(|n| n.contains("-20260913-")));
+        assert!(!weg.iter().any(|n| n.contains("-20260914-")));
+        // vor dem Fenster bleibt nur die neueste je Monat (September: der 30.9., also ist der 1.9. weg)
+        assert!(weg.iter().any(|n| n.contains("-20260901-")));
+        assert_eq!(weg.len(), 5 + 13);
+    }
+
+    #[test]
+    fn deutlich_weniger_vergleicht_mit_den_letzten_30_tagen() {
+        let tag = 86_400;
+        let kopie = |vor_tagen: u64, z: [Option<i64>; 4]| {
+            (stempel(&datenbank::utc_stempel(T0 - vor_tagen * tag)), z)
+        };
+        // nichts zum Vergleichen, oder nur Kopien ohne Daten: keine Warnung
+        assert_eq!(deutlich_weniger(0, &[], T0), None);
+        assert_eq!(
+            deutlich_weniger(0, &[kopie(1, [Some(0), Some(0), Some(0), None])], T0),
+            None
+        );
+        let liste = [
+            kopie(1, [Some(3), Some(1), Some(1), Some(1)]),    // 6
+            kopie(5, [Some(10), Some(2), Some(4), Some(4)]),   // 20, zeilenreichste
+            kopie(31, [Some(500), Some(0), Some(0), Some(0)]), // zu alt, zählt nicht
+        ];
+        let w = deutlich_weniger(0, &liste, T0).unwrap();
+        assert_eq!(w.zeitpunkt, datenbank::utc_iso(T0 - 5 * tag));
+        assert_eq!(w.buchungen, 10);
+        assert_eq!(w.zeilen, 20);
+        assert!(deutlich_weniger(9, &liste, T0).is_some());
+        // genau die Hälfte oder mehr: in Ordnung
+        assert_eq!(deutlich_weniger(10, &liste, T0), None);
+        assert_eq!(deutlich_weniger(25, &liste, T0), None);
+        // 29 Tage zurück zählt noch, 30 nicht mehr
+        assert!(deutlich_weniger(0, &[kopie(29, [Some(2), None, None, None])], T0).is_some());
+        assert_eq!(
+            deutlich_weniger(0, &[kopie(30, [Some(2), None, None, None])], T0),
+            None
+        );
+        // Gleichstand: die neueste
+        let gleich = [
+            kopie(3, [Some(4), None, None, None]),
+            kopie(2, [Some(4), None, None, None]),
+        ];
+        assert_eq!(
+            deutlich_weniger(1, &gleich, T0).unwrap().zeitpunkt,
+            datenbank::utc_iso(T0 - 2 * tag)
+        );
+    }
+
+    #[test]
+    fn leere_datenbank_verdraengt_keine_guten_kopien() {
+        let ordner = testordner("leer-nach-gut");
+        let db = ordner.join("kladdy.db");
+        let sicherungen = ordner.join(ORDNER);
+        tauri::async_runtime::block_on(migrieren(&db, MIGRATIONEN.len()));
+        kunde_anlegen(&db, "Anna");
+        kunde_anlegen(&db, "Ben");
+        for i in 0..10 {
+            assert_eq!(
+                automatisch_beim_start(&db, &sicherungen, T0 + i),
+                Automatisch::default()
+            );
+        }
+        let gute: Vec<String> = tauri::async_runtime::block_on(auflisten(&sicherungen, "kladdy"))
+            .into_iter()
+            .map(|s| s.name)
+            .collect();
+        assert_eq!(gute.len(), NEUESTE_BEHALTEN);
+
+        // Datenbank plötzlich leer: 12 Neustarts, keine gute Kopie geht verloren, jedes Mal die Warnung
+        fs::remove_file(&db).unwrap();
+        tauri::async_runtime::block_on(migrieren(&db, MIGRATIONEN.len()));
+        for i in 0..12 {
+            let a = automatisch_beim_start(&db, &sicherungen, T0 + 100 + i);
+            assert_eq!(a.fehler, None);
+            let w = a.weniger.expect("Warnung fehlt");
+            assert_eq!(w.zeilen, 2);
+            assert_eq!(w.buchungen, 0);
+        }
+        let liste = tauri::async_runtime::block_on(auflisten(&sicherungen, "kladdy"));
+        assert_eq!(liste.len(), NEUESTE_BEHALTEN + 12);
+        for name in &gute {
+            assert!(liste.iter().any(|s| &s.name == name), "{name} verdrängt");
+        }
+
+        // Datenbank fehlt ganz: Warnung, keine neue Kopie
+        fs::remove_file(&db).unwrap();
+        let a = automatisch_beim_start(&db, &sicherungen, T0 + 200);
+        assert!(a.weniger.is_some());
+        assert_eq!(a.fehler, None);
+
+        // Daten wieder da (z. B. wiederhergestellt): wieder normal aufgeräumt
+        tauri::async_runtime::block_on(migrieren(&db, MIGRATIONEN.len()));
+        kunde_anlegen(&db, "Anna");
+        kunde_anlegen(&db, "Ben");
+        assert_eq!(
+            automatisch_beim_start(&db, &sicherungen, T0 + 300),
+            Automatisch::default()
+        );
+        let liste = tauri::async_runtime::block_on(auflisten(&sicherungen, "kladdy"));
+        assert_eq!(liste.len(), NEUESTE_BEHALTEN);
+        let _ = fs::remove_dir_all(&ordner);
     }
 
     #[test]
@@ -950,16 +1236,25 @@ mod tests {
         let db = ordner.join("kladdy.db");
         let sicherungen = ordner.join(ORDNER);
         // keine Datei, leere Datei: nichts
-        assert_eq!(automatisch_beim_start(&db, &sicherungen, T0), None);
+        assert_eq!(
+            automatisch_beim_start(&db, &sicherungen, T0),
+            Automatisch::default()
+        );
         fs::write(&db, b"").unwrap();
-        assert_eq!(automatisch_beim_start(&db, &sicherungen, T0), None);
+        assert_eq!(
+            automatisch_beim_start(&db, &sicherungen, T0),
+            Automatisch::default()
+        );
         assert!(!sicherungen.exists());
         fs::remove_file(&db).unwrap();
 
         tauri::async_runtime::block_on(migrieren(&db, MIGRATIONEN.len()));
         kunde_anlegen(&db, "Anna");
         for i in 0..12 {
-            assert_eq!(automatisch_beim_start(&db, &sicherungen, T0 + i), None);
+            assert_eq!(
+                automatisch_beim_start(&db, &sicherungen, T0 + i),
+                Automatisch::default()
+            );
         }
         let liste = tauri::async_runtime::block_on(auflisten(&sicherungen, "kladdy"));
         assert_eq!(liste.len(), NEUESTE_BEHALTEN);
@@ -993,7 +1288,9 @@ mod tests {
         // Fehler (Ordner nicht anlegbar): Meldung, aber die Datenbank bleibt unberührt
         let gesperrt = ordner.join("gesperrt");
         fs::write(&gesperrt, b"x").unwrap();
-        let meldung = automatisch_beim_start(&db, &gesperrt.join(ORDNER), T0).unwrap();
+        let meldung = automatisch_beim_start(&db, &gesperrt.join(ORDNER), T0)
+            .fehler
+            .unwrap();
         assert!(
             meldung.contains("automatische Sicherung beim Start ist fehlgeschlagen"),
             "{meldung}"
@@ -1251,15 +1548,31 @@ mod tests {
 
     #[test]
     fn bericht_vom_start() {
-        assert_eq!(Bericht::aus(None, None), Bericht::default());
+        assert_eq!(
+            Bericht::aus(None, Automatisch::default()),
+            Bericht::default()
+        );
         let w = Wiederhergestellt {
             zeitpunkt: "2026-01-01T00:00:00Z".into(),
             vorher: None,
         };
-        let b = Bericht::aus(Some(Ok(w.clone())), Some("auto kaputt".into()));
+        let mehr = MehrDaten {
+            zeitpunkt: "2026-01-01T00:00:00Z".into(),
+            buchungen: 7,
+            zeilen: 9,
+        };
+        let auto = |fehler: Option<&str>| Automatisch {
+            fehler: fehler.map(str::to_string),
+            weniger: Some(mehr.clone()),
+        };
+        let b = Bericht::aus(Some(Ok(w.clone())), auto(Some("auto kaputt")));
         assert_eq!(b.wiederhergestellt, Some(w));
         assert_eq!(b.fehler, vec!["auto kaputt"]);
-        let b = Bericht::aus(Some(Err("nein".into())), None);
+        // nach gewolltem Wiederherstellen keine Warnung „weniger Daten“
+        assert_eq!(b.weniger_daten, None);
+        let b = Bericht::aus(Some(Err("nein".into())), auto(None));
         assert_eq!(b.fehler, vec!["nein"]);
+        assert_eq!(b.weniger_daten, Some(mehr.clone()));
+        assert_eq!(Bericht::aus(None, auto(None)).weniger_daten, Some(mehr));
     }
 }
