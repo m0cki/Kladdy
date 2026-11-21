@@ -435,7 +435,8 @@ const BLOCK: Readonly<Record<BausteinTyp, (b: Aufgeloest, x: Ctx) => Schnipsel>>
         L`\begin{tabular}{@{}l@{\hspace{5mm}}l@{}}`,
         L`\textcolor{grau}{Empfänger} & \Firma\\`,
         L`\textcolor{grau}{IBAN} & \IBAN\\`,
-        L`\textcolor{grau}{BIC} & \BIC\ifdefempty{\Bank}{}{ · \Bank}\\`,
+        // BIC ist freiwillig (SEPA): ohne BIC steht dort nur die Bank (kein & im \ifdefempty – Tabelle bleibt stabil)
+        L`\textcolor{grau}{\ifdefempty{\BIC}{Bank}{BIC}} & \ifdefempty{\BIC}{\Bank}{\BIC\ifdefempty{\Bank}{}{ · \Bank}}\\`,
         // Blanko: Betrag und Rechnungsnummer schreibt man von Hand (wie die Vorschau)
         x.blanko ? L`\textcolor{grau}{Betrag} & \KLuecke\ €\\` : L`\textcolor{grau}{Betrag} & \textbf{\Gesamt}\\`,
         x.blanko
