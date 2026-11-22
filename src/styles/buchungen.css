@@ -211,6 +211,18 @@
 .bu-drawer .drawer-foot .btn-primary.sm { height: 38px; }
 .bu-foot-lock { display: inline-flex; align-items: center; gap: 6px; font-size: .8rem; color: var(--muted); cursor: help; }
 .bu-foot-lock .ic { width: 15px; height: 15px; }
+/* „Löschen“ gesperrt: Hülle trägt den Tooltip (der deaktivierte Knopf selbst nimmt keine Maus) */
+.bu-loesch-zu { display: inline-flex; cursor: help; }
+
+/* Bestätigung „Eintrag löschen?“ (components/buchungen/LoeschDialog.tsx) – Dialog wie §9.4, schmal */
+.lo-dialog { --drawer-w: 380px; }
+.lo-dialog .drawer-head h2 .ic { color: var(--neg); }
+.lo-dialog .drawer-body p { margin: 0; line-height: 1.5; }
+.lo-zus { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0; font-size: .86rem; }
+.lo-zus dt { color: var(--muted); }
+.lo-zus dd { margin: 0; color: var(--text); overflow-wrap: anywhere; }
+.lo-hinweise { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.lo-hinweise .hint { font-size: .8rem; }
 
 /* Kacheln: Kategorie, Zahlungsweg, Beleg-Art (Radio-Stil) */
 .bu-tiles { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; }

@@ -1,4 +1,4 @@
-//! Buchungen (ANLEITUNG §5, §6.3, §6.4): Anlegen, Ändern und Stornieren als Rust-Commands.
+//! Buchungen (ANLEITUNG §5, §6.3, §6.4): Anlegen, Ändern, Stornieren und Löschen als Rust-Commands.
 //! Jeder Vorgang läuft in EINER Transaktion (CLAUDE.md „Mehrschritt-Vorgänge als Rust-Command mit Transaktion“):
 //! Nummer vergeben, ggf. neuen Kunden anlegen, Buchung schreiben, GoBD-Protokoll schreiben, alles oder nichts.
 //!
@@ -10,8 +10,11 @@
 //! Festgeschriebene Zeiträume (zahlungsdatum <= max(festschreibungen.bis_datum)) sind schreibgeschützt: hier geprüft
 //! (verständliche Meldung) und zusätzlich per Trigger (Migration 0004).
 //!
-//! Die Kernfunktionen (`anlegen`, `aendern`, `stornieren`) nehmen eine Verbindung und öffnen selbst die Transaktion,
-//! damit die Tests sie ohne Tauri gegen eine migrierte Datenbank im Arbeitsspeicher prüfen können.
+//! Löschen (`loeschen`) nur vor der Festschreibung und ohne ausgestellten eigenen Beleg, ein Storno-Paar nur gemeinsam;
+//! angehängte Dateien bleiben (nur die Verknüpfung wird gelöst), die Nummer wird nie neu vergeben.
+//!
+//! Die Kernfunktionen (`anlegen`, `aendern`, `stornieren`, `loeschen`) nehmen eine Verbindung und öffnen selbst die
+//! Transaktion, damit die Tests sie ohne Tauri gegen eine migrierte Datenbank im Arbeitsspeicher prüfen können.
 //! Die `#[tauri::command]`-Funktionen holen nur die Verbindung aus dem Pool des SQL-Plugins.
 
 use serde::{Deserialize, Serialize};
@@ -755,6 +758,339 @@ pub(crate) async fn gegenbuchung_in(
     Ok((storno_id, nummer))
 }
 
+/* ---------- Löschen ---------- */
+
+/// Was das Löschen einer Buchung umfasst – für den Bestätigungsdialog (`buchung_loeschbar`). Dieselben Prüfungen
+/// laufen beim Löschen selbst noch einmal in der Transaktion.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct Loeschbarkeit {
+    pub loeschbar: bool,
+    /// warum nicht (deutscher Satz für die Oberfläche), None wenn löschbar
+    pub grund: Option<String>,
+    /// Nummern der Buchungen, die gelöscht werden (Original zuerst, dann die Storno-Buchung)
+    pub nummern: Vec<String>,
+    /// true: Buchung und ihre Storno-Buchung werden nur gemeinsam gelöscht
+    pub storno_paar: bool,
+    /// angehängte Dateien: Zeilen und Dateien bleiben, nur die Verknüpfung wird gelöst
+    pub dateien: i64,
+    /// Beleg-Entwürfe (ohne Nummer), die mit der Zahlung verknüpft waren (entwurf_json.buchung_id): bleiben, ohne Verknüpfung
+    pub entwuerfe: i64,
+    /// die Buchung hatte einen Termin „ohne Beleg“ abgeschlossen; der Termin bleibt erledigt
+    pub termin: bool,
+}
+
+/// Antwort von `buchung_loeschen`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct LoeschErgebnis {
+    /// gelöschte Buchungsnummern (Original zuerst); sie werden nie neu vergeben
+    pub nummern: Vec<String>,
+    /// entknüpfte Dateien (bleiben in der Belegablage)
+    pub dateien: i64,
+    /// Beleg-Entwürfe, deren Verknüpfung zur Zahlung gelöst wurde
+    pub entwuerfe: i64,
+}
+
+/// Geprüfter Plan: welche Zeilen weg, welche Verweise gelöst werden.
+struct Loeschplan {
+    /// (ID, ganze Zeile), Original zuerst, ggf. dann seine Storno-Buchung
+    zeilen: Vec<(i64, Map<String, Value>)>,
+    /// IDs in `belege`, die auf eine der Zeilen verweisen
+    dateien: Vec<i64>,
+    /// (ID, entwurf_json) der Entwürfe mit `buchung_id` auf eine der Zeilen
+    entwuerfe: Vec<(i64, String)>,
+    termin: bool,
+}
+
+/// Belegart mit Artikel und passendem Pronomen („die Quittung“, „Sie“).
+fn beleg_mit_artikel(art: &str) -> (&'static str, &'static str) {
+    match art {
+        "quittung" => ("die Quittung", "Sie"),
+        "rechnung" => ("die Rechnung", "Sie"),
+        "gutschrift" => ("die Gutschrift", "Sie"),
+        "angebot" => ("das Angebot", "Es"),
+        "storno" => ("der Stornobeleg", "Er"),
+        _ => ("der Eigenbeleg", "Er"),
+    }
+}
+
+/// Warum diese Zeile nicht gelöscht werden darf (None = darf). `gewaehlt`: die Buchung, die der Nutzer löschen will
+/// (sonst ihr Storno-Partner); `paar`: Original und Storno gehen nur gemeinsam.
+async fn loesch_hindernis(
+    tx: &mut SqliteConnection,
+    id: i64,
+    z: &Map<String, Value>,
+    bis: &Option<String>,
+    gewaehlt: bool,
+    paar: bool,
+) -> Result<Option<String>, String> {
+    let nummer = feld_text(z, "nummer").unwrap_or_default();
+    let wer = if gewaehlt {
+        if feld_text(z, "typ").as_deref() == Some("einnahme") {
+            "dieser Einnahme".to_string()
+        } else {
+            "dieser Ausgabe".to_string()
+        }
+    } else if feld_i64(z, "storno_von_id").is_some() {
+        format!("der Storno-Buchung {nummer}")
+    } else {
+        format!("der Buchung {nummer}")
+    };
+    let folge = if paar {
+        ", deshalb auch Buchung und Storno."
+    } else {
+        " – bitte stornieren."
+    };
+    if feld_text(z, "art").as_deref() != Some("zahlung") {
+        return Ok(Some(format!(
+            "Die Buchung {nummer} ist eine Abschreibung oder Pauschale und kann nur über ihr Modul gelöscht werden."
+        )));
+    }
+    let datum = feld_text(z, "zahlungsdatum").unwrap_or_default();
+    if feld_i64(z, "festgeschrieben").unwrap_or(0) != 0 || ist_festgeschrieben(bis, &datum) {
+        return Ok(Some(match (paar, gewaehlt) {
+            (false, _) => {
+                "Der Zeitraum ist festgeschrieben – Korrektur nur per Storno.".to_string()
+            }
+            (true, true) => {
+                "Der Zeitraum ist festgeschrieben – Buchung und Storno bleiben erhalten."
+                    .to_string()
+            }
+            (true, false) => {
+                let teil = wer.strip_prefix("der ").unwrap_or(&wer);
+                format!(
+                    "Die {teil} liegt im festgeschriebenen Zeitraum – Buchung und Storno bleiben erhalten."
+                )
+            }
+        }));
+    }
+    // ausgestellter eigener Beleg: über rechnung_id oder als „verknüpfte Zahlung“ im Entwurf, aus dem er entstand
+    let beleg: Option<(String, String)> = sqlx::query_as(
+        "SELECT art, nummer FROM rechnungen
+          WHERE nummer IS NOT NULL
+            AND (id = ? OR (json_valid(entwurf_json) AND json_extract(entwurf_json, '$.buchung_id') = ?))
+          ORDER BY id LIMIT 1",
+    )
+    .bind(feld_i64(z, "rechnung_id"))
+    .bind(id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(db_fehler)?;
+    if let Some((art, beleg_nr)) = beleg {
+        let (art_text, pronomen) = beleg_mit_artikel(&art);
+        let zu = match wer.strip_prefix("der ") {
+            Some(rest) => format!("Zur {rest}"),
+            None => format!("Zu {wer}"),
+        };
+        return Ok(Some(format!(
+            "{zu} ist {art_text} {beleg_nr} ausgestellt. {pronomen} bleibt erhalten{folge}"
+        )));
+    }
+    let anlage: Option<String> = sqlx::query_scalar(
+        "SELECT bezeichnung FROM anlagen WHERE id = ? OR buchung_id = ? ORDER BY id LIMIT 1",
+    )
+    .bind(feld_i64(z, "anlage_id"))
+    .bind(id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(db_fehler)?;
+    if let Some(bezeichnung) = anlage {
+        return Ok(Some(format!(
+            "Die Buchung {nummer} gehört zum Anlagegut „{bezeichnung}“{}",
+            if paar {
+                " – Buchung und Storno bleiben erhalten."
+            } else {
+                " – bitte stornieren."
+            }
+        )));
+    }
+    Ok(None)
+}
+
+/// Prüft, ob die Buchung (samt Storno-Partner) gelöscht werden darf, und sammelt alle Verweise, die gelöst werden.
+/// Verweise auf `buchungen` (Fremdschlüssel): `belege.buchung_id` (wird gelöst), `buchungen.storno_von_id` (Paar wird
+/// gemeinsam gelöscht, Storno zuerst), `anlagen.buchung_id` (Hindernis). Ohne Fremdschlüssel: `entwurf_json.buchung_id`
+/// von Entwürfen (wird gelöst) bzw. ausgestellten Belegen (Hindernis).
+async fn loeschplan(tx: &mut SqliteConnection, id: i64) -> Result<Loeschplan, String> {
+    let Some(gewaehlt) = zeile_json(tx, "buchungen", id).await? else {
+        return Err("Die Buchung gibt es nicht (mehr).".into());
+    };
+    let storno_von = feld_i64(&gewaehlt, "storno_von_id");
+    let partner_id: Option<i64> = match storno_von {
+        Some(o) => Some(o),
+        None => sqlx::query_scalar("SELECT id FROM buchungen WHERE storno_von_id = ? LIMIT 1")
+            .bind(id)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(db_fehler)?,
+    };
+    let partner = match partner_id {
+        Some(p) => zeile_json(tx, "buchungen", p).await?.map(|z| (p, z)),
+        None => None,
+    };
+    let paar = partner.is_some();
+    let mut zeilen = vec![(id, gewaehlt)];
+    if let Some(p) = partner {
+        if storno_von.is_some() {
+            zeilen.insert(0, p); // Original zuerst
+        } else {
+            zeilen.push(p);
+        }
+    }
+    let bis = festgeschrieben_bis(tx).await?;
+    for (zid, z) in &zeilen {
+        if let Some(grund) = loesch_hindernis(tx, *zid, z, &bis, *zid == id, paar).await? {
+            return Err(grund);
+        }
+    }
+    let mut dateien = Vec::new();
+    let mut entwuerfe = Vec::new();
+    let mut termin = false;
+    for (zid, z) in &zeilen {
+        termin |= feld_i64(z, "termin_id").is_some();
+        let ids: Vec<i64> =
+            sqlx::query_scalar("SELECT id FROM belege WHERE buchung_id = ? ORDER BY id")
+                .bind(zid)
+                .fetch_all(&mut *tx)
+                .await
+                .map_err(db_fehler)?;
+        dateien.extend(ids);
+        let e: Vec<(i64, String)> = sqlx::query_as(
+            "SELECT id, entwurf_json FROM rechnungen
+              WHERE nummer IS NULL AND json_valid(entwurf_json)
+                AND json_extract(entwurf_json, '$.buchung_id') = ?
+              ORDER BY id",
+        )
+        .bind(zid)
+        .fetch_all(&mut *tx)
+        .await
+        .map_err(db_fehler)?;
+        entwuerfe.extend(e);
+    }
+    Ok(Loeschplan {
+        zeilen,
+        dateien,
+        entwuerfe,
+        termin,
+    })
+}
+
+/// Für den Bestätigungsdialog: Darf gelöscht werden, und was hängt daran? Ändert nichts.
+pub async fn loeschbar(conn: &mut SqliteConnection, id: i64) -> Result<Loeschbarkeit, String> {
+    Ok(match loeschplan(conn, id).await {
+        Ok(p) => Loeschbarkeit {
+            loeschbar: true,
+            grund: None,
+            nummern: p
+                .zeilen
+                .iter()
+                .map(|(_, z)| feld_text(z, "nummer").unwrap_or_default())
+                .collect(),
+            storno_paar: p.zeilen.len() > 1,
+            dateien: p.dateien.len() as i64,
+            entwuerfe: p.entwuerfe.len() as i64,
+            termin: p.termin,
+        },
+        Err(grund) => Loeschbarkeit {
+            grund: Some(grund),
+            ..Loeschbarkeit::default()
+        },
+    })
+}
+
+/// Löscht eine Buchung endgültig – nur vor der Festschreibung und ohne ausgestellten eigenen Beleg; ein Storno-Paar
+/// nur gemeinsam. Angehängte Dateien bleiben (Zeile und Datei, GoBD-Aufbewahrung), nur `buchung_id` wird NULL
+/// (Migration 0012); Entwürfe verlieren ihre Verknüpfung zur Zahlung. Protokoll: 'geaendert' je gelöstem Verweis,
+/// 'geloescht' mit der ganzen Zeile je Buchung. Der Nummernkreis bleibt, wie er ist (Nummern nie wiederverwenden).
+pub async fn loeschen(
+    conn: &mut SqliteConnection,
+    id: i64,
+    zeitpunkt: &str,
+) -> Result<LoeschErgebnis, String> {
+    in_transaktion(conn, async |tx| loeschen_in(tx, id, zeitpunkt).await).await
+}
+
+async fn loeschen_in(
+    tx: &mut SqliteConnection,
+    id: i64,
+    zeitpunkt: &str,
+) -> Result<LoeschErgebnis, String> {
+    let plan = loeschplan(tx, id).await?;
+    for beleg in &plan.dateien {
+        let alt_id: Option<i64> = sqlx::query_scalar("SELECT buchung_id FROM belege WHERE id = ?")
+            .bind(beleg)
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(db_fehler)?;
+        sqlx::query("UPDATE belege SET buchung_id = NULL WHERE id = ?")
+            .bind(beleg)
+            .execute(&mut *tx)
+            .await
+            .map_err(db_fehler)?;
+        let mut alt = Map::new();
+        alt.insert("buchung_id".into(), alt_id.into());
+        let mut neu = Map::new();
+        neu.insert("buchung_id".into(), Value::Null);
+        protokollieren(
+            tx,
+            zeitpunkt,
+            "belege",
+            *beleg,
+            "geaendert",
+            Some(&alt),
+            Some(&neu),
+        )
+        .await?;
+    }
+    for (entwurf, vorher) in &plan.entwuerfe {
+        let nachher: String = sqlx::query_scalar("SELECT json_remove(?, '$.buchung_id')")
+            .bind(vorher)
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(db_fehler)?;
+        sqlx::query(
+            "UPDATE rechnungen SET entwurf_json = ?, geaendert_am = ? WHERE id = ? AND nummer IS NULL",
+        )
+        .bind(&nachher)
+        .bind(zeitpunkt)
+        .bind(entwurf)
+        .execute(&mut *tx)
+        .await
+        .map_err(db_fehler)?;
+        let mut alt = Map::new();
+        alt.insert("entwurf_json".into(), vorher.clone().into());
+        let mut neu = Map::new();
+        neu.insert("entwurf_json".into(), nachher.into());
+        protokollieren(
+            tx,
+            zeitpunkt,
+            "rechnungen",
+            *entwurf,
+            "geaendert",
+            Some(&alt),
+            Some(&neu),
+        )
+        .await?;
+    }
+    // Storno-Buchung zuerst (sie verweist auf das Original)
+    for (zid, z) in plan.zeilen.iter().rev() {
+        sqlx::query("DELETE FROM buchungen WHERE id = ?")
+            .bind(zid)
+            .execute(&mut *tx)
+            .await
+            .map_err(db_fehler)?;
+        protokollieren(tx, zeitpunkt, "buchungen", *zid, "geloescht", Some(z), None).await?;
+    }
+    Ok(LoeschErgebnis {
+        nummern: plan
+            .zeilen
+            .iter()
+            .map(|(_, z)| feld_text(z, "nummer").unwrap_or_default())
+            .collect(),
+        dateien: plan.dateien.len() as i64,
+        entwuerfe: plan.entwuerfe.len() as i64,
+    })
+}
+
 /* ---------- Tauri-Commands (dünne Hüllen) ---------- */
 
 pub(crate) async fn verbindung(
@@ -801,6 +1137,26 @@ pub async fn buchung_stornieren(
 ) -> Result<BuchungErgebnis, String> {
     let mut c = verbindung(&instanzen).await?;
     stornieren(&mut c, id, &heute, &datenbank::zeitstempel()).await
+}
+
+/// Frontend: `invoke('buchung_loeschbar', { id })` – nur lesen (Bestätigungsdialog, Knopf „Löschen“).
+#[tauri::command]
+pub async fn buchung_loeschbar(
+    instanzen: tauri::State<'_, DbInstances>,
+    id: i64,
+) -> Result<Loeschbarkeit, String> {
+    let mut c = verbindung(&instanzen).await?;
+    loeschbar(&mut c, id).await
+}
+
+/// Frontend: `invoke('buchung_loeschen', { id })`.
+#[tauri::command]
+pub async fn buchung_loeschen(
+    instanzen: tauri::State<'_, DbInstances>,
+    id: i64,
+) -> Result<LoeschErgebnis, String> {
+    let mut c = verbindung(&instanzen).await?;
+    loeschen(&mut c, id, &datenbank::zeitstempel()).await
 }
 
 #[cfg(test)]
@@ -1649,5 +2005,409 @@ mod tests {
             aus,
             serde_json::json!({"id": 3, "nummer": "2026-0003", "kunde_id": 1, "kunde_nummer": "K-0001", "kunde_neu": true, "belege_neu": 2})
         );
+    }
+
+    /* ---------- Löschen ---------- */
+
+    async fn sql(c: &mut SqliteConnection, sql: &str) {
+        sqlx::query(sql)
+            .execute(c)
+            .await
+            .unwrap_or_else(|e| panic!("{e}\n{sql}"));
+    }
+
+    #[test]
+    fn loeschen_einer_einnahme_mit_protokoll_ohne_neue_nummer() {
+        lauf(async {
+            let mut c = test_db().await;
+            let e = anlegen(&mut c, ohne(), &einnahme(), JETZT).await.unwrap();
+            let l = loeschbar(&mut c, e.id).await.unwrap();
+            assert_eq!(
+                l,
+                Loeschbarkeit {
+                    loeschbar: true,
+                    grund: None,
+                    nummern: vec!["2026-0001".into()],
+                    storno_paar: false,
+                    dateien: 0,
+                    entwuerfe: 0,
+                    termin: false,
+                }
+            );
+            let alt = Value::Object(
+                zeile_json(&mut c, "buchungen", e.id)
+                    .await
+                    .unwrap()
+                    .unwrap(),
+            );
+            let r = loeschen(&mut c, e.id, SPAETER).await.unwrap();
+            assert_eq!(
+                r,
+                LoeschErgebnis {
+                    nummern: vec!["2026-0001".into()],
+                    dateien: 0,
+                    entwuerfe: 0,
+                }
+            );
+            assert_eq!(anzahl(&mut c, "SELECT count(*) FROM buchungen").await, 0);
+            let p = protokoll(&mut c).await;
+            assert_eq!(p.len(), 2);
+            assert_eq!(
+                (p[1].0.as_str(), p[1].1, p[1].2.as_str()),
+                ("buchungen", e.id, "geloescht")
+            );
+            assert_eq!(json(&p[1].3), alt, "ganze alte Zeile im Protokoll");
+            assert!(p[1].4.is_none());
+            // Nummer wird nie neu vergeben, der Kreis läuft weiter
+            assert_eq!(kreis(&mut c, "buchung").await, (2026, 2));
+            let n = anlegen(&mut c, ohne(), &einnahme(), JETZT).await.unwrap();
+            assert_eq!(n.nummer, "2026-0002");
+            // (die interne ID vergibt SQLite ohne AUTOINCREMENT ggf. erneut – maßgeblich ist die Nummer; im Protokoll
+            // trennt 'geloescht' die beiden Datensätze)
+            let f = loeschen(&mut c, 999, SPAETER).await.unwrap_err();
+            assert_eq!(f, "Die Buchung gibt es nicht (mehr).");
+            let l = loeschbar(&mut c, 999).await.unwrap();
+            assert!(!l.loeschbar && l.nummern.is_empty());
+            assert_eq!(
+                l.grund.as_deref(),
+                Some("Die Buchung gibt es nicht (mehr).")
+            );
+        });
+    }
+
+    #[test]
+    fn loeschen_einer_ausgabe_laesst_die_datei_in_der_ablage() {
+        let o = crate::datenbank::testhilfe::testordner("buchung-loeschen");
+        let ablage = o.join("ablage");
+        let pdf = o.join("aral.pdf");
+        std::fs::write(&pdf, b"PDF").unwrap();
+        lauf(async {
+            let mut c = test_db().await;
+            let a = anlegen(
+                &mut c,
+                &ablage,
+                &BuchungEingabe {
+                    belege: vec![pdf.to_string_lossy().into_owned()],
+                    ..ausgabe()
+                },
+                JETZT,
+            )
+            .await
+            .unwrap();
+            assert_eq!(a.belege_neu, 1);
+            let (beleg_id, pfad): (i64, String) =
+                sqlx::query_as("SELECT id, pfad FROM belege WHERE buchung_id = ?")
+                    .bind(a.id)
+                    .fetch_one(&mut c)
+                    .await
+                    .unwrap();
+            assert_eq!(loeschbar(&mut c, a.id).await.unwrap().dateien, 1);
+            let r = loeschen(&mut c, a.id, SPAETER).await.unwrap();
+            assert_eq!(r.dateien, 1);
+            // Zeile bleibt (entknüpft), Datei bleibt
+            let (buchung, pfad_nachher): (Option<i64>, String) =
+                sqlx::query_as("SELECT buchung_id, pfad FROM belege WHERE id = ?")
+                    .bind(beleg_id)
+                    .fetch_one(&mut c)
+                    .await
+                    .unwrap();
+            assert_eq!((buchung, pfad_nachher.as_str()), (None, pfad.as_str()));
+            assert!(
+                ablage.join(&pfad).is_file(),
+                "Datei liegt weiter in der Ablage"
+            );
+            assert_eq!(anzahl(&mut c, "SELECT count(*) FROM buchungen").await, 0);
+            let p = protokoll(&mut c).await;
+            // neu (Buchung), neu (Beleg), Beleg entknüpft, Buchung gelöscht
+            let letzte: Vec<(&str, i64, &str)> = p[p.len() - 2..]
+                .iter()
+                .map(|z| (z.0.as_str(), z.1, z.2.as_str()))
+                .collect();
+            assert_eq!(
+                letzte,
+                vec![
+                    ("belege", beleg_id, "geaendert"),
+                    ("buchungen", a.id, "geloescht")
+                ]
+            );
+            let beleg_eintrag = &p[p.len() - 2];
+            assert_eq!(
+                json(&beleg_eintrag.3),
+                serde_json::json!({"buchung_id": a.id})
+            );
+            assert_eq!(
+                json(&beleg_eintrag.4),
+                serde_json::json!({"buchung_id": null})
+            );
+        });
+        let _ = std::fs::remove_dir_all(&o);
+    }
+
+    #[test]
+    fn storno_paar_nur_gemeinsam() {
+        lauf(async {
+            let mut c = test_db().await;
+            let e = anlegen(&mut c, ohne(), &einnahme(), JETZT).await.unwrap();
+            let s = stornieren(&mut c, e.id, "2026-10-16", SPAETER)
+                .await
+                .unwrap();
+            // Fremdschlüssel sind an: das Original allein ginge nicht
+            assert!(
+                sqlx::query("DELETE FROM buchungen WHERE id = ?")
+                    .bind(e.id)
+                    .execute(&mut c)
+                    .await
+                    .is_err()
+            );
+            for id in [e.id, s.id] {
+                let l = loeschbar(&mut c, id).await.unwrap();
+                assert!(l.loeschbar && l.storno_paar, "{id}");
+                assert_eq!(l.nummern, vec!["2026-0001", "2026-0002"]);
+            }
+            let r = loeschen(&mut c, s.id, SPAETER).await.unwrap();
+            assert_eq!(r.nummern, vec!["2026-0001", "2026-0002"]);
+            assert_eq!(anzahl(&mut c, "SELECT count(*) FROM buchungen").await, 0);
+            let p = protokoll(&mut c).await;
+            let n = p.len();
+            assert_eq!(
+                (
+                    p[n - 2].1,
+                    p[n - 2].2.as_str(),
+                    p[n - 1].1,
+                    p[n - 1].2.as_str()
+                ),
+                (s.id, "geloescht", e.id, "geloescht"),
+                "Storno zuerst"
+            );
+            assert_eq!(json(&p[n - 2].3)["storno_von_id"], e.id);
+            assert_eq!(kreis(&mut c, "buchung").await, (2026, 3));
+        });
+    }
+
+    #[test]
+    fn loeschen_verweigert_ausgestellten_beleg() {
+        lauf(async {
+            let mut c = test_db().await;
+            let b = anlegen(&mut c, ohne(), &einnahme(), JETZT).await.unwrap();
+            sql(
+                &mut c,
+                "INSERT INTO rechnungen (id, art, nummer, status, erstellt_am, geaendert_am)
+                 VALUES (1, 'quittung', 'QU-2026-012', 'bezahlt', 'a', 'a')",
+            )
+            .await;
+            sql(&mut c, "UPDATE buchungen SET rechnung_id = 1 WHERE id = 1").await;
+            let meldung = "Zu dieser Einnahme ist die Quittung QU-2026-012 ausgestellt. Sie bleibt erhalten – bitte stornieren.";
+            let l = loeschbar(&mut c, b.id).await.unwrap();
+            assert_eq!((l.loeschbar, l.grund.as_deref()), (false, Some(meldung)));
+            assert_eq!(loeschen(&mut c, b.id, SPAETER).await.unwrap_err(), meldung);
+            // Storno der Zahlung (wie beim Storno des Belegs, ohne rechnung_id): auch nicht, das Paar bleibt
+            let alt = zeile_json(&mut c, "buchungen", b.id)
+                .await
+                .unwrap()
+                .unwrap();
+            let (sid, _) = in_transaktion(&mut c, async |tx| {
+                gegenbuchung_in(tx, b.id, &alt, "2026-10-16", 2026, SPAETER).await
+            })
+            .await
+            .unwrap();
+            assert_eq!(
+                loeschen(&mut c, sid, SPAETER).await.unwrap_err(),
+                "Zur Buchung 2026-0001 ist die Quittung QU-2026-012 ausgestellt. Sie bleibt erhalten, deshalb auch Buchung und Storno."
+            );
+            // Eigenbeleg zu einer Ausgabe, verknüpft über den Entwurf, aus dem er ausgestellt wurde
+            let a = anlegen(&mut c, ohne(), &ausgabe(), JETZT).await.unwrap();
+            sql(
+                &mut c,
+                &format!(
+                    "INSERT INTO rechnungen (id, art, nummer, status, entwurf_json, erstellt_am, geaendert_am)
+                     VALUES (2, 'eigenbeleg', 'EB-2026-001', 'bezahlt', '{{\"buchung_id\":{}}}', 'a', 'a')",
+                    a.id
+                ),
+            )
+            .await;
+            assert_eq!(
+                loeschbar(&mut c, a.id).await.unwrap().grund.as_deref(),
+                Some(
+                    "Zu dieser Ausgabe ist der Eigenbeleg EB-2026-001 ausgestellt. Er bleibt erhalten – bitte stornieren."
+                )
+            );
+            assert_eq!(anzahl(&mut c, "SELECT count(*) FROM buchungen").await, 3);
+            // Entwurf (ohne Nummer) über rechnung_id ist kein Hindernis
+            sql(
+                &mut c,
+                "INSERT INTO rechnungen (id, art, status, erstellt_am, geaendert_am) VALUES (3, 'quittung', 'entwurf', 'a', 'a')",
+            )
+            .await;
+            let d = anlegen(&mut c, ohne(), &einnahme(), JETZT).await.unwrap();
+            sqlx::query("UPDATE buchungen SET rechnung_id = 3 WHERE id = ?")
+                .bind(d.id)
+                .execute(&mut c)
+                .await
+                .unwrap();
+            loeschen(&mut c, d.id, SPAETER).await.unwrap();
+            assert_eq!(anzahl(&mut c, "SELECT count(*) FROM rechnungen").await, 3);
+        });
+    }
+
+    #[test]
+    fn loeschen_verweigert_festgeschriebenes() {
+        lauf(async {
+            let mut c = test_db().await;
+            let alt = anlegen(
+                &mut c,
+                ohne(),
+                &BuchungEingabe {
+                    zahlungsdatum: "2025-12-20".into(),
+                    ..ausgabe()
+                },
+                JETZT,
+            )
+            .await
+            .unwrap();
+            let offen = anlegen(&mut c, ohne(), &ausgabe(), JETZT).await.unwrap();
+            sql(
+                &mut c,
+                "INSERT INTO festschreibungen (bis_datum, am) VALUES ('2025-12-31', 'x')",
+            )
+            .await;
+            let f = loeschen(&mut c, alt.id, SPAETER).await.unwrap_err();
+            assert_eq!(
+                f,
+                "Der Zeitraum ist festgeschrieben – Korrektur nur per Storno."
+            );
+            // Storno im offenen Zeitraum: nur gemeinsam mit dem festgeschriebenen Original ⇒ nein
+            let s = stornieren(&mut c, alt.id, "2026-10-16", SPAETER)
+                .await
+                .unwrap();
+            assert_eq!(
+                loeschbar(&mut c, s.id).await.unwrap().grund.as_deref(),
+                Some(
+                    "Die Buchung 2026-0001 liegt im festgeschriebenen Zeitraum – Buchung und Storno bleiben erhalten."
+                )
+            );
+            assert_eq!(
+                loeschbar(&mut c, alt.id).await.unwrap().grund.as_deref(),
+                Some("Der Zeitraum ist festgeschrieben – Buchung und Storno bleiben erhalten.")
+            );
+            // Spalte festgeschrieben zählt auch
+            sqlx::query("UPDATE buchungen SET festgeschrieben = 1 WHERE id = ?")
+                .bind(offen.id)
+                .execute(&mut c)
+                .await
+                .unwrap();
+            assert_eq!(
+                loeschen(&mut c, offen.id, SPAETER).await.unwrap_err(),
+                "Der Zeitraum ist festgeschrieben – Korrektur nur per Storno."
+            );
+            assert_eq!(anzahl(&mut c, "SELECT count(*) FROM buchungen").await, 3);
+        });
+    }
+
+    #[test]
+    fn loeschen_mit_sonstigen_verweisen() {
+        lauf(async {
+            let mut c = test_db().await;
+            // Anlagegut: Hindernis
+            let a = anlegen(&mut c, ohne(), &ausgabe(), JETZT).await.unwrap();
+            sqlx::query(
+                "INSERT INTO anlagen (id, bezeichnung, anschaffung_datum, kosten_cent, nutzungsdauer_jahre, buchung_id)
+                 VALUES (1, 'Rasenmäher', '2026-10-14', 100000, 4, ?)",
+            )
+            .bind(a.id)
+            .execute(&mut c)
+            .await
+            .unwrap();
+            assert_eq!(
+                loeschen(&mut c, a.id, SPAETER).await.unwrap_err(),
+                "Die Buchung 2026-0001 gehört zum Anlagegut „Rasenmäher“ – bitte stornieren."
+            );
+            // Kauf mit anlage_id an der Buchung: ebenso
+            let k = anlegen(&mut c, ohne(), &ausgabe(), JETZT).await.unwrap();
+            sqlx::query("UPDATE buchungen SET anlage_id = 1 WHERE id = ?")
+                .bind(k.id)
+                .execute(&mut c)
+                .await
+                .unwrap();
+            assert!(
+                loeschbar(&mut c, k.id)
+                    .await
+                    .unwrap()
+                    .grund
+                    .unwrap()
+                    .contains("Anlagegut „Rasenmäher“")
+            );
+            // AfA/Pauschale: nur über ihr Modul
+            sqlx::query("UPDATE buchungen SET art = 'afa', zahlungsart = NULL, anlage_id = NULL WHERE id = ?")
+                .bind(k.id)
+                .execute(&mut c)
+                .await
+                .unwrap();
+            assert!(
+                loeschen(&mut c, k.id, SPAETER)
+                    .await
+                    .unwrap_err()
+                    .contains("Abschreibung oder Pauschale")
+            );
+            // Entwurf mit verknüpfter Zahlung: bleibt, verliert nur die Verknüpfung; Termin bleibt erledigt
+            let e = anlegen(&mut c, ohne(), &einnahme(), JETZT).await.unwrap();
+            sql(
+                &mut c,
+                "INSERT INTO termine (id, datum, leistung, status, ohne_beleg, erstellt_am, geaendert_am)
+                 VALUES (1, '2026-10-14', 'Rasen mähen', 'erledigt', 1, 'a', 'a')",
+            )
+            .await;
+            sqlx::query("UPDATE buchungen SET termin_id = 1 WHERE id = ?")
+                .bind(e.id)
+                .execute(&mut c)
+                .await
+                .unwrap();
+            sqlx::query(
+                "INSERT INTO rechnungen (id, art, status, entwurf_json, erstellt_am, geaendert_am)
+                 VALUES (5, 'quittung', 'entwurf', json_object('grund', 'kein', 'buchung_id', ?), 'a', 'a')",
+            )
+            .bind(e.id)
+            .execute(&mut c)
+            .await
+            .unwrap();
+            let l = loeschbar(&mut c, e.id).await.unwrap();
+            assert!(l.loeschbar && l.termin);
+            assert_eq!(l.entwuerfe, 1);
+            let r = loeschen(&mut c, e.id, SPAETER).await.unwrap();
+            assert_eq!(r.entwuerfe, 1);
+            let (entwurf, geaendert): (String, String) =
+                sqlx::query_as("SELECT entwurf_json, geaendert_am FROM rechnungen WHERE id = 5")
+                    .fetch_one(&mut c)
+                    .await
+                    .unwrap();
+            assert_eq!(
+                (
+                    serde_json::from_str::<Value>(&entwurf).unwrap(),
+                    geaendert.as_str()
+                ),
+                (serde_json::json!({"grund": "kein"}), SPAETER)
+            );
+            let status: String = sqlx::query_scalar("SELECT status FROM termine WHERE id = 1")
+                .fetch_one(&mut c)
+                .await
+                .unwrap();
+            assert_eq!(status, "erledigt");
+            let p = protokoll(&mut c).await;
+            let n = p.len();
+            assert_eq!(
+                (p[n - 2].0.as_str(), p[n - 2].1, p[n - 2].2.as_str()),
+                ("rechnungen", 5, "geaendert")
+            );
+            assert_eq!(
+                json(&p[n - 2].4)["entwurf_json"],
+                serde_json::json!("{\"grund\":\"kein\"}")
+            );
+            assert!(
+                sqlx::query("PRAGMA foreign_key_check")
+                    .fetch_all(&mut c)
+                    .await
+                    .unwrap()
+                    .is_empty()
+            );
+        });
     }
 }

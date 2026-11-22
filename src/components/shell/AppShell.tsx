@@ -26,6 +26,7 @@ import { KundeSchublade } from '../kunden/KundeSchublade';
 import { TerminSchublade } from '../termine/TerminSchublade';
 import { BelegDropOverlay } from '../belege/BelegDropOverlay';
 import { BelegDialog } from '../belege/BelegDialog';
+import { LoeschDialog } from '../buchungen/LoeschDialog';
 
 export function AppShell() {
   const collapsed = useUi((s) => s.sidebarCollapsed);
@@ -139,6 +140,7 @@ export function AppShell() {
       <KundeSchublade />
       <TerminSchublade />
       <BelegDialog />
+      <LoeschDialog />
       <BelegDropOverlay />
       <Toasts />
     </>

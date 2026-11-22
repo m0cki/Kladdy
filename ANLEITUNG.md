@@ -206,6 +206,10 @@ Möbelmontage in einer Wohnung ist dagegen in der Regel keine Grundstücksleistu
 - **GoBD-Grundsätze, die die App technisch umsetzen soll:**
   - Vollständig, zeitnah, geordnet, **unveränderbar**: Änderungen nur nachvollziehbar (Änderungsprotokoll mit alt/neu).
   - **Festschreiben** abgeschlossener Monate/Jahre: danach nur noch Storno + Neubuchung, kein Bearbeiten/Löschen.
+  - **Löschen einer Buchung** (Fehleingabe) nur vor der Festschreibung und solange kein ausgestellter eigener Beleg
+    (Quittung/Rechnung mit Nummer) daran hängt; eine stornierte Buchung nur zusammen mit ihrer Storno-Buchung.
+    Angehängte Dateien bleiben in der Belegablage (nur die Verknüpfung wird gelöst), die Nummer wird nie neu vergeben,
+    das Protokoll hält die ganze Zeile fest (`geloescht` mit `alt_json`).
   - Fortlaufende Buchungsnummern, nie wiederverwenden.
   - Belege unverändert speichern (Hash), Rechnungs-PDFs nach dem Finalisieren einfrieren.
   - Daten exportierbar (CSV) für Finanzamt/Steuerberater.
@@ -747,6 +751,7 @@ Eine ruhige Liste aller geschäftlichen Zahlungen – kein Kontoauszug, keine Sa
   Beleg, 📎 wenn Datei vorhanden, „fehlt“-Badge) · Beschreibung, darunter Kunde bzw. Geschäft (muted) · Kategorie ·
   Zahlungsweg (Icon + Name) · Betrag (Eingang `--pos` „+“, Ausgang „−“) · beim Hover ✎ Bearbeiten (mit Protokoll) / 🗑 Entfernen.
   Der Prototyp löscht dabei sofort (mit Rückgängig); in der App wird stattdessen **storniert** (Gegenbuchung, GoBD).
+  Zusätzlich **„Löschen …“** (🗑, auch an stornierten Zeilen für Buchung + Storno) mit Bestätigungsdialog, Regeln wie §2.5/§6.4.
   Zahlungen zu einem ausgestellten Beleg zeigen ein Schloss: nur per Storno des Belegs änderbar (GoBD).
 - Unter der Tabelle nur die Anzahl („142 Einträge“). Summen und Diagramme stehen in der Auswertung.
 - Leerer Zustand: „Noch nichts im Zeitraum – oben rechts **+ Erfassen** oder ein Beleg-PDF aufs Fenster ziehen.“
@@ -807,6 +812,16 @@ Nummer ausgestellt statt ein neuer angelegt – im Prototyp heißt der Kunden-Pa
      über „In der Maske ergänzen“ weiter (Maske mit `buchung=…`, „Ausstellen & verknüpfen“).
    - **Schritt 2 (optional):** „Unterschriebenes Exemplar anhängen“ – Scan/Foto ergänzt den Beleg (`scan_beleg_id`), ersetzt ihn nicht.
 7. Speichern (⌘↩), „Speichern & neu“ (⇧⌘↩). Toast mit Rückgängig.
+8. **Löschen („Buchung bearbeiten“):** Im Fuß neben „Stornieren“ der Knopf **„Löschen“** (Gefahr-Stil). Rust
+   (`buchung_loeschbar`) sagt vorab, ob es geht; sonst ist der Knopf gesperrt und der Tooltip nennt den Grund
+   (festgeschrieben, ausgestellter Beleg, Anlagegut, AfA/Pauschale). Klick ⇒ eigener modaler Dialog **„Eintrag löschen?“**
+   (kein Toast): Nr., Datum, Betrag (Ausgabe mit −), Beschreibung; Hinweise: angehängte Dateien bleiben in der Belegablage,
+   die Nummer wird nicht neu vergeben, ggf. „Die Buchung und ihre Storno-Buchung werden gelöscht“, ungespeicherte
+   Änderungen gehen verloren. „Abbrechen“ hat den Fokus (Esc), „Endgültig löschen“ ruft **einen** Rust-Command
+   `buchung_loeschen` in **einer** Transaktion (BEGIN IMMEDIATE): erneut prüfen, `belege.buchung_id` ⇒ NULL (Migration
+   0012 erlaubt genau das, nicht bei festgeschriebener Buchung), `entwurf_json.buchung_id` von Entwürfen entfernen, Storno
+   vor Original löschen; Protokoll `geaendert` je gelöstem Verweis und `geloescht` mit der ganzen Zeile. Danach Schublade
+   zu, Liste neu, Toast „Buchung 2026-0007 gelöscht“ (ohne Rückgängig).
 
 **Drag & Drop auf das Fenster (auf jeder Seite):** Overlay „Beleg hier ablegen“ ⇒ die Erfassen-Schublade öffnet sich mit dem
 Beleg und **vorausgefüllten Feldern**; jedes erkannte Feld ist als Vorschlag markiert („aus PDF“ / „aus Dateiname“), oben eine
@@ -1894,7 +1909,7 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
      (ohne Protokoll je Zeile, nichts festgeschrieben). Tectonic: `src-tauri/src/tectonic.rs` (`tectonic_finden` in der
      Reihenfolge aus §3.1, für `compile_latex` wiederverwendbar; `tectonic_suchen`, `tectonic_pfad_pruefen`,
      `tectonic_pruefen` mit `--version` und Zeitlimit), eigener Pfad in `einstellungen['tectonic_pfad']`
-- **Nächste Migration:** `0012` (`0011` = `vorlagen_eigene`: `vorlagen.archiviert`, mehrere eigene Vorlagen je Art; ausgelieferte Migrationen nie ändern).
+- **Nächste Migration:** `0013` (`0012` = `belege_entknuepfen`: Trigger erlaubt `belege.buchung_id` Wert ⇒ NULL beim Löschen einer Buchung, nicht bei festgeschriebener; `0011` = `vorlagen_eigene`; ausgelieferte Migrationen nie ändern).
 - **Phase 1 abgeschlossen.** Weiter mit **Phase 2** in Teilen (je ein PR): 1. Diagramm-Komponenten (§9.6, §9.5) ·
   2. Auswertung mit großem Umschalter + Überblick (§6.9.1) · 3. Liquidität (§6.9.2) · 4. Suche/Befehlspalette ⌘K (§6.2)
 - **Phase 2 in Teilen:**

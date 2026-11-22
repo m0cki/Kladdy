@@ -110,6 +110,11 @@ pub const MIGRATIONEN: &[MigrationsDatei] = &[
         beschreibung: "vorlagen_eigene",
         sql: include_str!("../migrations/0011_vorlagen_eigene.sql"),
     },
+    MigrationsDatei {
+        version: 12,
+        beschreibung: "belege_entknuepfen",
+        sql: include_str!("../migrations/0012_belege_entknuepfen.sql"),
+    },
 ];
 
 /// Verbindungs-URL zu einer Datei im App-Verzeichnis, wie sie das Plugin und `Database.load` erwarten.
@@ -760,13 +765,14 @@ mod tests {
                 .map_err(meldung)
                 .unwrap_err();
             assert_eq!(f, "Belege werden nie gelöscht (GoBD).");
-            let gesperrt = "Belege werden nie geändert (GoBD). Nur die Aufbewahrungsfrist kann verlängert werden.";
+            let gesperrt = "Belege werden nie geändert (GoBD). Nur die Aufbewahrungsfrist kann verlängert und die Verknüpfung zu einer gelöschten Buchung gelöst werden.";
             for sql in [
                 "UPDATE belege SET pfad = '2026/cd.pdf'",
                 "UPDATE belege SET sha256 = 'cd'",
                 "UPDATE belege SET originalname = NULL",
                 "UPDATE belege SET groesse = 4",
-                "UPDATE belege SET buchung_id = NULL",
+                "UPDATE belege SET buchung_id = 2",
+                "UPDATE belege SET buchung_id = NULL, groesse = 4",
                 "UPDATE belege SET rechnung_id = 1",
                 "UPDATE belege SET art = 'erechnung_xml'",
                 "UPDATE belege SET mime = 'image/png'",
@@ -798,6 +804,92 @@ mod tests {
                     .await
                     .unwrap();
             assert_eq!((pfad.as_str(), bis.as_str()), ("2026/ab.pdf", "2035-12-31"));
+        });
+    }
+
+    /// 0012: Die Verknüpfung zur Buchung darf genau von einem Wert auf NULL gehen (Buchung löschen, Datei bleibt) –
+    /// nicht zurück, nicht auf eine andere Buchung und nicht bei einer festgeschriebenen Buchung.
+    #[test]
+    fn trigger_erlaubt_nur_entknuepfen() {
+        tauri::async_runtime::block_on(async {
+            let mut c = testhilfe::test_db().await;
+            sqlx::query(
+                "INSERT INTO buchungen (id, nummer, typ, zahlungsdatum, betrag_cent, kategorie_id, zahlungsart, beschreibung, erstellt_am, geaendert_am) VALUES
+                   (1, '2026-0001', 'ausgabe', '2026-10-14', 100, 2, 'bar', 'x', 'jetzt', 'jetzt'),
+                   (2, '2026-0002', 'ausgabe', '2026-10-15', 200, 2, 'bar', 'y', 'jetzt', 'jetzt'),
+                   (3, '2025-0001', 'ausgabe', '2025-12-01', 300, 2, 'bar', 'z', 'jetzt', 'jetzt')",
+            )
+            .execute(&mut c)
+            .await
+            .unwrap();
+            sqlx::query(
+                "INSERT INTO belege (id, buchung_id, pfad, originalname, mime, sha256, groesse, art, aufbewahren_bis, erstellt_am) VALUES
+                   (1, 1, '2026/ab.pdf', 'a.pdf', 'application/pdf', 'ab', 3, 'beleg', '2034-12-31', 'jetzt'),
+                   (2, 3, '2025/cd.pdf', 'c.pdf', 'application/pdf', 'cd', 3, 'beleg', '2033-12-31', 'jetzt')",
+            )
+            .execute(&mut c)
+            .await
+            .unwrap();
+            sqlx::query("INSERT INTO festschreibungen (bis_datum, am) VALUES ('2025-12-31', 'x')")
+                .execute(&mut c)
+                .await
+                .unwrap();
+            let gesperrt = "Belege werden nie geändert (GoBD). Nur die Aufbewahrungsfrist kann verlängert und die Verknüpfung zu einer gelöschten Buchung gelöst werden.";
+            let meldung = |e: sqlx::Error| db_fehler(e);
+            // Wert ⇒ anderer Wert: nein
+            let f = sqlx::query("UPDATE belege SET buchung_id = 2 WHERE id = 1")
+                .execute(&mut c)
+                .await
+                .map_err(meldung)
+                .unwrap_err();
+            assert_eq!(f, gesperrt);
+            // festgeschriebene Buchung: bleibt verknüpft
+            let f = sqlx::query("UPDATE belege SET buchung_id = NULL WHERE id = 2")
+                .execute(&mut c)
+                .await
+                .map_err(meldung)
+                .unwrap_err();
+            assert_eq!(
+                f,
+                "Die Buchung liegt im festgeschriebenen Zeitraum, ihre Belege bleiben verknüpft (GoBD)."
+            );
+            // Wert ⇒ NULL: ja
+            sqlx::query("UPDATE belege SET buchung_id = NULL WHERE id = 1")
+                .execute(&mut c)
+                .await
+                .unwrap();
+            // NULL ⇒ Wert: nein (auch nicht zurück)
+            for sql in [
+                "UPDATE belege SET buchung_id = 1 WHERE id = 1",
+                "UPDATE belege SET buchung_id = 2 WHERE id = 1",
+            ] {
+                let f = sqlx::query(sql)
+                    .execute(&mut c)
+                    .await
+                    .map_err(meldung)
+                    .unwrap_err();
+                assert_eq!(f, gesperrt, "{sql}");
+            }
+            // NULL bleibt NULL, Frist verlängern geht weiter
+            sqlx::query(
+                "UPDATE belege SET buchung_id = NULL, aufbewahren_bis = '2035-12-31' WHERE id = 1",
+            )
+            .execute(&mut c)
+            .await
+            .unwrap();
+            let z: (Option<i64>, String, String) = sqlx::query_as(
+                "SELECT buchung_id, sha256, aufbewahren_bis FROM belege WHERE id = 1",
+            )
+            .fetch_one(&mut c)
+            .await
+            .unwrap();
+            assert_eq!(z, (None, "ab".into(), "2035-12-31".into()));
+            let geblieben: Option<i64> =
+                sqlx::query_scalar("SELECT buchung_id FROM belege WHERE id = 2")
+                    .fetch_one(&mut c)
+                    .await
+                    .unwrap();
+            assert_eq!(geblieben, Some(3));
         });
     }
 
@@ -1342,6 +1434,10 @@ mod tests {
             11,
             "69ad5dd163de6fc2f3f2eb4d329ad1a0f05f3a2eaeec4821cbe1708f20f03e20",
         ),
+        (
+            12,
+            "1502a36314af754f565e86deaf2f566bdbb031af09639114a2f2b11f22cc02b5",
+        ),
     ];
 
     #[test]
@@ -1517,6 +1613,15 @@ mod tests {
                    VALUES (3, 'Meine Quittung (Formular)', 'quittung', '[]', 1, '2026-02-03T10:00:00Z', 'formular')",
             );
         }
+        if k >= 11 {
+            // Stand nach 0011, so wie ihn die Migration aus den Daten oben erzeugt hätte (abgeschaltete Kopie
+            // archiviert, aktive eigene Rechnungsvorlage, Entwurf mit vorlage_id)
+            sql.push("UPDATE vorlagen SET archiviert = 1 WHERE ist_standard = 0");
+            sql.push(
+                "UPDATE einstellungen SET wert = '{\"quittung\":\"klassisch\",\"rechnung\":\"eigen:1\"}' WHERE schluessel = 'vorlagen_design'",
+            );
+            sql.push("UPDATE rechnungen SET vorlage_id = 1 WHERE id = 2");
+        }
         sql.push("INSERT INTO festschreibungen (bis_datum, am) VALUES ('2025-12-31', '2026-01-10T08:00:00Z')");
         for s in sql {
             sqlx::query(s)
@@ -1528,7 +1633,7 @@ mod tests {
 
     /// Upgrade von jedem früheren Schemastand auf den neuesten: keine Zeile geht verloren, kein vorhandener Wert
     /// ändert sich – außer den beabsichtigten Umstellungen aus 0011 (aktive eigene Vorlage in `vorlagen_design`,
-    /// `vorlage_id` der Entwürfe), die genau so erwartet werden.
+    /// `vorlage_id` der Entwürfe), die von Ständen vor 0011 genau so erwartet werden. 0012 ändert nur Trigger.
     #[test]
     fn upgrade_von_jedem_stand_verliert_nichts() {
         let neueste = MIGRATIONEN.len();
@@ -1564,14 +1669,15 @@ mod tests {
                         }
                     }
                 }
-                assert_eq!(
-                    unterschiede,
+                let erwartet: Vec<String> = if k < 11 {
                     vec![
                         "einstellungen['vorlagen_design'].wert: '{\"quittung\":\"klassisch\"}' ⇒ '{\"quittung\":\"klassisch\",\"rechnung\":\"eigen:1\"}'".to_string(),
                         "rechnungen[2].vorlage_id: NULL ⇒ 1".to_string(),
-                    ],
-                    "Stand {k}"
-                );
+                    ]
+                } else {
+                    Vec::new()
+                };
+                assert_eq!(unterschiede, erwartet, "Stand {k}");
                 for t in [
                     "buchungen",
                     "kunden",
@@ -1670,6 +1776,46 @@ mod tests {
                     .await
                     .unwrap();
                 assert_eq!(stand, neueste as i64);
+                // 0012 greift: Datei von der (offenen) Buchung lösen geht, auf eine andere hängen nicht
+                sqlx::query("UPDATE belege SET buchung_id = NULL WHERE id = 1")
+                    .execute(&mut c)
+                    .await
+                    .unwrap_or_else(|e| panic!("Stand {k}: {e}"));
+                assert!(
+                    sqlx::query("UPDATE belege SET buchung_id = 2 WHERE id = 1")
+                        .execute(&mut c)
+                        .await
+                        .is_err(),
+                    "Stand {k}"
+                );
+                // ... und sonst bleibt die Zeile unveränderlich, bei festgeschriebener Buchung auch die Verknüpfung
+                sqlx::query(
+                    "INSERT INTO belege (id, buchung_id, pfad, mime, sha256, groesse, art, aufbewahren_bis, erstellt_am)
+                       VALUES (3, 3, '2026/cc33.pdf', 'application/pdf', 'cc33', 1024, 'beleg', '2034-12-31', 'a')",
+                )
+                .execute(&mut c)
+                .await
+                .unwrap_or_else(|e| panic!("Stand {k}: {e}"));
+                assert!(
+                    sqlx::query("UPDATE belege SET buchung_id = NULL, pfad = 'x' WHERE id = 3")
+                        .execute(&mut c)
+                        .await
+                        .is_err(),
+                    "Stand {k}"
+                );
+                sqlx::query(
+                    "INSERT INTO festschreibungen (bis_datum, am) VALUES ('2026-03-31', 'b')",
+                )
+                .execute(&mut c)
+                .await
+                .unwrap_or_else(|e| panic!("Stand {k}: {e}"));
+                assert!(
+                    sqlx::query("UPDATE belege SET buchung_id = NULL WHERE id = 3")
+                        .execute(&mut c)
+                        .await
+                        .is_err(),
+                    "Stand {k}: festgeschrieben"
+                );
                 c.close().await.unwrap();
             });
             let _ = std::fs::remove_dir_all(&ordner);

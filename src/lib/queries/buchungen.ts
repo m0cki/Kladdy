@@ -2,7 +2,8 @@
  * - ladeBuchungen: Zeilen eines Zeitraums nach Zahlungsdatum. Storno-Gegenbuchungen selbst werden nicht gezeigt,
  *   das Original trägt `storniert = 1`.
  * - ladeOhneBelegAnzahl: Zähler in der Seitenleiste (§6.1) – gleiche Regel wie fehltBeleg() in lib/buchungen.ts.
- * - buchungAnlegen / buchungAendern / buchungStornieren: invoke; Fehler kommen als deutscher Text. */
+ * - buchungAnlegen / buchungAendern / buchungStornieren / buchungLoeschbar / buchungLoeschen: invoke; Fehler kommen als
+ *   deutscher Text. */
 import { invoke } from '@tauri-apps/api/core';
 import { abfrage, eine } from '../db';
 import type { BuchungDaten, BuchungZeile, KategorieWahl, KundeKurz } from '../buchungen';
@@ -105,3 +106,32 @@ export const buchungAendern = (id: number, daten: BuchungDaten): Promise<Buchung
 /** Gegenbuchung anlegen; liegt das Original im festgeschriebenen Zeitraum, datiert Rust sie auf `heute`. */
 export const buchungStornieren = (id: number, heute: string): Promise<BuchungErgebnis> =>
   invoke<BuchungErgebnis>('buchung_stornieren', { id, heute });
+
+/** Was das Löschen umfasst (src-tauri/src/buchungen.rs → Loeschbarkeit). Ändert nichts. */
+export interface Loeschbarkeit {
+  loeschbar: boolean;
+  /** warum nicht (deutscher Satz), null wenn löschbar */
+  grund: string | null;
+  /** Nummern, die gelöscht werden: Original zuerst, ggf. dann die Storno-Buchung */
+  nummern: string[];
+  /** Buchung und Storno-Buchung gehen nur gemeinsam */
+  storno_paar: boolean;
+  /** angehängte Dateien: bleiben in der Belegablage, nur die Verknüpfung wird gelöst */
+  dateien: number;
+  /** Beleg-Entwürfe (ohne Nummer) mit dieser Zahlung: bleiben, ohne Verknüpfung */
+  entwuerfe: number;
+  /** die Einnahme hatte einen Termin „ohne eigenen Beleg“ abgeschlossen; der Termin bleibt erledigt */
+  termin: boolean;
+}
+
+/** Antwort von `buchung_loeschen`. */
+export interface LoeschErgebnis {
+  nummern: string[];
+  dateien: number;
+  entwuerfe: number;
+}
+
+export const buchungLoeschbar = (id: number): Promise<Loeschbarkeit> => invoke<Loeschbarkeit>('buchung_loeschbar', { id });
+
+/** Endgültig löschen (nur vor der Festschreibung, ohne ausgestellten Beleg; ein Storno-Paar gemeinsam) – Rust prüft erneut. */
+export const buchungLoeschen = (id: number): Promise<LoeschErgebnis> => invoke<LoeschErgebnis>('buchung_loeschen', { id });

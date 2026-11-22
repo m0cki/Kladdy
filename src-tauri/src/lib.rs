@@ -149,6 +149,8 @@ pub fn run() {
             buchungen::buchung_anlegen,
             buchungen::buchung_aendern,
             buchungen::buchung_stornieren,
+            buchungen::buchung_loeschbar,
+            buchungen::buchung_loeschen,
             belege::beleg_pruefen,
             belege::beleg_anhaengen,
             belege::beleg_oeffnen,

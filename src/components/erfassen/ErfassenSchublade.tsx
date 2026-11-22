@@ -37,6 +37,7 @@ import {
   Pencil,
   Plus,
   Sparkles,
+  Trash2,
   TriangleAlert,
   User,
   Users,
@@ -105,11 +106,13 @@ import { betragAlsEingabe, formatBetrag, parseBetrag } from '../../lib/money';
 import {
   buchungAendern,
   buchungAnlegen,
+  buchungLoeschbar,
   ladeBuchung,
   ladeFestBis,
   ladeKategorienWahl,
   ladeKundenKurz,
   ladeLieferanten,
+  type Loeschbarkeit,
 } from '../../lib/queries/buchungen';
 import { ladeErtragStamm, type ErtragStamm } from '../../lib/queries/ertrag';
 import { belegAusstellen, belegBezahlt, belegScanAnhaengen, belegZuBuchung, ladeBeleg } from '../../lib/queries/rechnungen';
@@ -126,6 +129,7 @@ import { Seg } from '../ui/Seg';
 import { KategorieIcon, ZAHLUNGSWEG_ICON } from '../buchungen/Symbole';
 import { BelegDropzone, VorgemerkteBelege, VorhandeneBelege, useBelegeZuBuchung } from '../belege/BelegDateien';
 import { belegDialog } from '../belege/BelegDialog';
+import { loeschDialog } from '../buchungen/LoeschDialog';
 import { BlattVorschau } from '../belege/Blatt';
 import { BelegDatumFelder, BelegZumErtrag } from './BelegZumErtrag';
 import { useBelegErkennung, type ErkennungAnsicht } from './BelegErkennung';
@@ -391,6 +395,26 @@ export function ErfassenSchublade() {
   useEffect(() => {
     if (open) useUi.getState().setUngespeichert(dirty);
   }, [open, dirty]);
+
+  // Löschen (nur „Buchung bearbeiten“): Rust sagt, ob es geht und warum nicht – Knopf aktiv bzw. mit Grund gesperrt
+  const datenStand = useUi((s) => s.datenStand);
+  const zeileId = aktuell && bearbeitung ? (zeile?.id ?? null) : null;
+  const [loeschbar, setLoeschbar] = useState<{ id: number; l: Loeschbarkeit } | null>(null);
+  useEffect(() => {
+    if (zeileId == null || !datenbankVerfuegbar()) return;
+    let aktiv = true;
+    buchungLoeschbar(zeileId).then(
+      (l) => {
+        if (aktiv) setLoeschbar({ id: zeileId, l });
+      },
+      (e: unknown) => {
+        if (aktiv) setLoeschbar({ id: zeileId, l: { loeschbar: false, grund: fehlerText(e), nummern: [], storno_paar: false, dateien: 0, entwuerfe: 0, termin: false } });
+      },
+    );
+    return () => {
+      aktiv = false;
+    };
+  }, [zeileId, datenStand]);
 
   // Betrag fokussieren, sobald das Formular steht
   useEffect(() => {
@@ -759,6 +783,35 @@ export function ErfassenSchublade() {
         Stornieren
       </button>
     ) : null;
+  const loesch = zeile && zeileId === zeile.id && loeschbar?.id === zeile.id ? loeschbar.l : null;
+  const loeschKnopf =
+    zeile && zeileId === zeile.id ? (
+      loesch?.loeschbar ? (
+        <button
+          type="button"
+          className="btn danger"
+          title="Endgültig löschen – nur vor der Festschreibung und ohne ausgestellten Beleg; angehängte Dateien bleiben"
+          onClick={() =>
+            loeschDialog(zeile, {
+              ungespeichert: dirty,
+              danach: () => {
+                if (useErfassen.getState().auftrag === auftrag) erfassenFertig();
+              },
+            })
+          }
+        >
+          <Trash2 />
+          Löschen
+        </button>
+      ) : (
+        <span className="bu-loesch-zu" title={loesch?.grund ?? 'Prüfe, ob sich der Eintrag löschen lässt …'}>
+          <button type="button" className="btn danger" disabled aria-label={loesch?.grund ? `Löschen geht nicht: ${loesch.grund}` : 'Löschen'}>
+            <Trash2 />
+            Löschen
+          </button>
+        </span>
+      )
+    ) : null;
 
   /* ---------- Beleg zum Ertrag ---------- */
   const onWeg = (w: Ertragsweg) => {
@@ -832,6 +885,7 @@ export function ErfassenSchublade() {
   const fuss = (
     <>
       {stornoKnopf}
+      {loeschKnopf}
       {nurLesen && sp !== 'festgeschrieben' ? (
         <span className="bu-foot-lock" title={sp ? SPERR_TEXT[sp] : undefined}>
           <Lock />

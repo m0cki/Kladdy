@@ -1,8 +1,10 @@
 /* Ein- & Ausgänge (Startseite, §6.3): ruhige Liste aller geschäftlichen Zahlungen eines Zeitraums – keine Salden, keine Summen.
  * Kopf in drei Teilen (Titel · Zeitraum mittig · „+ Erfassen“), klebrige Filterleiste (Tabs, Suche, Filter-Popover, Chips,
- * „N ohne Beleg“), Tabelle neueste zuerst, darunter nur die Anzahl. Ändern über die Erfassen-Schublade, Entfernen = Storno.
+ * „N ohne Beleg“), Tabelle neueste zuerst, darunter nur die Anzahl. Ändern über die Erfassen-Schublade, Entfernen = Storno
+ * (oder vor der Festschreibung und ohne ausgestellten Beleg: Löschen).
  * Filter und Zeitraum lassen sich per Adresse vorgeben (Sprung aus der Auswertung, lib/buchungen.ts → listenVorgabe).
  * Büroklammer öffnet den Beleg (mehrere: Menü), „Beleg anhängen …“ im Zeilenmenü (nicht bei Gegenbuchungen).
+ * „Löschen …“ im Zeilenmenü (auch an stornierten Zeilen: Buchung und Storno gemeinsam) öffnet den Dialog „Eintrag löschen?“.
  * Optik und Verhalten wie referenz/prototyp/js/pages/buchungen.js; Logik in lib/buchungen.ts, Daten in lib/queries/buchungen.ts. */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
@@ -22,6 +24,7 @@ import {
   ReceiptText,
   RotateCcw,
   Search,
+  Trash2,
   TriangleAlert,
   X,
 } from 'lucide-react';
@@ -51,6 +54,7 @@ import {
 import { belegAnhaengenDialog } from '../lib/belegablage';
 import { bearbeiten, erfassen } from '../lib/erfassen';
 import { ladeBuchungen, ladeKategorienWahl } from '../lib/queries/buchungen';
+import { vielleichtLoeschbar } from '../lib/loeschen';
 import { storniereMitNachfrage } from '../lib/storno';
 import { teile } from '../lib/suche';
 import { formatBetrag } from '../lib/money';
@@ -62,6 +66,7 @@ import { Seg } from '../components/ui/Seg';
 import { ZeitraumWahl } from '../components/ui/ZeitraumWahl';
 import { KategorieIcon, ZAHLUNGSWEG_ICON } from '../components/buchungen/Symbole';
 import { BelegClip } from '../components/belege/BelegClip';
+import { loeschDialog } from '../components/buchungen/LoeschDialog';
 import { Ladeansicht, useLaden } from './einstellungen/Laden';
 
 const DF_LANG = new Intl.DateTimeFormat('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
@@ -489,6 +494,18 @@ function Zeile({ b, q }: { b: BuchungZeile; q: string }) {
       oeffnen();
     }
   };
+  // Endgültig löschen (nur vor der Festschreibung, ohne ausgestellten Beleg; bei Storno beide) – Dialog fragt Rust
+  const loeschKnopf = vielleichtLoeschbar(b) ? (
+    <button
+      type="button"
+      className="icon-btn sm bu-del"
+      title={storniert ? 'Löschen … (Buchung und Storno-Buchung gemeinsam)' : 'Löschen …'}
+      aria-label="Löschen"
+      onClick={() => loeschDialog(b)}
+    >
+      <Trash2 />
+    </button>
+  ) : null;
   let text = b.beschreibung;
   if (wer && text.endsWith(` · ${wer}`)) text = text.slice(0, -(wer.length + 3)); // Name steht in der zweiten Zeile
 
@@ -571,7 +588,9 @@ function Zeile({ b, q }: { b: BuchungZeile; q: string }) {
       </td>
       <td className="num bu-amt-td">
         <div className="bu-amt-w">
-          {storniert ? null : (
+          {storniert ? (
+            loeschKnopf ? <span className="bu-acts">{loeschKnopf}</span> : null
+          ) : (
             <span className="bu-acts">
               <button
                 type="button"
@@ -615,6 +634,7 @@ function Zeile({ b, q }: { b: BuchungZeile; q: string }) {
                   <Ban />
                 </button>
               ) : null}
+              {loeschKnopf}
               {s === 'beleg' || s === 'festgeschrieben' || s === 'modul' ? (
                 <span className="icon-btn sm bu-lock" tabIndex={0} title={s === 'beleg' && b.rechnung_nummer ? `Gehört zu ${b.rechnung_nummer}. ${SPERR_TEXT.beleg}` : SPERR_TEXT[s]}>
                   <Lock />
