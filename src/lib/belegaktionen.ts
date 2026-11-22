@@ -5,6 +5,7 @@
 import { useUi } from '../store/ui';
 import { akzentPapier } from './settings';
 import { ausgestellterBeleg, belegPdfOeffnen, pdfErzeugenUndAblegen } from './belegpdf';
+import { bearbeiten } from './erfassen';
 import { fehlerText } from './fehler';
 import { ladeBelegEinstellungen, ladeFirma, ladeUstModus } from './queries/einstellungen';
 import {
@@ -75,7 +76,13 @@ export async function alsBezahlt(z: Ziel, datum: string, zahlungsart: Zahlungsar
   try {
     const r = await belegBezahlt(z.id, datum, zahlungsart, heuteIso());
     ui().datenGeaendert();
-    ui().showToast({ text: `${nr(z)} bezahlt · Einnahme ${r.buchung_nummer ?? ''} gebucht (im Protokoll)`, icon: 'check' });
+    // die neue Einnahme ist ein Klick entfernt (Erfassen-Schublade, gesperrt: gehört zum Beleg)
+    const buchung = r.buchung_id;
+    ui().showToast({
+      text: `${nr(z)} bezahlt · Einnahme ${r.buchung_nummer ?? ''} gebucht (im Protokoll)`,
+      icon: 'check',
+      actions: buchung != null ? [{ label: 'Einnahme ansehen', run: () => bearbeiten(buchung) }] : undefined,
+    });
     return true;
   } catch (e) {
     fehler('Als bezahlt markieren', e);

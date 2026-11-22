@@ -37,7 +37,8 @@ export interface Vorbelegung {
   entwurf?: number;
 }
 
-export type Auftrag = { art: 'neu'; vorbelegung: Vorbelegung; n: number } | { art: 'bearbeiten'; id: number; n: number };
+/** `beleg` beim Bearbeiten: gleich „Beleg erstellen“ dieser Art (Einnahme ohne eigenen Beleg, nachträglich). */
+export type Auftrag = { art: 'neu'; vorbelegung: Vorbelegung; n: number } | { art: 'bearbeiten'; id: number; n: number; beleg?: ErtragsArt };
 
 interface ErfassenState {
   auftrag: Auftrag | null;
@@ -140,9 +141,12 @@ export function erfassen(vorbelegung: Vorbelegung = {}): void {
   );
 }
 
-/** Bestehende Buchung in der Schublade öffnen (bearbeiten bzw. ansehen, wenn gesperrt). */
-export function bearbeiten(id: number): void {
-  nachVerwerfen('Die offene Eingabe ist noch nicht gespeichert. Verwerfen?', () => oeffne({ art: 'bearbeiten', id, n: ++zaehler }));
+/** Bestehende Buchung in der Schublade öffnen (bearbeiten bzw. ansehen, wenn gesperrt). `beleg`: bei einer Einnahme ohne
+ *  eigenen Beleg gleich „Beleg erstellen“ (Quittung bzw. bezahlte Rechnung nachträglich, Ein- & Ausgänge). */
+export function bearbeiten(id: number, o: { beleg?: ErtragsArt } = {}): void {
+  nachVerwerfen('Die offene Eingabe ist noch nicht gespeichert. Verwerfen?', () =>
+    oeffne({ art: 'bearbeiten', id, n: ++zaehler, ...(o.beleg ? { beleg: o.beleg } : {}) }),
+  );
 }
 
 /** Schublade schließen – mit Nachfrage bei ungespeicherten Eingaben. */

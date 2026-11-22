@@ -5,9 +5,11 @@
  * Der Beleg entsteht aus demselben Formular wie in der Beleg-Maske (neuesFormular ⇒ formularZuDaten/-Dokument),
  * damit Vorschau, Pflichtangaben und Schnappschuss überall gleich sind. Mit „Beleg erstellen“ stehen die Beschreibungen
  * nur in den Positionen (Summe = Betrag der Einnahme, Buchungstext wie Rust aus den Positionen); bei Rechnung getrennt
- * Rechnungs-, Leistungsdatum (auch Zeitraum) und Zahlungsziel. Tests: ertrag.test.ts */
+ * Rechnungs-, Leistungsdatum (auch Zeitraum) und Zahlungsziel. Nachträglich zu einer schon gebuchten Einnahme
+ * („Buchung bearbeiten“): ertragNachtraeglich, summenAbweichung, ausgestellt über beleg_zu_buchung.
+ * Tests: ertrag.test.ts */
 import { kundeAufloesen, type Formular, type Zahlungsart } from './buchungen';
-import { parseBetrag } from './money';
+import { formatBetrag, parseBetrag } from './money';
 import type { Firma } from './firma';
 import { naechsteNummer, type Nummernkreis } from './numbering';
 import type { UstModus } from './queries/einstellungen';
@@ -196,11 +198,28 @@ export function hinweis35a(e: Ertrag, zahlungsart: Zahlungsart): string | null {
     : 'Will der Kunde die Arbeitskosten von der Steuer absetzen (§ 35a EStG)? Dann Rechnung wählen – absetzbar nur bei unbarer Zahlung (Überweisung oder Karte).';
 }
 
-/** Was beim Speichern passiert (unter dem Beleg-Kasten). */
-export const belegHinweis = (e: Ertrag): string =>
-  rechnungOffen(e)
-    ? 'Die Rechnung wird ausgestellt und erscheint unter „Belege“ als offen. Die Einnahme entsteht erst, wenn das Geld eingeht.'
-    : 'Wird beim Speichern mit dieser Nummer ausgestellt und mit der Einnahme verknüpft – Betrag und Datum wie oben.';
+/** Was beim Speichern passiert (unter dem Beleg-Kasten). `buchung`: Nummer der schon gebuchten Einnahme (nachträglich). */
+export const belegHinweis = (e: Ertrag, buchung: string | null = null): string =>
+  buchung
+    ? `Wird beim Speichern mit dieser Nummer ausgestellt und mit der Einnahme ${buchung} verknüpft – es entsteht keine zweite Einnahme.`
+    : rechnungOffen(e)
+      ? 'Die Rechnung wird ausgestellt und erscheint unter „Belege“ als offen. Die Einnahme entsteht erst, wenn das Geld eingeht.'
+      : 'Wird beim Speichern mit dieser Nummer ausgestellt und mit der Einnahme verknüpft – Betrag und Datum wie oben.';
+
+/* ---------- Beleg nachträglich zu einer gebuchten Einnahme ---------- */
+
+/** „Buchung bearbeiten“ einer Einnahme ohne eigenen Beleg (buchungen.ts belegNachholbar): Start wie bisher ohne eigenen
+ *  Beleg; „Beleg erstellen“ bietet Quittung oder Rechnung „bereits bezahlt“ – eine offene Rechnung passt nicht zu schon
+ *  gezahltem Geld. Die Positionen füllt der Wechsel auf „Beleg erstellen“ aus Betrag und Text der Buchung. */
+export const ertragNachtraeglich = (belegArt: ErtragsArt): Ertrag => ({ ...ertragStart({}, belegArt), weg: 'ohne', bezahlt: true });
+
+/** Ergeben die Positionen genau den Betrag der Einnahme? Sonst die Meldung – der Betrag der Buchung wird nie still an die
+ *  Positionen angepasst (ändern lässt er sich oben, über den normalen Änderungsweg mit Protokoll). */
+export function summenAbweichung(e: Pick<Ertrag, 'positionen'>, betragCent: number | null): string | null {
+  const summe = ertragSumme(e);
+  if (betragCent === null || betragCent <= 0 || summe === betragCent) return null;
+  return `Die Positionen ergeben ${formatBetrag(summe)}, die Einnahme beträgt ${formatBetrag(betragCent)} – bitte die Positionen anpassen oder den Betrag oben ändern.`;
+}
 
 /** Offene Rechnungen zum Zuordnen: ausgestellt und offen, die am längsten fälligen zuerst. */
 export function offeneRechnungen(zeilen: readonly BelegZeile[]): BelegZeile[] {
@@ -435,10 +454,23 @@ export function belegVorbereiten(f: Formular, e: Ertrag, ctx: ErtragKontext, bez
   };
 }
 
-/** Adresse der Beleg-Maske mit den Eingaben der Schublade (Pflichtangaben dort ergänzen bzw. Eigenbeleg erstellen). */
+/** Adresse der Beleg-Maske mit den Eingaben der Schublade (Pflichtangaben dort ergänzen bzw. Eigenbeleg erstellen).
+ *  `buchung`: schon gebuchte Einnahme, die der Beleg beim Ausstellen verknüpft. Positionen, Leistungsdatum/-zeitraum,
+ *  Zahlungsziel, Vorlage und Anschrift passen nicht in die Adresse – sie gehen als Navigations-Zustand mit
+ *  (maskenZustand ⇒ maskenUebergabe in der Maske). */
 export function maskenPfad(
   art: Belegart,
-  o: { betrag?: number | null; datum?: string; text?: string; kundeId?: number | null; name?: string; zahlungsart?: Zahlungsart; bezahlt?: boolean; kategorieId?: number | null },
+  o: {
+    betrag?: number | null;
+    datum?: string;
+    text?: string;
+    kundeId?: number | null;
+    name?: string;
+    zahlungsart?: Zahlungsart;
+    bezahlt?: boolean;
+    kategorieId?: number | null;
+    buchung?: number | null;
+  },
 ): string {
   const p = new URLSearchParams({ art });
   if (o.betrag && o.betrag > 0) p.set('betrag', String(o.betrag));
@@ -449,5 +481,32 @@ export function maskenPfad(
   if (o.zahlungsart) p.set('zahlungsart', o.zahlungsart);
   if (o.bezahlt) p.set('bezahlt', '1');
   if (o.kategorieId != null) p.set('kategorie', String(o.kategorieId));
+  if (o.buchung != null) p.set('buchung', String(o.buchung));
   return `/belege/neu?${p.toString()}`;
+}
+
+/** Navigations-Zustand für „In der Maske ergänzen“: das ganze Formular, wie die Schublade es ausstellen würde. */
+export interface MaskenZustand {
+  formular: BelegFormular;
+}
+
+export const maskenZustand = (formular: BelegFormular): MaskenZustand => ({ formular });
+
+const TEXTFELDER = ['kunde', 'adresse', 'datum', 'leistungVon', 'leistungBis', 'zielTage', 'betreff', 'einleitung', 'schlusstext', 'zahlungsart', 'vorlageDesign'] as const;
+
+/** Formular aus dem Navigations-Zustand der Maske (maskenZustand), sonst null. Nur Quittung und Rechnung kommen so. */
+export function maskenUebergabe(state: unknown): BelegFormular | null {
+  if (!state || typeof state !== 'object') return null;
+  const f: unknown = (state as { formular?: unknown }).formular;
+  if (!f || typeof f !== 'object') return null;
+  const x = f as Record<string, unknown>;
+  if (x.art !== 'quittung' && x.art !== 'rechnung') return null;
+  if (!TEXTFELDER.every((k) => typeof x[k] === 'string')) return null;
+  const pos = x.positionen;
+  if (!Array.isArray(pos) || !pos.length) return null;
+  const ok = pos.every(
+    (p: unknown) =>
+      !!p && typeof p === 'object' && ['beschreibung', 'menge', 'einheit', 'preis'].every((k) => typeof (p as Record<string, unknown>)[k] === 'string'),
+  );
+  return ok ? (f as BelegFormular) : null;
 }
