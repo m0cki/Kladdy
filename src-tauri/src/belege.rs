@@ -684,7 +684,7 @@ pub fn pdf_lesen(pfad: &str) -> Result<Vec<u8>, String> {
 }
 
 /// macOS: `open` (Standard-App) bzw. `open -R` (im Finder zeigen).
-fn mit_open(zeigen: bool, datei: &Path) -> Result<(), String> {
+pub(crate) fn mit_open(zeigen: bool, datei: &Path, was: &str) -> Result<(), String> {
     let mut befehl = std::process::Command::new("/usr/bin/open");
     if zeigen {
         befehl.arg("-R");
@@ -692,13 +692,13 @@ fn mit_open(zeigen: bool, datei: &Path) -> Result<(), String> {
     let status = befehl
         .arg(datei)
         .status()
-        .map_err(|e| format!("Der Beleg konnte nicht geöffnet werden: {e}"))?;
+        .map_err(|e| format!("{was} konnte nicht geöffnet werden: {e}"))?;
     if status.success() {
         Ok(())
     } else if zeigen {
-        Err("Der Beleg konnte im Finder nicht gezeigt werden.".into())
+        Err(format!("{was} konnte im Finder nicht gezeigt werden."))
     } else {
-        Err("Der Beleg konnte nicht geöffnet werden.".into())
+        Err(format!("{was} konnte nicht geöffnet werden."))
     }
 }
 
@@ -759,7 +759,7 @@ pub async fn beleg_oeffnen(
     let ablage = ablage_ordner(&app)?;
     let mut c = verbindung(&instanzen).await?;
     let datei = beleg_datei(&mut c, &ablage, id).await?;
-    mit_open(false, &datei)
+    mit_open(false, &datei, "Der Beleg")
 }
 
 /// Frontend: `invoke('beleg_zeigen', { id })` – zeigt die abgelegte Datei im Finder.
@@ -772,7 +772,7 @@ pub async fn beleg_zeigen(
     let ablage = ablage_ordner(&app)?;
     let mut c = verbindung(&instanzen).await?;
     let datei = beleg_datei(&mut c, &ablage, id).await?;
-    mit_open(true, &datei)
+    mit_open(true, &datei, "Der Beleg")
 }
 
 #[cfg(test)]

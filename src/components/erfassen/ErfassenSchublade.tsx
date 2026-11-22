@@ -8,12 +8,18 @@
  * beim Speichern als `belege` mit; bei gesperrten Einträgen (festgeschrieben) nur über „Beleg anhängen“ (beleg_anhaengen).
  * Neue Einnahme: „Beleg zum Ertrag“ (BelegZumErtrag.tsx, lib/ertrag.ts) – Beleg erstellen stellt Quittung bzw. Rechnung
  * samt Einnahme in EINER Transaktion aus (beleg_ausstellen), „Offene Rechnung zuordnen“ bucht deren Zahlung
- * (beleg_bezahlt), „Ohne eigenen Beleg“ ist die einfache Einnahme (buchung_anlegen).
+ * (beleg_bezahlt), „Ohne eigenen Beleg“ ist die einfache Einnahme (buchung_anlegen). Bei „Beleg erstellen“ ersetzen die
+ * Positionen die Beschreibung (der Betrag oben ist ihre Summe, bei genau einer Position direkt eingebbar), unter dem
+ * Datum stehen Leistungsdatum und Zahlungsziel (BelegDatumFelder), daneben auf Wunsch die Live-Vorschau des Belegs.
  * Belegerkennung: useBelegErkennung (BelegErkennung.tsx) füllt leere Felder, zeigt oben die Zusammenfassung und an den
  * Feldern „aus PDF“ / „aus Dateiname“.
  * Termin bzw. vorbereiteter Beleg (Vorbelegung `termin`/`entwurf`, §6.5): oben eine Hinweiszeile; „Beleg erstellen“ stellt
  * den Entwurf mit Nummer aus (Termin ⇒ erledigt), „Offene Rechnung zuordnen“ macht die Rechnung zum Beleg des Termins,
- * „Ohne eigenen Beleg“ schließt ihn „ohne Beleg“ ab – der Entwurf wird dabei verworfen, alles in Rust. */
+ * „Ohne eigenen Beleg“ schließt ihn „ohne Beleg“ ab – der Entwurf wird dabei verworfen, alles in Rust.
+ * Buchung bearbeiten einer Einnahme ohne eigenen Beleg (belegNachholbar): „Beleg erstellen“ stellt Quittung bzw. bezahlte
+ * Rechnung nachträglich aus und verknüpft sie mit DIESER Einnahme (beleg_zu_buchung, eine Transaktion; geänderte Angaben
+ * oben laufen vorher über den normalen Änderungsweg). Die Positionen müssen den Betrag genau ergeben (summenAbweichung).
+ * „In der Maske ergänzen“ nimmt das ganze Formular mit (maskenZustand: Positionen, Leistungsdatum, Zahlungsziel …). */
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -31,6 +37,7 @@ import {
   Pencil,
   Plus,
   Sparkles,
+  Trash2,
   TriangleAlert,
   User,
   Users,
@@ -39,6 +46,7 @@ import {
   SPERR_TEXT,
   ZAHLUNGSWEGE,
   abziehbar,
+  belegNachholbar,
   datumKurz,
   formularSchluessel,
   geschaefte,
@@ -69,15 +77,27 @@ import { datenbankVerfuegbar } from '../../lib/db';
 import { belegeLeeren, erfassenFertig, erfassenSchliessen, useErfassen, type Vorbelegung } from '../../lib/erfassen';
 import {
   belegVorbereiten,
+  betragEingebbar,
+  betragInPosition,
+  ertragBuchungstext,
+  ertragNachtraeglich,
+  ertragOeffnen,
+  ertragPosition,
   ertragPruefen,
   ertragSchluessel,
   ertragStart,
+  ertragSumme,
+  positionenAusBuchung,
   maskenPfad,
+  maskenZustand,
   naechsteBelegNummer,
   PAPIER_BELEG,
   papierGewaehlt,
   rechnungOffen,
+  summenAbweichung,
+  type BelegVorbereitet,
   type Ertrag,
+  type ErtragFehler,
   type ErtragsArt,
   type Ertragsweg,
 } from '../../lib/ertrag';
@@ -86,16 +106,18 @@ import { betragAlsEingabe, formatBetrag, parseBetrag } from '../../lib/money';
 import {
   buchungAendern,
   buchungAnlegen,
+  buchungLoeschbar,
   ladeBuchung,
   ladeFestBis,
   ladeKategorienWahl,
   ladeKundenKurz,
   ladeLieferanten,
+  type Loeschbarkeit,
 } from '../../lib/queries/buchungen';
 import { ladeErtragStamm, type ErtragStamm } from '../../lib/queries/ertrag';
-import { belegAusstellen, belegBezahlt, belegScanAnhaengen, ladeBeleg } from '../../lib/queries/rechnungen';
+import { belegAusstellen, belegBezahlt, belegScanAnhaengen, belegZuBuchung, ladeBeleg } from '../../lib/queries/rechnungen';
 import { ladeTermin } from '../../lib/queries/termine';
-import { formularAusEntwurf, type BelegZeile as RechnungsZeile } from '../../lib/rechnungen';
+import { formularAusEntwurf, type BelegZeile as RechnungsZeile, type PositionFormular } from '../../lib/rechnungen';
 import { storniere, storniereMitNachfrage } from '../../lib/storno';
 import { ART_LABEL, erfassenHinweis, ertragAusEntwurf, ertragBezug, vorbelegungMitBezug, type ErfassenBezug } from '../../lib/termine';
 import { heute, imZeitraum, istDatum, zeitraum } from '../../lib/zeitraum';
@@ -107,7 +129,9 @@ import { Seg } from '../ui/Seg';
 import { KategorieIcon, ZAHLUNGSWEG_ICON } from '../buchungen/Symbole';
 import { BelegDropzone, VorgemerkteBelege, VorhandeneBelege, useBelegeZuBuchung } from '../belege/BelegDateien';
 import { belegDialog } from '../belege/BelegDialog';
-import { BelegZumErtrag } from './BelegZumErtrag';
+import { loeschDialog } from '../buchungen/LoeschDialog';
+import { BlattVorschau } from '../belege/Blatt';
+import { BelegDatumFelder, BelegZumErtrag } from './BelegZumErtrag';
 import { useBelegErkennung, type ErkennungAnsicht } from './BelegErkennung';
 
 interface Stamm {
@@ -214,6 +238,30 @@ function formularAus(b: BuchungZeile): Formular {
   };
 }
 
+/** Live-Vorschau des Belegs ein/aus – je Mac gemerkt (Darstellung, kein Geschäftsdatum). */
+const VORSCHAU_KEY = 'kladdy.erfassen.vorschau';
+function vorschauGemerkt(): boolean {
+  try {
+    return typeof localStorage === 'undefined' || localStorage.getItem(VORSCHAU_KEY) !== '0';
+  } catch {
+    return true;
+  }
+}
+function vorschauMerken(an: boolean): void {
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.setItem(VORSCHAU_KEY, an ? '1' : '0');
+  } catch {
+    /* ohne Speicher gilt der Schalter nur bis zum Schließen */
+  }
+}
+
+/** „Beleg erstellen“: Betrag und Beschreibung der Buchung wandern in die einzige Position, der Betrag ist dann die Summe. */
+function zumBeleg(f: Formular, e: Ertrag): { positionen: PositionFormular[]; betrag: string } {
+  const positionen = positionenAusBuchung(e, f);
+  const summe = ertragSumme({ positionen });
+  return { positionen, betrag: summe > 0 ? betragAlsEingabe(summe) : '' };
+}
+
 type Ladezustand = { status: 'laden' } | { status: 'ohne-db' } | { status: 'fehler'; fehler: string } | { status: 'ok' };
 
 export function ErfassenSchublade() {
@@ -227,7 +275,12 @@ export function ErfassenSchublade() {
   const [ertragStartWert, setErtragStartWert] = useState('');
   const [ertragStamm, setErtragStamm] = useState<ErtragStamm | null>(null);
   const [ertragLadeFehler, setErtragLadeFehler] = useState<string | null>(null);
-  const [ertragFehler, setErtragFehler] = useState<string | undefined>(undefined);
+  const [ertragFehler, setErtragFehler] = useState<ErtragFehler | undefined>(undefined);
+  const [vorschau, setVorschauWert] = useState(vorschauGemerkt);
+  const setVorschau = useCallback((an: boolean) => {
+    setVorschauWert(an);
+    vorschauMerken(an);
+  }, []);
   const setErtrag = useCallback((teil: Partial<Ertrag>) => {
     setErtragWert((e) => ({ ...e, ...teil }));
     setErtragFehler(undefined);
@@ -266,19 +319,35 @@ export function ErfassenSchublade() {
         z = await ladeBuchung(auftrag.id);
         if (!z) throw new Error('Diesen Eintrag gibt es nicht (mehr).');
       }
-      // Belege zum Ertrag nur für neue Einträge; scheitert das Laden, bleibt „Ohne eigenen Beleg“
+      // Belege zum Ertrag für neue Einträge und Einnahmen ohne eigenen Beleg (nachträglich); scheitert das Laden,
+      // bleibt „Ohne eigenen Beleg“
+      const nachholbar = z !== null && belegNachholbar(z);
       const [s, es, b] = await Promise.all([
         ladeStamm(z?.kategorie_id ?? null),
-        neu ? ladeErtragStamm().then((x): ErtragStamm | string => x, (e: unknown) => fehlerText(e)) : Promise.resolve(null),
+        neu || nachholbar ? ladeErtragStamm().then((x): ErtragStamm | string => x, (e: unknown) => fehlerText(e)) : Promise.resolve(null),
         neu ? ladeBezug(auftrag.vorbelegung, heute()) : Promise.resolve(null),
       ]);
       // was der Aufrufer nicht vorgibt, kommt aus Termin bzw. Entwurf (Kunde, Betrag, Leistung, Art)
       const v: Vorbelegung = auftrag.art === 'neu' ? vorbelegungMitBezug(auftrag.vorbelegung, b) : {};
-      const f: Formular = z ? formularAus(z) : leeresFormular(s, v);
+      const f0: Formular = z ? formularAus(z) : leeresFormular(s, v);
       if (!aktiv) return;
       const esOk = es && typeof es !== 'string' ? es : null;
-      const e0: Ertrag = { ...ertragStart(v, esOk?.belegArt ?? 'quittung', esOk?.einnahmeWeg ?? 'beleg'), ...(b?.entwurf ? ertragAusEntwurf(b.entwurf) : {}) };
-      const e: Ertrag = esOk ? e0 : { ...e0, weg: 'ohne' };
+      // Positionen, Leistungsdatum und Zahlungsziel aus Entwurf bzw. Termin (dessen Tag ist das Leistungsdatum)
+      // nachträglich: Start „Ohne eigenen Beleg“ (so wie gebucht), „Beleg erstellen“ füllt die Position aus der Buchung
+      const e0: Ertrag = nachholbar
+        ? ertragOeffnen(ertragNachtraeglich(esOk?.belegArt ?? 'quittung'), { zielTage: esOk?.zahlungszielTage ?? null })
+        : ertragOeffnen(ertragStart(v, esOk?.belegArt ?? 'quittung', esOk?.einnahmeWeg ?? 'beleg'), {
+            entwurf: b?.entwurf ? ertragAusEntwurf(b.entwurf) : null,
+            terminDatum: b?.termin?.datum ?? null,
+            zielTage: esOk?.zahlungszielTage ?? null,
+          });
+      const e1: Ertrag = esOk ? e0 : { ...e0, weg: 'ohne' };
+      // Ein- & Ausgänge › „Beleg erstellen“ an der Zeile: gleich mit der Position aus Betrag und Text der Buchung
+      const vorwahl = auftrag.art === 'bearbeiten' && nachholbar && esOk ? auftrag.beleg : undefined;
+      const e: Ertrag = vorwahl ? { ...e1, art: vorwahl, weg: 'beleg', positionen: zumBeleg(f0, e1).positionen } : e1;
+      // „Beleg erstellen“: der Betrag ist die Summe der Positionen
+      const summe = !z && f0.typ === 'einnahme' && e.weg === 'beleg' ? ertragSumme(e) : 0;
+      const f: Formular = summe > 0 ? { ...f0, betrag: betragAlsEingabe(summe) } : f0;
       setStamm(s);
       setBezug(b);
       setZeile(z);
@@ -307,8 +376,9 @@ export function ErfassenSchublade() {
   const gegenbuchung = zeile?.storno_von_id != null;
   const aktuell = laden.status === 'ok' && geladenN === auftragN;
   const nimmtBelege = aktuell ? !gegenbuchung && sp !== 'storniert' : laden.status === 'laden' || laden.status === 'ok';
-  // Beleg zum Ertrag: nur bei neuen Einnahmen, sonst wie „Ohne eigenen Beleg“
-  const ertragAktiv = !bearbeitung && form?.typ === 'einnahme';
+  // Beleg zum Ertrag: bei neuen Einnahmen und nachträglich zu einer Einnahme ohne eigenen Beleg, sonst wie „Ohne eigenen Beleg“
+  const nachtraeglich = bearbeitung && zeile !== null && belegNachholbar(zeile) && form?.typ === 'einnahme';
+  const ertragAktiv = form?.typ === 'einnahme' && (!bearbeitung || nachtraeglich);
   const weg: Ertragsweg = ertragAktiv ? ertrag.weg : 'ohne';
   const dirty =
     laden.status === 'ok' &&
@@ -325,6 +395,26 @@ export function ErfassenSchublade() {
   useEffect(() => {
     if (open) useUi.getState().setUngespeichert(dirty);
   }, [open, dirty]);
+
+  // Löschen (nur „Buchung bearbeiten“): Rust sagt, ob es geht und warum nicht – Knopf aktiv bzw. mit Grund gesperrt
+  const datenStand = useUi((s) => s.datenStand);
+  const zeileId = aktuell && bearbeitung ? (zeile?.id ?? null) : null;
+  const [loeschbar, setLoeschbar] = useState<{ id: number; l: Loeschbarkeit } | null>(null);
+  useEffect(() => {
+    if (zeileId == null || !datenbankVerfuegbar()) return;
+    let aktiv = true;
+    buchungLoeschbar(zeileId).then(
+      (l) => {
+        if (aktiv) setLoeschbar({ id: zeileId, l });
+      },
+      (e: unknown) => {
+        if (aktiv) setLoeschbar({ id: zeileId, l: { loeschbar: false, grund: fehlerText(e), nummern: [], storno_paar: false, dateien: 0, entwuerfe: 0, termin: false } });
+      },
+    );
+    return () => {
+      aktiv = false;
+    };
+  }, [zeileId, datenStand]);
 
   // Betrag fokussieren, sobald das Formular steht
   useEffect(() => {
@@ -373,7 +463,16 @@ export function ErfassenSchublade() {
           ertragAktiv ? ladeErtragStamm().catch(() => ertragStamm) : Promise.resolve(ertragStamm),
         ]);
         const f = leeresFormular(s, { typ: form.typ, datum: form.zahlungsdatum, zahlungsart: form.zahlungsart });
-        const e: Ertrag = { ...ertrag, adresse: '', leistung: '', offenId: null, ...(bezug ? { vorlage: null, bezahlt: true } : {}) };
+        // Art, Vorlage und Zahlungsziel bleiben stehen; Positionen und Leistungsdatum gehören zum gespeicherten Beleg
+        const e: Ertrag = {
+          ...ertrag,
+          adresse: '',
+          positionen: [ertragPosition()],
+          leistungVon: '',
+          leistungBis: '',
+          offenId: null,
+          ...(bezug ? { vorlage: null, bezahlt: true } : {}),
+        };
         setStamm(s);
         setBezug(null); // der nächste Eintrag gehört zu keinem Termin mehr
         setForm(f);
@@ -394,7 +493,7 @@ export function ErfassenSchublade() {
       if (weg === 'offen') {
         const re = ertragStamm?.offene.find((x) => x.id === ertrag.offenId);
         if (!re) {
-          setErtragFehler(ertragPruefen(form, ertrag, belege.length)?.text ?? 'Bitte eine offene Rechnung auswählen.');
+          setErtragFehler(ertragPruefen(form, ertrag, belege.length) ?? { feld: 'offen', text: 'Bitte eine offene Rechnung auswählen.' });
           wackeln(document.querySelector('.bu-drawer .bu-offen, .bu-drawer .bu-offen-empty'));
           return;
         }
@@ -433,26 +532,99 @@ export function ErfassenSchublade() {
       }
 
       const offenRechnung = weg === 'beleg' && rechnungOffen(ertrag);
-      // eine noch offene Rechnung trägt das Rechnungsdatum, keine Zahlung – die Festschreibung betrifft sie nicht
-      const r = pruefeFormular(form, {
+      // eine noch offene Rechnung trägt das Rechnungsdatum, keine Zahlung – die Festschreibung betrifft sie nicht;
+      // beim eigenen Beleg ersetzen die Positionen die Beschreibung (geprüft in ertragPruefen)
+      // nachträglich bleibt der Text der Einnahme, wie er ist (geändert nur, wenn oben geändert)
+      const pruefText = weg === 'beleg' && (!nachtraeglich || !form.beschreibung.trim()) ? ertragBuchungstext(ertrag) : form.beschreibung;
+      const r = pruefeFormular({ ...form, beschreibung: pruefText }, {
         kategorien: stamm.kategorien,
         kunden: stamm.kunden,
         heute: h,
         festBis: offenRechnung ? null : stamm.festBis,
         belegdatum: zeile?.belegdatum ?? erkannt.belegdatum,
       });
-      const ef = weg === 'beleg' ? ertragPruefen(form, ertrag, belege.length) : null;
+      const abweichung = weg === 'beleg' && nachtraeglich ? summenAbweichung(ertrag, r.ok ? r.daten.betrag_cent : parseBetrag(form.betrag)) : null;
+      const ef = weg === 'beleg' ? (ertragPruefen(form, ertrag, belege.length) ?? (abweichung ? { feld: 'positionen' as const, text: abweichung } : null)) : null;
       if (!r.ok || ef) {
         const alle: Partial<Record<FormFeld, string>> = { ...(ef?.feld === 'wer' ? { wer: ef.text } : {}), ...(r.ok ? {} : r.fehler) };
         setFehler(alle);
-        if (ef && ef.feld !== 'wer') setErtragFehler(ef.text);
+        if (ef && ef.feld !== 'wer') setErtragFehler(ef);
         const erstes = (['betrag', 'kategorie', 'zahlungsdatum', 'beschreibung', 'wer', 'privat'] as const).find((k) => alle[k]);
         if (erstes) {
           const el = document.getElementById(`bf-${erstes}`);
           if (erstes === 'privat') (el?.closest('details') as HTMLDetailsElement | null)?.setAttribute('open', '');
           (el?.matches('input') ? el : el?.querySelector<HTMLElement>('button'))?.focus();
           wackeln(el?.closest('.field') ?? null);
-        } else wackeln(document.querySelector('.bu-drawer .bu-scan'));
+        } else wackeln(document.querySelector(ef?.feld === 'positionen' ? '.bu-drawer .bu-pos' : '.bu-drawer .bu-scan'));
+        return;
+      }
+
+      /* Beleg nachträglich: ausstellen und mit DIESER Einnahme verknüpfen – keine zweite Einnahme (beleg_zu_buchung) */
+      if (weg === 'beleg' && nachtraeglich && zeile) {
+        if (!ertragStamm) return;
+        const v = belegVorbereiten(form, ertrag, { ...ertragStamm, heute: h });
+        // oben geändert ⇒ die Änderung läuft in derselben Transaktion über den normalen Änderungsweg (Protokoll)
+        const geaendert = formularSchluessel(form) !== start;
+        const was = ertrag.art === 'rechnung' ? 'Rechnung' : 'Quittung';
+        if (v.fehlt.length || !v.daten) {
+          const fehlt = `Für die ${was} fehlt noch: ${v.fehlt.join(' · ')}`;
+          if (geaendert) {
+            // die Maske kennt nur die gespeicherte Einnahme – erst die Änderung speichern
+            ui.showToast({ key: 'ertrag-pflicht', text: `${fehlt}. Bitte zuerst die Änderung an der Einnahme speichern („Ohne eigenen Beleg“), dann in der Maske ergänzen.`, icon: 'warn', sticky: true });
+            return;
+          }
+          const pfad = maskenPfad(ertrag.art, {
+            betrag: zeile.betrag_cent,
+            datum: zeile.zahlungsdatum,
+            text: zeile.beschreibung,
+            kundeId: zeile.kunde_id,
+            zahlungsart: zeile.zahlungsart ?? undefined,
+            bezahlt: ertrag.art === 'rechnung',
+            kategorieId: zeile.kategorie_id,
+            buchung: zeile.id,
+          });
+          const zustand = maskenZustand({ ...v.formular, buchungId: zeile.id });
+          toastMit({ key: 'ertrag-pflicht', text: fehlt, icon: 'warn', sticky: true }, [
+            {
+              label: 'In der Maske ergänzen',
+              run: () => {
+                erfassenFertig();
+                navigate(pfad, { state: zustand });
+              },
+            },
+          ]);
+          return;
+        }
+        setSpeichert(true);
+        try {
+          const res = await belegZuBuchung(zeile.id, geaendert ? r.daten : null, v.daten, {
+            dokument: { ...v.dokument, akzent: akzentPapier(ui.settings) },
+            bausteine: v.gedruckt,
+            kategorie_id: r.daten.kategorie_id,
+            heute: h,
+          });
+          ui.datenGeaendert();
+          const teile = [`${was} ${res.nummer} erstellt · mit Einnahme ${zeile.nummer} verknüpft`];
+          if (geaendert) teile.push('Änderung gespeichert (im Protokoll)');
+          if (res.kunde_neu && res.kunde_nummer) teile.push(`neuer Kunde ${res.kunde_nummer}`);
+          const scan = belege[0];
+          if (scan) {
+            try {
+              await belegScanAnhaengen(res.id, scan.pfad);
+              teile.push('unterschriebenes Exemplar abgelegt');
+            } catch (e) {
+              ui.showToast({ text: `Das unterschriebene Exemplar ließ sich nicht anhängen: ${fehlerText(e)} – in der Maske erneut versuchen.`, icon: 'warn', sticky: true });
+            }
+          }
+          // kein „Rückgängig“: ein Storno nähme die schon vorher gebuchte Einnahme mit
+          toastMit({ text: teile.join(' · '), icon: 'check' }, [{ label: 'Beleg öffnen', run: () => navigate(`/belege/${res.id}`) }]);
+          void pdfNachholen(res.id);
+          erfassenFertig();
+        } catch (e) {
+          ui.showToast({ text: `Ausstellen ging nicht: ${fehlerText(e)}`, icon: 'warn', sticky: true });
+        } finally {
+          setSpeichert(false);
+        }
         return;
       }
 
@@ -461,12 +633,12 @@ export function ErfassenSchublade() {
         if (!ertragStamm) return;
         // mit vorbereitetem Entwurf: genau dieser bekommt seine Nummer (Termin ⇒ erledigt, beides in Rust)
         const entwurfId = bezug?.entwurf?.id ?? null;
-        const v = belegVorbereiten(form, ertrag, r.daten.betrag_cent, { ...ertragStamm, heute: h }, ertragBezug(bezug));
+        const v = belegVorbereiten(form, ertrag, { ...ertragStamm, heute: h }, ertragBezug(bezug));
         if (v.fehlt.length || !v.daten) {
           const pfad = entwurfId != null ? `/belege/${entwurfId}` : maskenPfad(ertrag.art, {
             betrag: r.daten.betrag_cent,
             datum: form.zahlungsdatum,
-            text: form.beschreibung,
+            text: v.buchungstext,
             kundeId: r.daten.kunde_id,
             name: r.daten.neuer_kunde ?? undefined,
             zahlungsart: form.zahlungsart,
@@ -474,12 +646,14 @@ export function ErfassenSchublade() {
             kategorieId: r.daten.kategorie_id,
           });
           const was = ertrag.art === 'rechnung' ? 'Rechnung' : 'Quittung';
+          // Positionen, Leistungsdatum/-zeitraum, Zahlungsziel, Vorlage und Anschrift gehen als Zustand mit
+          const zustand = maskenZustand(v.formular);
           toastMit({ key: 'ertrag-pflicht', text: `Für die ${was} fehlt noch: ${v.fehlt.join(' · ')}`, icon: 'warn', sticky: true }, [
             {
               label: 'In der Maske ergänzen',
               run: () => {
                 erfassenFertig();
-                navigate(pfad);
+                navigate(pfad, { state: zustand });
               },
             },
           ]);
@@ -512,7 +686,7 @@ export function ErfassenSchublade() {
             nummer: res.nummer,
             art: ertrag.art,
             status: offenRechnung ? ('offen' as const) : ('bezahlt' as const),
-            summe_cent: r.daten.betrag_cent,
+            summe_cent: ertragSumme(ertrag),
             zahlungsart: offenRechnung ? null : form.zahlungsart,
             bezahlt_am: offenRechnung ? null : form.zahlungsdatum,
             termin_id: bezug?.termin?.id ?? null,
@@ -564,7 +738,7 @@ export function ErfassenSchublade() {
         setSpeichert(false);
       }
     },
-    [form, stamm, zeile, nurLesen, speichert, belege, weg, ertrag, ertragStamm, ertragAktiv, navigate, erkannt.belegdatum, bezug],
+    [form, stamm, zeile, nurLesen, speichert, belege, weg, ertrag, ertragStamm, ertragAktiv, nachtraeglich, start, navigate, erkannt.belegdatum, bezug],
   );
 
   // ⌘↩ speichern, ⇧⌘↩ speichern & neu
@@ -609,6 +783,35 @@ export function ErfassenSchublade() {
         Stornieren
       </button>
     ) : null;
+  const loesch = zeile && zeileId === zeile.id && loeschbar?.id === zeile.id ? loeschbar.l : null;
+  const loeschKnopf =
+    zeile && zeileId === zeile.id ? (
+      loesch?.loeschbar ? (
+        <button
+          type="button"
+          className="btn danger"
+          title="Endgültig löschen – nur vor der Festschreibung und ohne ausgestellten Beleg; angehängte Dateien bleiben"
+          onClick={() =>
+            loeschDialog(zeile, {
+              ungespeichert: dirty,
+              danach: () => {
+                if (useErfassen.getState().auftrag === auftrag) erfassenFertig();
+              },
+            })
+          }
+        >
+          <Trash2 />
+          Löschen
+        </button>
+      ) : (
+        <span className="bu-loesch-zu" title={loesch?.grund ?? 'Prüfe, ob sich der Eintrag löschen lässt …'}>
+          <button type="button" className="btn danger" disabled aria-label={loesch?.grund ? `Löschen geht nicht: ${loesch.grund}` : 'Löschen'}>
+            <Trash2 />
+            Löschen
+          </button>
+        </span>
+      )
+    ) : null;
 
   /* ---------- Beleg zum Ertrag ---------- */
   const onWeg = (w: Ertragsweg) => {
@@ -616,9 +819,37 @@ export function ErfassenSchublade() {
     // „Offene Rechnung zuordnen“ verlassen: deren Nummer gehört nicht an eine andere Einnahme (die Rechnung bleibt offen)
     const re = ertrag.weg === 'offen' ? ertragStamm?.offene.find((x) => x.id === ertrag.offenId) : undefined;
     if (re) setForm((f) => (f && f.belegnummer.trim() === re.nummer ? { ...f, belegnummer: '' } : f));
-    setErtrag({ weg: w, offenId: null });
+    if (w === 'beleg' && form) {
+      // Betrag und Beschreibung wandern in die Position, der Betrag oben ist ab jetzt deren Summe
+      const z = zumBeleg(form, ertrag);
+      setErtrag({ weg: w, offenId: null, positionen: z.positionen });
+      // nachträglich bleibt der Betrag der Einnahme stehen – die Positionen müssen ihn ergeben
+      if (!nachtraeglich) setForm((f) => (f ? { ...f, betrag: z.betrag } : f));
+    } else {
+      // „Beleg erstellen“ verlassen: die Positionen geben die Beschreibung der Buchung vor (falls noch leer)
+      const text = ertrag.weg === 'beleg' && ertrag.positionen.some((x) => x.beschreibung.trim()) ? ertragBuchungstext(ertrag) : '';
+      if (text) setForm((f) => (f && !f.beschreibung.trim() ? { ...f, beschreibung: text } : f));
+      setErtrag({ weg: w, offenId: null });
+    }
     setFehler({});
   };
+  const onPositionen = (positionen: PositionFormular[]) => {
+    setErtrag({ positionen });
+    if (nachtraeglich) return; // der Betrag der Einnahme wird nie still angepasst
+    const summe = ertragSumme({ positionen });
+    setForm((f) => (f ? { ...f, betrag: summe > 0 ? betragAlsEingabe(summe) : '' } : f));
+    fehlerWeg('betrag');
+  };
+  // Live-Vorschau: der Beleg, wie er jetzt ausgestellt würde (Fehler beim Rechnen ⇒ keine Vorschau)
+  const vorbereitet: BelegVorbereitet | null = useMemo(() => {
+    if (weg !== 'beleg' || !ertragStamm || !form) return null;
+    try {
+      return belegVorbereiten(form, ertrag, { ...ertragStamm, heute: heute() }, ertragBezug(bezug));
+    } catch {
+      return null;
+    }
+  }, [weg, ertragStamm, form, ertrag, bezug]);
+  const mitVorschau = weg === 'beleg' && vorschau && vorbereitet !== null;
   const onOffen = (z: RechnungsZeile) => {
     const k = stamm?.kunden.find((x) => x.id === z.kunde_id);
     setErtrag({ offenId: z.id });
@@ -654,6 +885,7 @@ export function ErfassenSchublade() {
   const fuss = (
     <>
       {stornoKnopf}
+      {loeschKnopf}
       {nurLesen && sp !== 'festgeschrieben' ? (
         <span className="bu-foot-lock" title={sp ? SPERR_TEXT[sp] : undefined}>
           <Lock />
@@ -693,7 +925,7 @@ export function ErfassenSchublade() {
   );
 
   return (
-    <Drawer open={open} onClose={erfassenSchliessen} title={titel} sub={sub} icon={icon} width={900} foot={fuss} className="bu-drawer">
+    <Drawer open={open} onClose={erfassenSchliessen} title={titel} sub={sub} icon={icon} width={mitVorschau ? 1240 : 900} foot={fuss} className="bu-drawer">
       <>
         {laden.status === 'ohne-db' ? (
           <section>
@@ -739,10 +971,49 @@ export function ErfassenSchublade() {
                   belege={belege}
                   nimmtBelege={nimmtBelege}
                   fehler={ertragFehler}
+                  vorbereitet={vorbereitet}
+                  onPositionen={onPositionen}
+                  vorschau={vorschau}
+                  onVorschau={setVorschau}
                   onWeg={onWeg}
                   onOffen={onOffen}
                   onNummer={(nr) => set('belegnummer', nr)}
+                  buchung={nachtraeglich && zeile ? zeile.nummer : null}
                 />
+              ) : null
+            }
+            nachtraeglich={nachtraeglich}
+            betragNurSumme={weg === 'beleg' && !nachtraeglich && !betragEingebbar(ertrag)}
+            onBetrag={
+              weg === 'beleg' && !nachtraeglich
+                ? (eingabe) => setErtragWert((e) => ({ ...e, positionen: betragInPosition(e, eingabe) }))
+                : undefined
+            }
+            datumZusatz={
+              weg === 'beleg' && ertragStamm ? (
+                <BelegDatumFelder form={form} ertrag={ertrag} setErtrag={setErtrag} zielStandard={ertragStamm.zahlungszielTage} nachtraeglich={nachtraeglich} />
+              ) : null
+            }
+            vorschauSpalte={
+              mitVorschau && vorbereitet ? (
+                <aside className="bu-vorschau" aria-label="Vorschau des Belegs">
+                  <div className="bu-vorschau-kopf">
+                    <span>Vorschau</span>
+                    <small>so wird der Beleg gedruckt</small>
+                  </div>
+                  <BlattVorschau doc={vorbereitet.dokument} bausteine={vorbereitet.gedruckt} maxScale={0.75} />
+                  {vorbereitet.fehlt.length ? (
+                    <p className="hint warn">
+                      <TriangleAlert />
+                      Für den Beleg fehlt noch: {vorbereitet.fehlt.join(' · ')}
+                    </p>
+                  ) : (
+                    <p className="hint">
+                      <Check />
+                      Alle Pflichtangaben sind da.
+                    </p>
+                  )}
+                </aside>
               ) : null
             }
             onEigenbeleg={eigenbeleg}
@@ -752,6 +1023,16 @@ export function ErfassenSchublade() {
               ) : null
             }
             onTyp={(t) => {
+              if (t === 'einnahme' && form.typ !== t && !bearbeitung && ertrag.weg === 'beleg') {
+                const zb = zumBeleg(form, ertrag);
+                setErtrag({ positionen: zb.positionen });
+                setForm((f) => (f ? { ...f, betrag: zb.betrag } : f));
+              }
+              // zurück zur Ausgabe: die Beschreibung ist wieder sichtbar – aus den Positionen, falls leer
+              if (t === 'ausgabe' && form.typ === 'einnahme' && !bearbeitung && ertrag.weg === 'beleg' && ertrag.positionen.some((x) => x.beschreibung.trim())) {
+                const text = ertragBuchungstext(ertrag);
+                setForm((f) => (f && !f.beschreibung.trim() ? { ...f, beschreibung: text } : f));
+              }
               setForm((f) => {
                 if (!f || f.typ === t) return f;
                 const kat = stamm.kategorien.find((k) => k.id === f.kategorieId);
@@ -812,6 +1093,16 @@ interface InhaltProps {
   ertragBereich: ReactNode;
   /** Hinweiszeile zum Termin bzw. vorbereiteten Beleg (oben) */
   terminHinweis: ReactNode;
+  /** Buchung bearbeiten einer Einnahme ohne eigenen Beleg: der Beleg lässt sich nachträglich erstellen */
+  nachtraeglich: boolean;
+  /** „Beleg erstellen“ mit mehreren Positionen (bzw. Menge ≠ 1): der Betrag zeigt nur ihre Summe */
+  betragNurSumme: boolean;
+  /** „Beleg erstellen“ mit einer Position: Eingabe im Betrag füllt deren Preis */
+  onBetrag?: (eingabe: string) => void;
+  /** Felder unter dem Datum (Leistungsdatum, Zahlungsziel – BelegDatumFelder) */
+  datumZusatz: ReactNode;
+  /** Live-Vorschau des Belegs als dritte Spalte */
+  vorschauSpalte: ReactNode;
   onEigenbeleg: () => void;
 }
 
@@ -824,11 +1115,12 @@ const Fehler = ({ text }: { text?: string }) =>
 
 const TIP_DATUM = 'Für die EÜR zählt der Tag, an dem das Geld geflossen ist (Zufluss-/Abflussprinzip, § 11 EStG) – nicht das Rechnungsdatum.';
 const TIP_RECHNUNGSDATUM = 'Datum der Rechnung. Die Einnahme wird erst erfasst, wenn das Geld eingeht – dann zählt der Zahlungstag (§ 11 EStG).';
+const TIP_RECHNUNGSDATUM_BEZAHLT = 'Datum der Rechnung – bei „bereits bezahlt“ zugleich der Zahlungstag: an diesem Tag wird die Einnahme gebucht (§ 11 EStG).';
 const TIP_NR = 'Bei Ausgaben die Rechnungs- oder Bonnummer des Geschäfts. Bei Einnahmen ohne Beleg aus Kladdy z. B. die Nummer einer handschriftlichen Quittung. Quittungen und Rechnungen aus Kladdy (QU-/RE-…) bekommen ihre Nummer beim Ausstellen.';
 
 function FormularInhalt(props: InhaltProps) {
   const { form, stamm, zeile, sp, belege, nimmtBelege, fehler, katVorschlag, erkannt, set, fehlerWeg, onTyp, onKategorie, vorschlagen } = props;
-  const { weg, belegArt, offenRechnung, ertragBereich, onEigenbeleg, terminHinweis } = props;
+  const { weg, belegArt, offenRechnung, ertragBereich, onEigenbeleg, terminHinweis, nachtraeglich, betragNurSumme, onBetrag, datumZusatz, vorschauSpalte } = props;
   const { pathname } = useLocation();
   const seiteZeitraum = useUi((s) => s.zeitraum);
   const ro = sp !== null;
@@ -836,8 +1128,12 @@ function FormularInhalt(props: InhaltProps) {
   const ausgabe = typ === 'ausgabe';
   // „Offene Rechnung zuordnen“: Betrag, Text und Kunde kommen aus der Rechnung
   const zuordnen = weg === 'offen';
+  // „Beleg erstellen“: die Positionen beschreiben die Leistung – keine zweite Beschreibung
+  const mitBeschreibung = weg !== 'beleg';
+  const rechnung = weg === 'beleg' && belegArt === 'rechnung';
   // Beleg-Nr. nur ohne eigenen Beleg (sonst vergibt der Beleg die Nummer); bei neuen Einnahmen steht sie bei „Nur buchen“
-  const mitNr = weg === 'ohne' && !(typ === 'einnahme' && ertragBereich != null);
+  // nachträglich (Buchung bearbeiten) bleibt das Feld, wie es war
+  const mitNr = weg === 'ohne' && !(typ === 'einnahme' && ertragBereich != null && !nachtraeglich);
   const kats = stamm.kategorien.filter((k) => k.typ === typ);
   const kat = stamm.kategorien.find((k) => k.id === form.kategorieId);
   const cent = parseBetrag(form.betrag);
@@ -907,7 +1203,7 @@ function FormularInhalt(props: InhaltProps) {
         </div>
       ) : null}
 
-      <div className="bu-spalten">
+      <div className={`bu-spalten ${vorschauSpalte ? 'mit-vorschau' : ''}`}>
       <div className="bu-spalte">
       <section className="bu-sec-betrag">
         <Seg
@@ -952,14 +1248,20 @@ function FormularInhalt(props: InhaltProps) {
               spellCheck={false}
               placeholder="0,00"
               value={form.betrag}
-              readOnly={ro || zuordnen}
+              readOnly={ro || zuordnen || betragNurSumme}
+              title={betragNurSumme ? 'Summe der Positionen – ändern bei den Positionen' : undefined}
               onChange={(e) => {
                 set('betrag', e.target.value);
                 fehlerWeg('betrag');
+                onBetrag?.(e.target.value);
               }}
               onBlur={(e) => {
+                if (betragNurSumme) return;
                 const c = parseBetrag(e.target.value);
-                if (c !== null && c > 0) set('betrag', betragAlsEingabe(c));
+                if (c !== null && c > 0) {
+                  set('betrag', betragAlsEingabe(c));
+                  onBetrag?.(betragAlsEingabe(c));
+                }
               }}
             />
             <span className="suffix">€</span>
@@ -967,6 +1269,15 @@ function FormularInhalt(props: InhaltProps) {
           <Fehler text={fehler.betrag} />
           {betragHint && !fehler.betrag ? <p className="hint">{betragHint}</p> : null}
           {zuordnen && !ro ? <p className="hint">Betrag der gewählten Rechnung – gebucht wird die Rechnungssumme.</p> : null}
+          {weg === 'beleg' && !ro && !fehler.betrag ? (
+            <p className="hint">
+              {nachtraeglich
+                ? 'Betrag der Einnahme – die Positionen müssen ihn genau ergeben.'
+                : betragNurSumme
+                  ? 'Summe der Positionen – gebucht wird diese Summe.'
+                  : 'Steht als Preis in der Position – weitere Positionen beim Beleg.'}
+            </p>
+          ) : null}
         </div>
         {!zuordnen && (kats.length > 1 || (kat && kat.typ !== typ)) ? (
           <div className="field">
@@ -1011,9 +1322,13 @@ function FormularInhalt(props: InhaltProps) {
       <section>
         <h3>Angaben</h3>
         <div className="form-grid">
-          <div className={mitNr ? 'field' : 'field full'}>
-            <label className="field-label" htmlFor="bf-zahlungsdatum" title={offenRechnung ? TIP_RECHNUNGSDATUM : TIP_DATUM}>
-              {offenRechnung ? 'Rechnungsdatum' : 'Zahlungsdatum'}
+          <div className={mitNr || rechnung ? 'field' : 'field full'}>
+            <label
+              className="field-label"
+              htmlFor="bf-zahlungsdatum"
+              title={offenRechnung ? TIP_RECHNUNGSDATUM : rechnung ? TIP_RECHNUNGSDATUM_BEZAHLT : TIP_DATUM}
+            >
+              {rechnung ? 'Rechnungsdatum' : 'Zahlungsdatum'}
               <span className="q" aria-hidden="true">
                 ?
               </span>
@@ -1032,6 +1347,7 @@ function FormularInhalt(props: InhaltProps) {
               }}
             />
           </div>
+          {datumZusatz}
           {mitNr ? (
             <div className="field">
               <label className="field-label" htmlFor="bf-belegnummer" title={TIP_NR}>
@@ -1060,6 +1376,7 @@ function FormularInhalt(props: InhaltProps) {
           ) : datumHint ? (
             <p className="hint full">{datumHint}</p>
           ) : null}
+          {mitBeschreibung ? (
           <div className="field full">
             <label className="field-label" htmlFor="bf-beschreibung">
               Beschreibung
@@ -1080,6 +1397,7 @@ function FormularInhalt(props: InhaltProps) {
             />
             <Fehler text={fehler.beschreibung} />
           </div>
+          ) : null}
           {zuordnen ? null : (
             <div className="field full">
               <label className="field-label" htmlFor="bf-wer">
@@ -1193,7 +1511,7 @@ function FormularInhalt(props: InhaltProps) {
         {nimmtBelege && weg !== 'beleg' ? (
           hatDateien ? (
             <BelegDropzone kompakt titel="Weiteren Beleg hierher ziehen oder klicken" text="" />
-          ) : !ausgabe && ertragBereich != null ? (
+          ) : !ausgabe && ertragBereich != null && !nachtraeglich ? (
             <BelegDropzone kompakt titel="Scan oder Datei anhängen (optional)" text="" />
           ) : (
             <BelegDropzone
@@ -1233,6 +1551,7 @@ function FormularInhalt(props: InhaltProps) {
         ) : null}
       </section>
       </div>
+      {vorschauSpalte}
       </div>
     </>
   );

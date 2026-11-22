@@ -9,7 +9,7 @@
  * - Kunde per ID („Name · K-0012“), bei gleichem Namen wird nachgefragt (wie in der Erfassen-Schublade).
  * Optik und Verhalten wie referenz/prototyp/js/pages/belege.js (renderBeleg); Logik in lib/rechnungen.ts. */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { open as dateiDialog } from '@tauri-apps/plugin-dialog';
 import { Ban, Banknote, Blocks, CalendarDays, Check, ChevronLeft, ChevronRight, CircleCheck, Clock, Copy, FileText, FolderSearch, Info, Landmark, List, Lock, Mail, Paperclip, Pencil, Plus, Printer, QrCode, ReceiptEuro, Search, Stamp, Store, Trash2, TriangleAlert, type LucideIcon, Upload, Users, X } from 'lucide-react';
 import { pdfNachholen, pdfOeffnenFuer } from '../lib/belegaktionen';
@@ -17,7 +17,8 @@ import { setzeDropZiel } from '../lib/belegablage';
 import { ausgestellterBeleg, entwurfOeffnen, mailText, type Schnappschuss } from '../lib/belegpdf';
 import { ZAHLUNGSWEGE, kundenLabel, nameSchluessel, type KategorieWahl } from '../lib/buchungen';
 import { datenbankVerfuegbar } from '../lib/db';
-import { erfassen } from '../lib/erfassen';
+import { bearbeiten, erfassen } from '../lib/erfassen';
+import { maskenUebergabe } from '../lib/ertrag';
 import { fehlerText } from '../lib/fehler';
 import type { Firma } from '../lib/firma';
 import { ibanFormat } from '../lib/firma';
@@ -167,15 +168,33 @@ const zahlParam = (v: string | null): number | null => (v && /^\d+$/.test(v) ? N
 export default function BelegEditor() {
   const { id } = useParams();
   const [params] = useSearchParams();
+  const { pathname, search, state } = useLocation();
+  const navigate = useNavigate();
   const neu = !id || id === 'neu';
   const belegId = neu ? null : zahlParam(id);
   const schluessel = neu ? `neu?${params.toString()}` : `id:${id}`;
-  return <Maske key={schluessel} belegId={belegId} params={params} schluessel={schluessel} />;
+  // „In der Maske ergänzen“ aus der Erfassen-Schublade: das ganze Formular kommt als Navigations-Zustand mit. Die Maske
+  // übernimmt es einmal; danach aus dem Verlauf nehmen, damit „Zurück“ es nicht ein zweites Mal einsetzt.
+  const uebergabe = useMemo(() => maskenUebergabe(state), [state]);
+  useEffect(() => {
+    if (state != null) navigate({ pathname, search }, { replace: true, state: null });
+  }, [state, pathname, search, navigate]);
+  return <Maske key={schluessel} belegId={belegId} params={params} schluessel={schluessel} uebergabe={uebergabe} />;
 }
 
-function Maske({ belegId, params, schluessel }: { belegId: number | null; params: URLSearchParams; schluessel: string }) {
+function Maske({ belegId, params, schluessel, uebergabe }: { belegId: number | null; params: URLSearchParams; schluessel: string; uebergabe: BelegFormular | null }) {
   const datenStand = useUi((s) => s.datenStand);
   const [geladen, setGeladen] = useState<Geladen>(() => (datenbankVerfuegbar() ? { status: 'laden' } : { status: 'ohne-db' }));
+  // übergebenes Formular nur beim ersten Laden (spätere Läufe nach Datenänderungen behalten die Eingaben über `arbeit`)
+  const uebernehmen = useRef(uebergabe);
+  /** Formular aus der Schublade als ungespeicherte Arbeit einsetzen (Ausgangsstand `basis` ⇒ „ungespeichert“). */
+  const mitUebergabe = (basis: BelegFormular): BelegFormular => {
+    const u = uebernehmen.current;
+    uebernehmen.current = null;
+    if (!u || arbeit?.schluessel === schluessel) return basis;
+    arbeit = { schluessel, form: u, start: formularSchluessel(basis) };
+    return u;
+  };
 
   const laden = useCallback(async () => {
     if (!datenbankVerfuegbar()) return;
@@ -201,7 +220,7 @@ function Maske({ belegId, params, schluessel }: { belegId: number | null; params
           { heute: h, zielTage: { rechnung: stamm.einstellungen.zahlungsziel_tage, angebot: stamm.einstellungen.angebot_tage } },
         );
         const aktiv = stamm.vorlagen[f.art].find((v) => v.aktiv);
-        const form = { ...f, vorlageId: aktiv?.id ?? null, vorlageDesign: aktiv?.design ?? f.vorlageDesign };
+        const form = mitUebergabe({ ...f, vorlageId: aktiv?.id ?? null, vorlageDesign: aktiv?.design ?? f.vorlageDesign });
         setGeladen({ status: 'ok', stamm, beleg: null, ausgestellt: null, form: arbeit?.schluessel === schluessel ? arbeit.form : form });
         return;
       }
@@ -212,7 +231,7 @@ function Maske({ belegId, params, schluessel }: { belegId: number | null; params
         const form = formularAusDokument(s.dokument, { vorlageId: b.beleg.vorlage_id, terminId: b.beleg.termin_id });
         setGeladen({ status: 'ok', stamm, beleg: b.beleg, ausgestellt: s, form });
       } else {
-        const form = formularAusEntwurf(b.beleg, b.positionen, h);
+        const form = mitUebergabe(formularAusEntwurf(b.beleg, b.positionen, h));
         setGeladen({ status: 'ok', stamm, beleg: b.beleg, ausgestellt: null, form: arbeit?.schluessel === schluessel ? arbeit.form : form });
       }
     } catch (e) {
@@ -1677,13 +1696,25 @@ function AusgestelltAktionen({ beleg, zeile, mailen }: { beleg: BelegVoll; zeile
     if (beleg.art === 'angebot') return beleg.status === 'angenommen' ? 'In Rechnung umgewandelt' : beleg.status === 'abgelehnt' ? 'Vom Kunden abgelehnt' : `gültig bis ${datumText(beleg.faellig_am)}`;
     if (beleg.status === 'bezahlt') {
       const was = beleg.art === 'eigenbeleg' ? 'Ausgabe gebucht' : beleg.art === 'quittung' ? 'Bezahlt' : 'Bezahlt';
-      return `${was} am ${datumText(beleg.bezahlt_am ?? beleg.datum)}${beleg.buchung_nummer ? ` · gebucht als ${beleg.buchung_nummer}` : ''}`;
+      return `${was} am ${datumText(beleg.bezahlt_am ?? beleg.datum)}`;
     }
     return '';
   })();
+  // die gebuchte Zahlung (Einnahme bzw. Ausgabe) ist ein Klick entfernt – öffnet sie in der Erfassen-Schublade
+  const buchungId = beleg.status === 'bezahlt' && beleg.art !== 'storno' ? beleg.buchung_id : null;
   return (
     <>
-      <span className="bl-status">{status}</span>
+      <span className="bl-status">
+        {status}
+        {buchungId != null && beleg.buchung_nummer ? (
+          <>
+            {' · gebucht als '}
+            <button type="button" className="link" title={`${beleg.art === 'eigenbeleg' ? 'Ausgabe' : 'Einnahme'} ${beleg.buchung_nummer} ansehen`} onClick={() => bearbeiten(buchungId)}>
+              {beleg.buchung_nummer}
+            </button>
+          </>
+        ) : null}
+      </span>
       <span className="spacer" />
       {beleg.pdf_beleg_id != null ? (
         <>

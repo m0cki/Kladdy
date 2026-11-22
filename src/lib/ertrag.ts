@@ -3,27 +3,38 @@
  * zuordnen oder ohne eigenen Beleg speichern. Reine Logik ohne Datenbank. Geschrieben wird über die Rust-Commands der
  * Rechnungen (beleg_ausstellen bzw. beleg_bezahlt) – je eine Transaktion für Beleg, Einnahme, Kunde und Protokoll.
  * Der Beleg entsteht aus demselben Formular wie in der Beleg-Maske (neuesFormular ⇒ formularZuDaten/-Dokument),
- * damit Vorschau, Pflichtangaben und Schnappschuss überall gleich sind. Tests: ertrag.test.ts */
+ * damit Vorschau, Pflichtangaben und Schnappschuss überall gleich sind. Mit „Beleg erstellen“ stehen die Beschreibungen
+ * nur in den Positionen (Summe = Betrag der Einnahme, Buchungstext wie Rust aus den Positionen); bei Rechnung getrennt
+ * Rechnungs-, Leistungsdatum (auch Zeitraum) und Zahlungsziel. Nachträglich zu einer schon gebuchten Einnahme
+ * („Buchung bearbeiten“): ertragNachtraeglich, summenAbweichung, ausgestellt über beleg_zu_buchung.
+ * Tests: ertrag.test.ts */
 import { kundeAufloesen, type Formular, type Zahlungsart } from './buchungen';
+import { formatBetrag, parseBetrag } from './money';
 import type { Firma } from './firma';
 import { naechsteNummer, type Nummernkreis } from './numbering';
 import type { UstModus } from './queries/einstellungen';
 import type { VorlagenWahl } from './queries/vorlagen';
 import {
   artWechseln,
+  buchungstextAus,
+  faelligAus,
   faelligText,
-  formularSumme,
   formularZuDaten,
   formularZuDokument,
+  leerePosition,
   neuesFormular,
+  parseMenge,
+  positionenAus,
+  preisEingabe,
   type BelegDaten,
   type BelegFormular,
   type BelegZeile,
   type KundeAnschrift,
+  type PositionFormular,
 } from './rechnungen';
 import type { KennwerteJahr } from './steuer-kennwerte';
-import { istBausteinTyp, type Baustein } from './vorlagen/bausteine';
-import { bausteineFuer, type BelegDokument, type Belegart } from './vorlagen/dokument';
+import { istBausteinTyp, sichtbare, type Baustein } from './vorlagen/bausteine';
+import { bausteineFuer, belegSumme, type BelegDokument, type Belegart } from './vorlagen/dokument';
 import { KLEINBETRAG_STANDARD_CENT, pflichtCheck } from './vorlagen/pflicht';
 import { wahlFinden } from './vorlagen/eigene';
 import { STANDARD_DESIGN, standardVorlage } from './vorlagen/standard';
@@ -44,8 +55,15 @@ export interface Ertrag {
   vorlage: { id: number | null; design?: string } | null;
   /** Anschrift eines neuen Kunden bzw. eines Kunden ohne Anschrift in der Kartei, Zeilen mit \n */
   adresse: string;
-  /** Text der Position auf dem Beleg; leer = die Beschreibung */
-  leistung: string;
+  /** Positionen des Belegs wie in der Beleg-Maske (Beschreibung, Menge, Einheit, Einzelpreis). Ersetzen bei „Beleg
+   *  erstellen“ die Beschreibung der Buchung; ihre Summe ist der Betrag der Einnahme. */
+  positionen: PositionFormular[];
+  /** Leistungsdatum; '' = wie das Datum oben (Rechnungs- bzw. Zahlungsdatum) */
+  leistungVon: string;
+  /** Ende eines Leistungszeitraums; '' = einzelner Tag */
+  leistungBis: string;
+  /** nur Rechnung: Zahlungsziel in Tagen wie eingegeben; '' = Einstellungen › Belege */
+  zielTage: string;
   /** „Offene Rechnung zuordnen“: die gewählte Rechnung */
   offenId: number | null;
   /** „Nur buchen“: eine Papierquittung liegt im Ordner (ohne eingetragene Nummer wird die Buchung als „Papier“ belegt);
@@ -59,11 +77,17 @@ export const papierGewaehlt = (e: Pick<Ertrag, 'papier'>, zahlungsart: Zahlungsa
 /** Belegnummer, die eine Buchung mit Papierquittung ohne eigene Nummer bekommt (gilt dann nicht als „ohne Beleg“). */
 export const PAPIER_BELEG = 'Papier';
 
+/** Einheit neuer Positionen aus der Schublade */
+const EINHEIT = 'Stk.';
+
+/** Eine Position (Menge 1) mit Text und Preis, z. B. aus der Vorbelegung (Beschreibung und Betrag). */
+export const ertragPosition = (text = '', cent = 0): PositionFormular => ({ ...leerePosition(EINHEIT, text.trim()), preis: cent > 0 ? preisEingabe(cent) : '' });
+
 /** Start: vom Aufrufer vorgewählter Beleg ⇒ „Beleg erstellen“; mit mitgebrachter Datei (Drop) ⇒ „Nur buchen“; sonst
- *  die Einstellung „Neue Einnahme“ (`standardWeg`).
+ *  die Einstellung „Neue Einnahme“ (`standardWeg`). Die erste Position bekommt Text und Betrag der Vorbelegung.
  *  Zu einem Termin ist eine Rechnung standardmäßig „noch offen“ (nach dem Termin zahlt der Kunde meist später). */
 export function ertragStart(
-  v: { beleg?: ErtragsArt; belege?: readonly unknown[]; termin?: number; entwurf?: number },
+  v: { beleg?: ErtragsArt; belege?: readonly unknown[]; termin?: number; entwurf?: number; text?: string; betrag?: number },
   belegArt: ErtragsArt,
   standardWeg: 'beleg' | 'ohne' = 'beleg',
 ): Ertrag {
@@ -73,14 +97,79 @@ export function ertragStart(
     bezahlt: v.termin == null && v.entwurf == null,
     vorlage: null,
     adresse: '',
-    leistung: '',
+    positionen: [ertragPosition(v.text, v.betrag)],
+    leistungVon: '',
+    leistungBis: '',
+    zielTage: '',
     offenId: null,
     papier: null,
   };
 }
 
+/** Beleg-Kasten beim Öffnen: Start (ertragStart), dazu Positionen, Anschrift, Vorlage und Leistungsdatum eines
+ *  vorbereiteten Entwurfs (termine.ts → ertragAusEntwurf), der Tag des Termins als Leistungsdatum (sofern der Entwurf
+ *  keins hat) und das Zahlungsziel aus Einstellungen › Belege. */
+export function ertragOeffnen(start: Ertrag, o: { entwurf?: Partial<Ertrag> | null; terminDatum?: string | null; zielTage?: number | null }): Ertrag {
+  const e: Ertrag = { ...start, ...(o.entwurf ?? {}) };
+  if (!e.positionen.length) e.positionen = start.positionen;
+  if (o.terminDatum && !e.leistungVon) e.leistungVon = o.terminDatum;
+  if (o.zielTage != null && !e.zielTage.trim()) e.zielTage = String(o.zielTage);
+  return e;
+}
+
 /** Für „ungespeichert“: nur was man eintippt bzw. wählt (Weg und Art allein sind keine Eingabe). */
-export const ertragSchluessel = (e: Ertrag): string => JSON.stringify([e.adresse.trim(), e.leistung.trim(), e.offenId]);
+export const ertragSchluessel = (e: Ertrag): string =>
+  JSON.stringify([
+    e.adresse.trim(),
+    e.positionen.map((p) => [p.beschreibung.trim(), p.menge.trim(), p.einheit.trim(), p.preis.trim()]),
+    e.leistungVon,
+    e.leistungBis,
+    e.zielTage.trim(),
+    e.offenId,
+  ]);
+
+/* ---------- Positionen ⇄ Betrag ---------- */
+
+/** Summe der Positionen in Cent (unlesbare Zahlen zählen 0, wie in der Maske). */
+export function ertragSumme(e: Pick<Ertrag, 'positionen'>): number {
+  try {
+    return belegSumme({ positionen: positionenAus(e) });
+  } catch {
+    return 0;
+  }
+}
+
+/** Großer Betrag oben direkt eingebbar? Nur bei genau einer Position mit Menge 1 – er ist dann deren Preis. Sonst zeigt
+ *  er nur die Summe der Positionen. */
+export const betragEingebbar = (e: Pick<Ertrag, 'positionen'>): boolean => e.positionen.length === 1 && parseMenge(e.positionen[0].menge) === 1;
+
+/** Eingabe im großen Betragsfeld ⇒ Preis der einzigen Position (nur wenn eingebbar). */
+export function betragInPosition(e: Pick<Ertrag, 'positionen'>, eingabe: string): PositionFormular[] {
+  if (!betragEingebbar(e)) return e.positionen;
+  return [{ ...e.positionen[0], preis: eingabe }];
+}
+
+/** Beim Wechsel auf „Beleg erstellen“: Betrag und Beschreibung der Buchung wandern in die einzige Position (Text nur,
+ *  solange dort noch keiner steht). Mehrere Positionen bleiben, wie sie sind. */
+export function positionenAusBuchung(e: Pick<Ertrag, 'positionen'>, f: Pick<Formular, 'betrag' | 'beschreibung'>): PositionFormular[] {
+  if (e.positionen.length !== 1) return e.positionen;
+  const p = e.positionen[0];
+  const cent = parseBetrag(f.betrag);
+  const preis = betragEingebbar(e) && cent !== null && cent > 0 ? preisEingabe(cent) : p.preis;
+  return [{ ...p, preis, beschreibung: p.beschreibung.trim() ? p.beschreibung : f.beschreibung.trim() }];
+}
+
+/** Text der Einnahme, wenn der Beleg sie bucht (wie Rust: Betreff, sonst die Positionen, „… und 2 weitere“). */
+export const ertragBuchungstext = (e: Pick<Ertrag, 'positionen' | 'art'>, betreff = ''): string => buchungstextAus(betreff, positionenAus(e), e.art);
+
+/* ---------- Daten der Rechnung ---------- */
+
+/** Zahlungsziel in Tagen: eingegeben oder aus Einstellungen › Belege. */
+export const ertragZielTage = (e: Pick<Ertrag, 'zielTage'>, standard: number): string => e.zielTage.trim() || String(standard);
+
+/** Fälligkeit einer Rechnung mit dem Rechnungsdatum `datum`. */
+export const ertragFaellig = (e: Pick<Ertrag, 'zielTage'>, datum: string, standard: number): string | null =>
+  faelligAus({ art: 'rechnung', datum, zielTage: ertragZielTage(e, standard) });
 
 /** Eine Rechnung, die erst beim Zahlungseingang zur Einnahme wird. */
 export const rechnungOffen = (e: Pick<Ertrag, 'weg' | 'art' | 'bezahlt'>): boolean => e.weg === 'beleg' && e.art === 'rechnung' && !e.bezahlt;
@@ -109,11 +198,28 @@ export function hinweis35a(e: Ertrag, zahlungsart: Zahlungsart): string | null {
     : 'Will der Kunde die Arbeitskosten von der Steuer absetzen (§ 35a EStG)? Dann Rechnung wählen – absetzbar nur bei unbarer Zahlung (Überweisung oder Karte).';
 }
 
-/** Was beim Speichern passiert (unter dem Beleg-Kasten). */
-export const belegHinweis = (e: Ertrag): string =>
-  rechnungOffen(e)
-    ? 'Die Rechnung wird ausgestellt und erscheint unter „Belege“ als offen. Die Einnahme entsteht erst, wenn das Geld eingeht.'
-    : 'Wird beim Speichern mit dieser Nummer ausgestellt und mit der Einnahme verknüpft – Betrag und Datum wie oben.';
+/** Was beim Speichern passiert (unter dem Beleg-Kasten). `buchung`: Nummer der schon gebuchten Einnahme (nachträglich). */
+export const belegHinweis = (e: Ertrag, buchung: string | null = null): string =>
+  buchung
+    ? `Wird beim Speichern mit dieser Nummer ausgestellt und mit der Einnahme ${buchung} verknüpft – es entsteht keine zweite Einnahme.`
+    : rechnungOffen(e)
+      ? 'Die Rechnung wird ausgestellt und erscheint unter „Belege“ als offen. Die Einnahme entsteht erst, wenn das Geld eingeht.'
+      : 'Wird beim Speichern mit dieser Nummer ausgestellt und mit der Einnahme verknüpft – Betrag und Datum wie oben.';
+
+/* ---------- Beleg nachträglich zu einer gebuchten Einnahme ---------- */
+
+/** „Buchung bearbeiten“ einer Einnahme ohne eigenen Beleg (buchungen.ts belegNachholbar): Start wie bisher ohne eigenen
+ *  Beleg; „Beleg erstellen“ bietet Quittung oder Rechnung „bereits bezahlt“ – eine offene Rechnung passt nicht zu schon
+ *  gezahltem Geld. Die Positionen füllt der Wechsel auf „Beleg erstellen“ aus Betrag und Text der Buchung. */
+export const ertragNachtraeglich = (belegArt: ErtragsArt): Ertrag => ({ ...ertragStart({}, belegArt), weg: 'ohne', bezahlt: true });
+
+/** Ergeben die Positionen genau den Betrag der Einnahme? Sonst die Meldung – der Betrag der Buchung wird nie still an die
+ *  Positionen angepasst (ändern lässt er sich oben, über den normalen Änderungsweg mit Protokoll). */
+export function summenAbweichung(e: Pick<Ertrag, 'positionen'>, betragCent: number | null): string | null {
+  const summe = ertragSumme(e);
+  if (betragCent === null || betragCent <= 0 || summe === betragCent) return null;
+  return `Die Positionen ergeben ${formatBetrag(summe)}, die Einnahme beträgt ${formatBetrag(betragCent)} – bitte die Positionen anpassen oder den Betrag oben ändern.`;
+}
 
 /** Offene Rechnungen zum Zuordnen: ausgestellt und offen, die am längsten fälligen zuerst. */
 export function offeneRechnungen(zeilen: readonly BelegZeile[]): BelegZeile[] {
@@ -129,10 +235,33 @@ export const offenFaellig = (z: BelegZeile, heute: string): { text: string; uebe
   return { text: f.text, ueberfaellig: f.klasse === 'neg' };
 };
 
+export interface ErtragFehler {
+  feld: 'wer' | 'offen' | 'dateien' | 'positionen';
+  text: string;
+}
+
+const OHNE_TEXT = 'Was wurde gemacht? Bitte die Leistung beschreiben – sie steht auf dem Beleg.';
+
+/** Positionen prüfen: Zahlen lesbar, Menge über 0, jede Position mit Preis beschreibt die Leistung. */
+export function positionenPruefen(positionen: readonly PositionFormular[]): string | null {
+  for (const [i, p] of positionen.entries()) {
+    const nr = positionen.length > 1 ? `Position ${i + 1}: ` : '';
+    if (p.menge.trim() && parseMenge(p.menge) === null) return `${nr}Menge nicht lesbar – z. B. 1, 2,5 oder 0,25`;
+    if (p.preis.trim() && parseBetrag(p.preis) === null) return `${nr}Preis nicht lesbar – z. B. 45 oder 45,50`;
+    const zaehlt = p.beschreibung.trim() || p.preis.trim();
+    if (zaehlt && (parseMenge(p.menge) ?? 0) <= 0) return `${nr}Die Menge muss größer als 0 sein.`;
+    if (!p.beschreibung.trim() && (parseBetrag(p.preis) ?? 0) !== 0) return `${nr}${OHNE_TEXT}`;
+  }
+  if (!positionen.some((p) => p.beschreibung.trim())) return OHNE_TEXT;
+  return null;
+}
+
 /** Prüfungen, die nur der Beleg braucht (Betrag, Datum, Beschreibung und Kunde prüft pruefeFormular). */
-export function ertragPruefen(f: Pick<Formular, 'wer'>, e: Ertrag, dateien: number): { feld: 'wer' | 'offen' | 'dateien'; text: string } | null {
+export function ertragPruefen(f: Pick<Formular, 'wer'>, e: Ertrag, dateien: number): ErtragFehler | null {
   if (e.weg === 'offen' && e.offenId == null) return { feld: 'offen', text: 'Bitte eine offene Rechnung auswählen.' };
   if (e.weg !== 'beleg') return null;
+  const pos = positionenPruefen(e.positionen);
+  if (pos) return { feld: 'positionen', text: pos };
   if (e.art === 'rechnung' && !f.wer.trim()) return { feld: 'wer', text: 'Für eine Rechnung bitte den Kunden angeben.' };
   if (dateien > 1) return { feld: 'dateien', text: 'Als unterschriebenes Exemplar passt genau eine Datei – bitte die übrigen entfernen.' };
   return null;
@@ -188,13 +317,20 @@ export interface ErtragBezug {
   entwurf: BelegFormular | null;
 }
 
-/** Erfassen-Formular + Beleg-Angaben ⇒ Formular der Beleg-Maske. `cent` = gelesener Betrag. Mit vorbereitetem Entwurf
- *  (Prototyp buchungen.js speichern): dessen Texte, Vorlage und Positionen bleiben, solange der Betrag zur Summe passt;
- *  Kunde, Datum, Betreff und Zahlung kommen aus der Schublade. */
+/** Betreff eines vorbereiteten Entwurfs, der nicht nur den Text seiner ersten Position wiederholt (Termine legen beides
+ *  mit der Leistung an). Sonst '' – dann sprechen die Positionen (Quittung „Für“, Buchungstext). */
+function eigenerBetreff(w: BelegFormular): string {
+  const b = w.betreff.trim();
+  return b && b !== (w.positionen[0]?.beschreibung.trim() ?? '') ? w.betreff : '';
+}
+
+/** Erfassen-Formular + Beleg-Angaben ⇒ Formular der Beleg-Maske. Positionen, Leistungsdatum und Zahlungsziel kommen aus
+ *  dem Beleg-Kasten (`e`), Kunde, Datum und Zahlung aus der Schublade; die Beschreibung der Buchung bleibt außen vor.
+ *  Mit vorbereitetem Entwurf (Prototyp buchungen.js speichern) bleiben dessen Texte (Einleitung, Schlusstext, eigener
+ *  Betreff); seine Positionen hat die Schublade beim Öffnen übernommen (ertragAusEntwurf). */
 export function belegFormular(
   f: Formular,
   e: Ertrag,
-  cent: number,
   ctx: Pick<ErtragKontext, 'kunden' | 'vorlagen' | 'zahlungszielTage' | 'heute'>,
   bezug: ErtragBezug | null = null,
 ): BelegFormular {
@@ -203,9 +339,7 @@ export function belegFormular(
   const basis = neuesFormular(
     {
       art: e.art,
-      betrag: cent,
       datum: f.zahlungsdatum,
-      text: f.beschreibung,
       kunde,
       name: k.art === 'neu' || k.art === 'wahl' ? k.name : undefined,
       zahlungsart: f.zahlungsart,
@@ -215,7 +349,9 @@ export function belegFormular(
     },
     { heute: ctx.heute, zielTage: { rechnung: ctx.zahlungszielTage } },
   );
-  const leistung = e.leistung.trim();
+  const positionen = e.positionen.map((p) => ({ ...p, kategorieId: f.kategorieId }));
+  // Leistungsdatum: eingegeben (zum Termin beim Öffnen dessen Tag, ertragOeffnen), sonst das Datum oben
+  const leistungVon = e.leistungVon || f.zahlungsdatum;
   const vorlage = vorlageFuer(e, ctx.vorlagen);
   const form: BelegFormular = {
     ...basis,
@@ -223,35 +359,58 @@ export function belegFormular(
     kunde: f.wer.trim(),
     kundeBewusstNeu: f.kundeBewusstNeu,
     adresse: e.adresse.trim() ? e.adresse : basis.adresse,
-    // Leistungsdatum eines Termins ist sein Tag, nicht der Zahlungstag
-    leistungVon: bezug?.termin?.datum ?? basis.leistungVon,
-    positionen: basis.positionen.map((p, i) => (i === 0 && leistung ? { ...p, beschreibung: leistung } : p)),
+    leistungVon,
+    leistungBis: e.leistungBis && e.leistungBis > leistungVon ? e.leistungBis : '',
+    zielTage: ertragZielTage(e, ctx.zahlungszielTage),
+    // Beschreibungen stehen nur in den Positionen
+    betreff: '',
+    positionen,
+    mehrere: e.art === 'quittung' && positionen.length > 1,
     vorlageId: vorlage.id,
     vorlageDesign: vorlage.design,
   };
   const entwurf = bezug?.entwurf;
   if (!entwurf) return form;
   const w = entwurf.art === e.art ? entwurf : artWechseln(entwurf, e.art, { rechnung: ctx.zahlungszielTage });
-  const passt = formularSumme(w) === cent;
-  const positionen = !passt ? form.positionen : w.positionen.length === 1 && leistung ? [{ ...w.positionen[0], beschreibung: leistung }] : w.positionen;
   return {
     ...w,
     kunde: form.kunde,
     kundeBewusstNeu: form.kundeBewusstNeu,
     adresse: form.adresse,
     datum: form.datum,
-    leistungVon: bezug?.termin ? form.leistungVon : w.leistungVon || form.leistungVon,
+    leistungVon: form.leistungVon,
+    leistungBis: form.leistungBis,
     zielTage: form.zielTage,
-    betreff: form.betreff,
+    betreff: eigenerBetreff(entwurf),
     zahlungsart: form.zahlungsart,
     bezahltAm: form.bezahltAm,
     positionen,
-    mehrere: e.art === 'quittung' && positionen.length > 1,
+    mehrere: form.mehrere,
     vorlageId: form.vorlageId,
     vorlageDesign: form.vorlageDesign,
     terminId: w.terminId ?? form.terminId,
     buchungId: null,
   };
+}
+
+/** Hinweis im Beleg-Kasten (Bankverbindung auf der Rechnung). */
+export interface ErtragHinweis {
+  art: 'warn' | 'info';
+  text: string;
+}
+
+/** Bankverbindung auf der Rechnung: bei „noch offen“ fehlende IBAN bzw. fehlender/abgeschalteter Baustein „Zahlung“ der
+ *  Vorlage; bei „bereits bezahlt“ druckt der Baustein statt der Bankverbindung den Quittiert-Satz. */
+export function bankHinweise(e: Pick<Ertrag, 'weg' | 'art' | 'bezahlt'>, firma: Pick<Firma, 'iban'>, gedruckt: readonly Baustein[], vorlageName: string): ErtragHinweis[] {
+  if (e.weg !== 'beleg' || e.art !== 'rechnung') return [];
+  if (e.bezahlt) return [{ art: 'info', text: 'Bereits bezahlt: Statt der Bankverbindung steht auf der Rechnung „Den Betrag von … habe ich am … dankend erhalten.“' }];
+  const liste: ErtragHinweis[] = [];
+  const zahlung = sichtbare(gedruckt).find(({ b }) => b.typ === 'zahlung')?.b;
+  if (!zahlung)
+    liste.push({ art: 'warn', text: `Die Vorlage „${vorlageName}“ hat keinen Baustein „Zahlung & GiroCode“ – Zahlungshinweis und Bankverbindung fehlen auf der Rechnung.` });
+  else if (!zahlung.an('bank')) liste.push({ art: 'warn', text: `In der Vorlage „${vorlageName}“ ist die Bankverbindung im Baustein „Zahlung & GiroCode“ ausgeschaltet.` });
+  if (!firma.iban.trim()) liste.push({ art: 'warn', text: 'In den Firmendaten fehlt die IBAN – der Kunde weiß nicht, wohin er überweisen soll (Einstellungen › Firma).' });
+  return liste;
 }
 
 export interface BelegVorbereitet {
@@ -264,13 +423,18 @@ export interface BelegVorbereitet {
   naechste: string | null;
   /** fehlende Pflichtangaben (§2.3) bzw. Eingabefehler – leer = ausstellbar */
   fehlt: string[];
+  /** Hinweise zur Bankverbindung (nur Rechnung) */
+  bank: ErtragHinweis[];
+  /** Text, mit dem die Einnahme gebucht wird (wie Rust) */
+  buchungstext: string;
 }
 
 /** Alles für beleg_ausstellen – samt Pflichtangaben-Check wie in der Maske (mit `bezug`: zum Termin bzw. den Entwurf). */
-export function belegVorbereiten(f: Formular, e: Ertrag, cent: number, ctx: ErtragKontext, bezug: ErtragBezug | null = null): BelegVorbereitet {
-  const formular = belegFormular(f, e, cent, ctx, bezug);
+export function belegVorbereiten(f: Formular, e: Ertrag, ctx: ErtragKontext, bezug: ErtragBezug | null = null): BelegVorbereitet {
+  const formular = belegFormular(f, e, ctx, bezug);
   const dokument = formularZuDokument(formular, { kunden: ctx.kunden, firma: ctx.firma, ustModus: ctx.ustModus, logo: ctx.logo });
-  const gedruckt = bausteineFuer(dokument, vorlageFuer(e, ctx.vorlagen).bausteine).filter((b) => istBausteinTyp(b.typ));
+  const vorlage = vorlageFuer(e, ctx.vorlagen);
+  const gedruckt = bausteineFuer(dokument, vorlage.bausteine).filter((b) => istBausteinTyp(b.typ));
   const naechste = naechsteBelegNummer(ctx.kreise, e.art, f.zahlungsdatum, ctx.heute);
   const jahr = Number((istDatum(f.zahlungsdatum) ? f.zahlungsdatum : ctx.heute).slice(0, 4));
   const kennwerte = ctx.kennwerte.get(jahr) ?? [...ctx.kennwerte.values()].pop() ?? {};
@@ -278,13 +442,35 @@ export function belegVorbereiten(f: Formular, e: Ertrag, cent: number, ctx: Ertr
   const fehlt = pflicht.filter((p) => !p.ok).map((p) => p.label);
   const d = formularZuDaten(formular, ctx.kunden);
   if (!d.ok) fehlt.push(...Object.values(d.fehler));
-  return { formular, daten: d.ok ? d.daten : null, dokument, gedruckt, naechste, fehlt: [...new Set(fehlt)] };
+  return {
+    formular,
+    daten: d.ok ? d.daten : null,
+    dokument,
+    gedruckt,
+    naechste,
+    fehlt: [...new Set(fehlt)],
+    bank: bankHinweise(e, ctx.firma, gedruckt, vorlage.name),
+    buchungstext: buchungstextAus(formular.betreff, dokument.positionen, e.art),
+  };
 }
 
-/** Adresse der Beleg-Maske mit den Eingaben der Schublade (Pflichtangaben dort ergänzen bzw. Eigenbeleg erstellen). */
+/** Adresse der Beleg-Maske mit den Eingaben der Schublade (Pflichtangaben dort ergänzen bzw. Eigenbeleg erstellen).
+ *  `buchung`: schon gebuchte Einnahme, die der Beleg beim Ausstellen verknüpft. Positionen, Leistungsdatum/-zeitraum,
+ *  Zahlungsziel, Vorlage und Anschrift passen nicht in die Adresse – sie gehen als Navigations-Zustand mit
+ *  (maskenZustand ⇒ maskenUebergabe in der Maske). */
 export function maskenPfad(
   art: Belegart,
-  o: { betrag?: number | null; datum?: string; text?: string; kundeId?: number | null; name?: string; zahlungsart?: Zahlungsart; bezahlt?: boolean; kategorieId?: number | null },
+  o: {
+    betrag?: number | null;
+    datum?: string;
+    text?: string;
+    kundeId?: number | null;
+    name?: string;
+    zahlungsart?: Zahlungsart;
+    bezahlt?: boolean;
+    kategorieId?: number | null;
+    buchung?: number | null;
+  },
 ): string {
   const p = new URLSearchParams({ art });
   if (o.betrag && o.betrag > 0) p.set('betrag', String(o.betrag));
@@ -295,5 +481,32 @@ export function maskenPfad(
   if (o.zahlungsart) p.set('zahlungsart', o.zahlungsart);
   if (o.bezahlt) p.set('bezahlt', '1');
   if (o.kategorieId != null) p.set('kategorie', String(o.kategorieId));
+  if (o.buchung != null) p.set('buchung', String(o.buchung));
   return `/belege/neu?${p.toString()}`;
+}
+
+/** Navigations-Zustand für „In der Maske ergänzen“: das ganze Formular, wie die Schublade es ausstellen würde. */
+export interface MaskenZustand {
+  formular: BelegFormular;
+}
+
+export const maskenZustand = (formular: BelegFormular): MaskenZustand => ({ formular });
+
+const TEXTFELDER = ['kunde', 'adresse', 'datum', 'leistungVon', 'leistungBis', 'zielTage', 'betreff', 'einleitung', 'schlusstext', 'zahlungsart', 'vorlageDesign'] as const;
+
+/** Formular aus dem Navigations-Zustand der Maske (maskenZustand), sonst null. Nur Quittung und Rechnung kommen so. */
+export function maskenUebergabe(state: unknown): BelegFormular | null {
+  if (!state || typeof state !== 'object') return null;
+  const f: unknown = (state as { formular?: unknown }).formular;
+  if (!f || typeof f !== 'object') return null;
+  const x = f as Record<string, unknown>;
+  if (x.art !== 'quittung' && x.art !== 'rechnung') return null;
+  if (!TEXTFELDER.every((k) => typeof x[k] === 'string')) return null;
+  const pos = x.positionen;
+  if (!Array.isArray(pos) || !pos.length) return null;
+  const ok = pos.every(
+    (p: unknown) =>
+      !!p && typeof p === 'object' && ['beschreibung', 'menge', 'einheit', 'preis'].every((k) => typeof (p as Record<string, unknown>)[k] === 'string'),
+  );
+  return ok ? (f as BelegFormular) : null;
 }

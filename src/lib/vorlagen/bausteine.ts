@@ -6,6 +6,7 @@
  * LaTeX (lib/latex/vorlage.ts). Tests: vorlagen.test.ts */
 import { HINWEIS_19, type Belegart } from './dokument';
 import { klartext } from './formatierung';
+import { META_ANGABEN, META_NAME, META_REIHENFOLGE, labelKey } from './meta';
 
 /** Standard-Zeilen des Firmenkopfs: Anschrift und Steuernummer (§ 33 UStDV), dazu Telefon und E-Mail. */
 export const FIRMENBLOCK_ZEILEN = '{strasse} · {plz} {ort}\nSteuernr. {steuernummer}\n{telefon}\n{email}';
@@ -56,6 +57,8 @@ export interface BausteinFeld {
   typ: FeldTyp;
   default: Einstellung;
   optionen?: readonly (readonly [string, string])[];
+  /** kein Text zum Lesen oder Bearbeiten (z. B. die Reihenfolge der Belegdaten): nicht im Pflichtangaben-Check, nicht im Blatt */
+  intern?: boolean;
 }
 
 export interface BausteinDef {
@@ -70,6 +73,36 @@ export interface BausteinDef {
 }
 
 const ALLE: readonly Belegart[] = ['quittung', 'rechnung', 'angebot', 'eigenbeleg'];
+
+/* ---------- Logo im Baustein „Kopf mit Logo“ ---------- */
+
+export type LogoPosition = 'links' | 'mitte' | 'rechts';
+const LOGO_POSITIONEN = [['links', 'links, Firmenname rechts'], ['mitte', 'mittig über dem Firmennamen'], ['rechts', 'rechts (Standard)']] as const;
+/** Höhe in mm; „standard“ = bisherige Höhe (A4 16 mm, A5 quer 10 mm) */
+const LOGO_GROESSEN = [
+  ['standard', 'Standard (A4 16 mm, A5 10 mm)'],
+  ['8', '8 mm'],
+  ['12', '12 mm'],
+  ['16', '16 mm'],
+  ['20', '20 mm'],
+  ['25', '25 mm'],
+  ['30', '30 mm'],
+  ['40', '40 mm'],
+] as const;
+export const LOGO_MM_MIN = 8;
+export const LOGO_MM_MAX = 40;
+/** Größte Breite des Logos in mm: links/rechts neben dem Firmennamen 60 mm, mittig 100 mm (Vorschau: blatt.css) */
+export const logoBreiteMm = (pos: LogoPosition): number => (pos === 'mitte' ? 100 : 60);
+
+/** Lage des Logos; Unbekanntes ⇒ rechts (bisher) */
+export const logoPosition = (wert: string): LogoPosition => (wert === 'links' || wert === 'mitte' ? wert : 'rechts');
+
+/** Höhe des Logos in mm: Zahl zwischen 8 und 40, sonst (auch „standard“) die bisherige Höhe je Format */
+export function logoHoeheMm(wert: string, a4: boolean): number {
+  const n = Number(wert);
+  if (wert.trim() && Number.isFinite(n)) return Math.min(LOGO_MM_MAX, Math.max(LOGO_MM_MIN, Math.round(n)));
+  return a4 ? 16 : 10;
+}
 const GROESSE = [['normal', 'Normal'], ['klein', 'Klein'], ['grau', 'Klein, grau'], ['mini', 'Sehr klein, grau']] as const;
 
 /** Informationspflicht (Art. 13 DSGVO) in Kurzform – optionaler Baustein, nicht in den Standardvorlagen (§2.10). */
@@ -84,6 +117,9 @@ export const BAUSTEINE: Readonly<Record<BausteinTyp, BausteinDef>> = {
     felder: [
       { key: 'logo', label: 'Logo anzeigen', typ: 'toggle', default: true },
       { key: 'claim', label: 'Untertitel', typ: 'text', default: '{inhaber}' },
+      // Lage und Höhe des Logos (logoPosition, logoHoeheMm); fehlt die Einstellung ⇒ rechts, Standardhöhe wie bisher
+      { key: 'logopos', label: 'Logo', typ: 'select', default: 'rechts', optionen: LOGO_POSITIONEN },
+      { key: 'logogroesse', label: 'Höhe des Logos', typ: 'select', default: 'standard', optionen: LOGO_GROESSEN },
     ],
   },
   firmenblock: {
@@ -120,6 +156,11 @@ export const BAUSTEINE: Readonly<Record<BausteinTyp, BausteinDef>> = {
       { key: 'kundennr', label: 'Kunden-Nr.', typ: 'toggle', default: true },
       { key: 'steuernr', label: 'Steuernummer', typ: 'toggle', default: false },
       { key: 'faellig', label: 'Fälligkeit / gültig bis', typ: 'toggle', default: false },
+      // Eigene Beschriftungen (leer = Standard der Art), Reihenfolge und Datumsformat (meta.ts); eigene Eingabe in der
+      // Einstellungskarte (Vorlagen.tsx MetaEinstellungen), die Beschriftungen auch direkt im Blatt
+      ...META_ANGABEN.map((k): BausteinFeld => ({ key: labelKey(k), label: `Beschriftung „${META_NAME[k]}“`, typ: 'text', default: '' })),
+      { key: 'reihenfolge', label: 'Reihenfolge', typ: 'text', default: META_REIHENFOLGE, intern: true },
+      { key: 'datumsformat', label: 'Datumsformat', typ: 'select', default: 'kurz', optionen: [['kurz', '21.11.2026'], ['lang', '21. November 2026']] },
     ],
   },
   titel: {
@@ -284,7 +325,7 @@ export const BAUSTEINE: Readonly<Record<BausteinTyp, BausteinDef>> = {
 
 /** Feld einer Einstellung mit Text (und Formatierung)? */
 export const istTextFeld = (typ: BausteinTyp, key: string): BausteinFeld | null =>
-  BAUSTEINE[typ].felder.find((f) => f.key === key && (f.typ === 'text' || f.typ === 'textarea')) ?? null;
+  BAUSTEINE[typ].felder.find((f) => f.key === key && !f.intern && (f.typ === 'text' || f.typ === 'textarea')) ?? null;
 
 /** Standardwerte eines Bausteins. */
 export function standardWerte(typ: BausteinTyp): Record<string, Einstellung> {
@@ -304,15 +345,17 @@ export interface Aufgeloest {
 
 export function aufloesen(b: Baustein): Aufgeloest {
   const werte: Record<string, Einstellung> = { ...standardWerte(b.typ) };
-  for (const f of BAUSTEINE[b.typ].felder) {
+  const felder = BAUSTEINE[b.typ].felder;
+  for (const f of felder) {
     const v = b[f.key];
     if (typeof v === typeof f.default) werte[f.key] = v as Einstellung;
   }
+  const intern = new Set(felder.filter((f) => f.intern).map((f) => f.key));
   return {
     typ: b.typ,
     text: (key) => (typeof werte[key] === 'string' ? (werte[key] as string) : ''),
     an: (key) => werte[key] === true,
-    texte: () => Object.values(werte).flatMap((v) => (typeof v === 'string' ? [klartext(v)] : [])),
+    texte: () => Object.entries(werte).flatMap(([k, v]) => (typeof v === 'string' && !intern.has(k) ? [klartext(v)] : [])),
   };
 }
 

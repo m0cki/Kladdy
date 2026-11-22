@@ -206,6 +206,10 @@ Möbelmontage in einer Wohnung ist dagegen in der Regel keine Grundstücksleistu
 - **GoBD-Grundsätze, die die App technisch umsetzen soll:**
   - Vollständig, zeitnah, geordnet, **unveränderbar**: Änderungen nur nachvollziehbar (Änderungsprotokoll mit alt/neu).
   - **Festschreiben** abgeschlossener Monate/Jahre: danach nur noch Storno + Neubuchung, kein Bearbeiten/Löschen.
+  - **Löschen einer Buchung** (Fehleingabe) nur vor der Festschreibung und solange kein ausgestellter eigener Beleg
+    (Quittung/Rechnung mit Nummer) daran hängt; eine stornierte Buchung nur zusammen mit ihrer Storno-Buchung.
+    Angehängte Dateien bleiben in der Belegablage (nur die Verknüpfung wird gelöst), die Nummer wird nie neu vergeben,
+    das Protokoll hält die ganze Zeile fest (`geloescht` mit `alt_json`).
   - Fortlaufende Buchungsnummern, nie wiederverwenden.
   - Belege unverändert speichern (Hash), Rechnungs-PDFs nach dem Finalisieren einfrieren.
   - Daten exportierbar (CSV) für Finanzamt/Steuerberater.
@@ -411,6 +415,9 @@ für die eigene App.
    neue Version, ein Toast „Version 1.2.0 ist da · Was ist neu? · Jetzt aktualisieren“ → `downloadAndInstall()` mit
    Fortschritt → `relaunch()`. **Vorher automatisch ein Backup** der Datenbank anlegen. Berechtigungen in
    `capabilities/default.json`: `"updater:default"`, `"process:allow-restart"`.
+   **Sicherung vor dem Update (umgesetzt 21.11.2026):** `installUpdate()` ruft vor dem Laden
+   `sicherung_anlegen('vor-update')` (Kopie der offenen Datenbank nach `sicherungen/vor-update/`). Schlägt sie fehl, wird
+   **nichts installiert**: Warn-Toast mit Grund und „Erneut versuchen“, die alte Version läuft weiter (§5 Sicherungen).
    **Laden und Neustart getrennt (umgesetzt 15.10.2026, `src/lib/updates.ts`):** wie bei Mac-Apps üblich.
    „Jetzt aktualisieren“ lädt und installiert nur (`update.download()` + `update.install()`, Fortschritt im Toast, man
    kann weiterarbeiten). Danach Toast „Update bereit · Jetzt neu starten · Später“. „Später“ (oder Toast wegklicken)
@@ -678,6 +685,27 @@ Regeln:
 - **Kauf eines Anlageguts** (über der GWG-Grenze): echte Zahlung (`art` 'zahlung', mit Beleg und Zahlungsweg), aber in der
   EÜR nicht sofort abziehbar – sie verweist per `anlage_id` auf die Anlage, abgezogen wird über die AfA-Buchungen.
 
+**Sicherungen (umgesetzt 21.11.2026, `src-tauri/src/sicherungen.rs`, `src/lib/sicherungen.ts`):** Kopien per
+`VACUUM INTO` in `<appDataDir>/sicherungen/<anlass>/<stamm>-<anlass>-JJJJMMTT-hhmmss.db` (UTC, nie überschrieben;
+`kladdy` bzw. `kladdy-dev` trennt Release und Entwicklerversion). Anlässe: `automatisch` (bei jedem Start, ehe die Datenbank
+geöffnet wird; nur wenn die Datei existiert und nicht leer ist), `manuell` („Jetzt sichern“), `vor-update`,
+`vor-migration` (vor offenen Migrationen, wie bisher) und `vor-wiederherstellung`. Nur `automatisch/` rotiert: die 10
+neuesten, je Kalendertag die neueste für 30 Tage und je Kalendermonat die neueste für 12 Monate; alle anderen Ordner
+werden nie gelöscht. Hat die Datenbank (Buchungen + Belege + Kunden + Belegdateien) weniger als die Hälfte der Zeilen der
+zeilenreichsten automatischen Kopie der letzten 30 Tage (oder fehlt sie), wird in diesem Start **nicht** aufgeräumt
+und ein bleibender Warn-Toast nennt die Sicherung („Deine Daten sind deutlich weniger als in der Sicherung vom …“,
+Aktion „Sicherungen ansehen“; Issue #52). Fehler beim automatischen Sichern blockieren den Start nicht, sie erscheinen
+als Warn-Toast. Einstellungen › Daten › Sicherungen listet
+alle Kopien (Zeitpunkt, Anlass, Größe, Buchungen/Belege/Kunden, schreibgeschützt aus der Kopie gelesen; fremde oder neuere
+Kopien „nicht nutzbar“). **Wiederherstellen:** Pfad geprüft (nur `sicherungen/<anlass>/<datei>`, kein `..`, keine
+Symlinks), Kopie geprüft (`quick_check`, bekannte Migrationen mit passender Prüfsumme), Merkdatei `<db>.wiederherstellen`,
+Neustart. Beim nächsten Start vor allem anderen: aktuellen Stand nach `vor-wiederherstellung/` sichern (klappt das nicht
+⇒ Abbruch, nichts überschrieben), `-wal`/`-shm` entfernen, Kopie über eine temporäre Datei atomar einsetzen; danach laufen
+die Migrationen wie gewohnt (mit eigener Sicherung). Abgelegte Belegdateien und das Logo sind nicht in der Kopie.
+**Schutz der Migrationen (cargo test):** SHA-256 jeder ausgelieferten Migration ist festgehalten (ausgelieferte
+Migrationen nie ändern, für jede neue einen Hash ergänzen); ein Upgrade-Test füllt für jeden Zwischenstand alle
+vorhandenen Tabellen, migriert auf den neuesten Stand und prüft, dass keine Zeile fehlt und Stichwerte gleich bleiben.
+
 ---
 
 ## 6. Seiten & Funktionen
@@ -723,6 +751,7 @@ Eine ruhige Liste aller geschäftlichen Zahlungen – kein Kontoauszug, keine Sa
   Beleg, 📎 wenn Datei vorhanden, „fehlt“-Badge) · Beschreibung, darunter Kunde bzw. Geschäft (muted) · Kategorie ·
   Zahlungsweg (Icon + Name) · Betrag (Eingang `--pos` „+“, Ausgang „−“) · beim Hover ✎ Bearbeiten (mit Protokoll) / 🗑 Entfernen.
   Der Prototyp löscht dabei sofort (mit Rückgängig); in der App wird stattdessen **storniert** (Gegenbuchung, GoBD).
+  Zusätzlich **„Löschen …“** (🗑, auch an stornierten Zeilen für Buchung + Storno) mit Bestätigungsdialog, Regeln wie §2.5/§6.4.
   Zahlungen zu einem ausgestellten Beleg zeigen ein Schloss: nur per Storno des Belegs änderbar (GoBD).
 - Unter der Tabelle nur die Anzahl („142 Einträge“). Summen und Diagramme stehen in der Auswertung.
 - Leerer Zustand: „Noch nichts im Zeitraum – oben rechts **+ Erfassen** oder ein Beleg-PDF aufs Fenster ziehen.“
@@ -745,11 +774,54 @@ Nummer ausgestellt statt ein neuer angelegt – im Prototyp heißt der Kunden-Pa
      (Vorauswahl aus Einstellungen → Belege, Standard Quittung; bei Rechnung zusätzlich „bereits bezahlt | noch offen“),
      dazu eine **Vorlage** (Standard oder eigene aus dem Baukasten §7); angezeigt wird die Nummer, die vergeben wird
      („erhält Nr. QU-2026-105“). Ein dezenter Hinweis bei Quittung + Bar: „Will der Kunde die Arbeitskosten absetzen
-     (§ 35a)? Dann Rechnung – absetzbar nur bei Überweisung.“ Speichern legt Beleg **und** Einnahme in einer Transaktion an
+     (§ 35a)? Dann Rechnung – absetzbar nur bei Überweisung.“
+     **Positionen statt Beschreibung:** Bei „Beleg erstellen“ steht im Kasten eine Positionen-Liste wie in der Maske
+     (Beschreibung, Menge, Einzelpreis; Zeilen hinzufügen/entfernen, z. B. jedes Kfz einer Autoreinigung einzeln). Das Feld
+     „Beschreibung“ links entfällt; der Betrag oben ist die Summe der Positionen (bei genau einer Position mit Menge 1 direkt
+     eingebbar, er füllt deren Preis). Die Einnahme heißt wie die Positionen („Autoreinigung VW Golf und 2 weitere“, wie Rust
+     `buchungstext`). Bei „Offene Rechnung zuordnen“ und „Ohne eigenen Beleg“ bleibt die Beschreibung.
+     **Daten:** Bei Rechnung heißt das Datum „Rechnungsdatum“, darunter **Leistungsdatum** (Standard = Rechnungsdatum,
+     umschaltbar auf einen Zeitraum „von – bis“) und **Zahlungsziel** in Tagen (Standard aus Einstellungen → Belege) mit
+     „fällig am …“; bei „bereits bezahlt“ der Hinweis Zahlungsdatum = Rechnungsdatum. Bei Quittung bleibt „Zahlungsdatum“
+     mit dem dezenten Schalter „Leistung an einem anderen Tag?“. Zu einem Termin ist dessen Tag das Leistungsdatum.
+     **Bankverbindung:** Bei „Rechnung · noch offen“ Warnung, wenn in den Firmendaten die IBAN fehlt oder die Vorlage keinen
+     aktiven Baustein „Zahlung & GiroCode“ hat bzw. dort die Bankverbindung aus ist; bei „bereits bezahlt“ der Hinweis, dass
+     statt der Bankverbindung „Betrag … dankend erhalten“ gedruckt wird (der BIC ist freiwillig, die IBAN genügt).
+     **Live-Vorschau:** Umschalter (Auge) im Kasten zeigt den Beleg skaliert als dritte Spalte (schmaler Bildschirm: darunter),
+     samt „Für den Beleg fehlt noch: …“; der Zustand wird je Mac gemerkt. Speichern legt Beleg **und** Einnahme in einer Transaktion an
      und verknüpft beide (Toast „Einnahme gespeichert · QU-2026-105 erstellt“ mit „Beleg öffnen“). Eine „noch offene“
      Rechnung erscheint unter Belege → Offen; die Einnahme entsteht erst beim Zahlungseingang.
+     **Pflichtangaben fehlen:** Toast „Für die Quittung fehlt noch: …“ mit „In der Maske ergänzen“ – die Maske übernimmt das
+     ganze Formular der Schublade (Positionen, Leistungsdatum/-zeitraum, Zahlungsziel, Vorlage, Anschrift; als
+     Navigations-Zustand, nicht in der Adresse) und gilt dort als ungespeichert.
+   - **Beleg nachträglich („Buchung bearbeiten“):** Bei einer Einnahme ohne eigenen Beleg (nicht storniert, nicht
+     festgeschrieben, keine Pauschale/AfA) zeigt „Beleg zur Einnahme“ zwei Wege: **Beleg erstellen** · **Ohne eigenen Beleg**
+     (Start, so wie gebucht). Dasselbe öffnet das Beleg-Symbol an der Zeile in Ein- & Ausgänge (gleich mit „Beleg erstellen“).
+     Erlaubt sind **Quittung** oder **Rechnung „bereits bezahlt“** (keine offene Rechnung, kein Zuordnen – das Geld ist schon
+     gebucht). Gleiche Bedienung wie beim Erfassen (Positionen, Vorlage, Anschrift, Leistungsdatum, Vorschau), vorbelegt mit
+     einer Position aus Betrag und Text der Buchung; Kunde, Zahlungstag und Zahlungsweg kommen aus der Buchung. Der Betrag
+     oben bleibt der Betrag der Einnahme: Ergeben die Positionen eine andere Summe, steht die Meldung „Die Positionen ergeben …,
+     die Einnahme beträgt … – bitte die Positionen anpassen oder den Betrag oben ändern.“ – nie eine stille Anpassung. Wer
+     oben etwas ändert (Betrag, Kunde, Datum …), ändert die Buchung über den normalen Änderungsweg mit Protokoll.
+     Speichern = **ein** Rust-Command `beleg_zu_buchung` in **einer** Transaktion: ggf. die Änderung der Buchung, dann
+     Ausstellen wie üblich (Nummer atomar, Kunden-Schnappschuss, `snapshot_json`, PDF) und Verknüpfen mit **dieser** Einnahme
+     (`rechnung_id`, Beleg-Nr.) – es entsteht **keine zweite Einnahme**; ein Termin der Buchung wird „mit Beleg“ erledigt.
+     Protokoll: Beleg neu · Buchung geändert · Beleg geändert. Rust lehnt ab: Ausgabe, schon mit Beleg, storniert,
+     festgeschrieben, anderer Tag als der Zahlungstag, Summe ≠ Betrag. Toast „Quittung QU-… erstellt · mit Einnahme …
+     verknüpft“ mit „Beleg öffnen“ (kein „Rückgängig“: ein Storno nähme die Einnahme mit). Fehlen Pflichtangaben, geht es
+     über „In der Maske ergänzen“ weiter (Maske mit `buchung=…`, „Ausstellen & verknüpfen“).
    - **Schritt 2 (optional):** „Unterschriebenes Exemplar anhängen“ – Scan/Foto ergänzt den Beleg (`scan_beleg_id`), ersetzt ihn nicht.
 7. Speichern (⌘↩), „Speichern & neu“ (⇧⌘↩). Toast mit Rückgängig.
+8. **Löschen („Buchung bearbeiten“):** Im Fuß neben „Stornieren“ der Knopf **„Löschen“** (Gefahr-Stil). Rust
+   (`buchung_loeschbar`) sagt vorab, ob es geht; sonst ist der Knopf gesperrt und der Tooltip nennt den Grund
+   (festgeschrieben, ausgestellter Beleg, Anlagegut, AfA/Pauschale). Klick ⇒ eigener modaler Dialog **„Eintrag löschen?“**
+   (kein Toast): Nr., Datum, Betrag (Ausgabe mit −), Beschreibung; Hinweise: angehängte Dateien bleiben in der Belegablage,
+   die Nummer wird nicht neu vergeben, ggf. „Die Buchung und ihre Storno-Buchung werden gelöscht“, ungespeicherte
+   Änderungen gehen verloren. „Abbrechen“ hat den Fokus (Esc), „Endgültig löschen“ ruft **einen** Rust-Command
+   `buchung_loeschen` in **einer** Transaktion (BEGIN IMMEDIATE): erneut prüfen, `belege.buchung_id` ⇒ NULL (Migration
+   0012 erlaubt genau das, nicht bei festgeschriebener Buchung), `entwurf_json.buchung_id` von Entwürfen entfernen, Storno
+   vor Original löschen; Protokoll `geaendert` je gelöstem Verweis und `geloescht` mit der ganzen Zeile. Danach Schublade
+   zu, Liste neu, Toast „Buchung 2026-0007 gelöscht“ (ohne Rückgängig).
 
 **Drag & Drop auf das Fenster (auf jeder Seite):** Overlay „Beleg hier ablegen“ ⇒ die Erfassen-Schublade öffnet sich mit dem
 Beleg und **vorausgefüllten Feldern**; jedes erkannte Feld ist als Vorschlag markiert („aus PDF“ / „aus Dateiname“), oben eine
@@ -822,7 +894,7 @@ Kundentermine planen und dazu auf Wunsch schon die **Quittung (oder Rechnung) vo
   PDF, speichert es als Beleg, friert die Daten ein (`snapshot_json`, Kundendaten als Schnappschuss) und legt einen neuen
   Kunden an, falls der Name noch unbekannt ist. Danach keine Änderung mehr, nur noch **Stornorechnung**.
 - Aktionen: PDF öffnen, im Finder zeigen, **per Mail senden** (`mailto:`), als bezahlt markieren (Datum + Zahlungsweg ⇒
-  Einnahme), duplizieren, Angebot ⇒ Rechnung umwandeln, unterschriebenes Exemplar anhängen.
+  Einnahme; Toast mit „Einnahme ansehen“, in der Maske ist „gebucht als 2026-0042“ ein Link auf die Buchung), duplizieren, Angebot ⇒ Rechnung umwandeln, unterschriebenes Exemplar anhängen.
 - **Quittung** ⇒ A5 quer, „Betrag in Worten“ automatisch; bis 250 € Kleinbetragsrechnung (Hinweis in der Maske).
 - **Eigenbeleg (Ersatzbeleg)** für Ausgaben ohne Originalbeleg: Datum, Betrag, Zahlungsempfänger (Geschäft), Zweck, Grund,
   Kategorie, Unterschriftszeile ⇒ PDF **und** direkt als Ausgabe erfasst.
@@ -1016,8 +1088,12 @@ Firmenkopf mit großem fettem Namen in Versalien, „QUITTUNG“ in Versalien, �
   „Neue Quittungen verwenden „…“ · Diese verwenden“. Zeigen und Bearbeiten ändern nie die aktive Vorlage (außer bei der
   automatischen Kopie des aktiven Designs, s. o.). „Zurücksetzen“ gibt es nur bei eigenen Vorlagen (Bausteine ihres
   Designs, mit Rückgängig). Zuletzt gezeigte Vorlage je Art in localStorage (`kladdy.vorlagen.v1`), Adresse
-  `?art=quittung&design=formular` bzw. `&design=eigen:12`. Unter den Bausteinen ein Hinweis, dass Firmendaten unter
-  Einstellungen › Firma stehen (Link).
+  `?art=quittung&design=formular` bzw. `&design=eigen:12`. Knopf **„Firmendaten“** in der Leiste über dem Blatt (ebenso
+  Klick auf den Firmennamen im Kopf mit Logo und der Hinweis in den Bausteinen mit Firmendaten) öffnet eine Schublade mit
+  demselben Formular wie Einstellungen › Firma (`FirmaFormular.tsx`: gleiche Prüfung, Speichern beim Verlassen, Protokoll,
+  Logo); die Vorschau zeigt den neuen Stand sofort. Unter den Bausteinen „Nächste Rechnungsnummer: … · Nummernformat
+  ändern …“ (auch im Baustein „Anschrift & Belegdaten“) öffnet den Nummernkreis der Art aus Einstellungen › Nummernkreise
+  in einer Schublade (`NummernkreisEinzeln`). Kein weiterer Menüpunkt.
 - **Beleg-Maske und Erfassen-Schublade:** Auswahl „Vorlage“ = Designs und eigene Vorlagen der Art, vorbelegt die aktive.
   Ein Entwurf merkt sich `vorlage_id` (eigene Vorlage, sonst NULL) und das Design (`entwurf_json.vorlage_design`, nur
   wenn ≠ `klassisch`); gesucht wird zuerst über die ID, sonst über das Design. Alte Entwürfe ohne Schlüssel ⇒ `klassisch`.
@@ -1039,6 +1115,15 @@ Firmenkopf mit großem fettem Namen in Versalien, „QUITTUNG“ in Versalien, �
   „Alle Angaben abgeschaltet – druckt nichts“. Vorschau und PDF gleich.
   **Unterschrift:** Stil „Zwei Linien“ (bisher) oder „Eine Linie“ (Beschriftung darüber, Linie über die ganze Breite).
   **Freitext/Steuerhinweis:** Größe „Sehr klein, grau“ (6,5 pt).
+- **Kopf mit Logo:** Lage des Logos links, Mitte (über dem zentrierten Namen, bis 100 mm breit) oder rechts (Standard) und
+  Höhe „Standard“ (16 mm A4, 10 mm A5 quer) oder 8–40 mm (`logoPosition`, `logoHoeheMm` in `bausteine.ts`).
+- **Anschrift & Belegdaten:** je Angabe (Nr., Datum, Leistungsdatum, Kunden-Nr., Steuernummer, Fällig am/Gültig bis)
+  anzeigen, eigene Beschriftung (leer = Standard der Art; formatierbar, im PDF über `textTex`/`escape.ts`) und Reihenfolge
+  (↑/↓, gespeichert als `reihenfolge` = Schlüsselliste, unbekannte fallen weg, fehlende hinten an). Datumsformat
+  „21.11.2026“ (Standard) oder „21. November 2026“ (`\DatumLang`, `\LeistungsdatumLang`, `\FaelligLang`). Logik:
+  `src/lib/vorlagen/meta.ts`. Der Pflichtangaben-Check sieht nur, ob die Angabe an ist (Beschriftung und Reihenfolge
+  zählen nicht).
+- **Zahlung:** Die Zeile „BIC“ fällt weg, wenn keine BIC hinterlegt ist (dann ggf. „Bank“ allein), in Vorschau und PDF.
 - Pflichtangaben-Check: Der Firmenkopf zählt für Anschrift, Inhaber und Steuernummer, Quittungsangaben im Stil „Formular“
   für die Nummer. Abgeschaltete Quittungsangaben zählen nicht (Hinweis „Quittungsangaben: „Datum“ ist abgeschaltet“).
 
@@ -1824,7 +1909,7 @@ Jede Phase: Prompt in Claude Code einfügen → Claude setzt um, testet und nenn
      (ohne Protokoll je Zeile, nichts festgeschrieben). Tectonic: `src-tauri/src/tectonic.rs` (`tectonic_finden` in der
      Reihenfolge aus §3.1, für `compile_latex` wiederverwendbar; `tectonic_suchen`, `tectonic_pfad_pruefen`,
      `tectonic_pruefen` mit `--version` und Zeitlimit), eigener Pfad in `einstellungen['tectonic_pfad']`
-- **Nächste Migration:** `0012` (`0011` = `vorlagen_eigene`: `vorlagen.archiviert`, mehrere eigene Vorlagen je Art; ausgelieferte Migrationen nie ändern).
+- **Nächste Migration:** `0013` (`0012` = `belege_entknuepfen`: Trigger erlaubt `belege.buchung_id` Wert ⇒ NULL beim Löschen einer Buchung, nicht bei festgeschriebener; `0011` = `vorlagen_eigene`; ausgelieferte Migrationen nie ändern).
 - **Phase 1 abgeschlossen.** Weiter mit **Phase 2** in Teilen (je ein PR): 1. Diagramm-Komponenten (§9.6, §9.5) ·
   2. Auswertung mit großem Umschalter + Überblick (§6.9.1) · 3. Liquidität (§6.9.2) · 4. Suche/Befehlspalette ⌘K (§6.2)
 - **Phase 2 in Teilen:**

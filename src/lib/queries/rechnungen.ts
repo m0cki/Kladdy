@@ -6,7 +6,7 @@
  * Fehler kommen als deutscher Text. */
 import { invoke } from '@tauri-apps/api/core';
 import { abfrage, eine } from '../db';
-import type { Zahlungsart } from '../buchungen';
+import type { BuchungDaten, Zahlungsart } from '../buchungen';
 import type { BelegDaten, BelegStatus, BelegZeile, EntwurfZeile, KundeAnschrift, ListenArt, PositionZeile } from '../rechnungen';
 
 const ZEILE_SQL = `
@@ -177,6 +177,12 @@ export const belegEntwurfLoeschen = (id: number): Promise<BelegErgebnis> => invo
 /** Speichert und stellt in EINER Transaktion aus (id null = neuer Beleg). */
 export const belegAusstellen = (id: number | null, daten: BelegDaten, ausstellen: AusstellenDaten): Promise<BelegErgebnis> =>
   invoke<BelegErgebnis>('beleg_ausstellen', { id, daten, ausstellen });
+
+/** Beleg nachträglich zu einer schon gebuchten Einnahme („Buchung bearbeiten“ → „Beleg erstellen“): Quittung bzw.
+ *  bezahlte Rechnung ausstellen und mit der Buchung verknüpfen, in EINER Transaktion. `buchung`: geänderte Angaben der
+ *  Buchung (laufen vorher über den normalen Änderungsweg mit Protokoll), null = unverändert. */
+export const belegZuBuchung = (buchungId: number, buchung: BuchungDaten | null, daten: BelegDaten, ausstellen: AusstellenDaten): Promise<BelegErgebnis> =>
+  invoke<BelegErgebnis>('beleg_zu_buchung', { buchungId, buchung, daten, ausstellen });
 
 /** Als bezahlt markieren; mit `termin` (Erfassen-Schublade zum Termin) wird die Rechnung zum Beleg des Termins. */
 export const belegBezahlt = (id: number, datum: string, zahlungsart: string, heute: string, termin: number | null = null): Promise<BelegErgebnis> =>

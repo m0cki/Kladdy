@@ -211,6 +211,18 @@
 .bu-drawer .drawer-foot .btn-primary.sm { height: 38px; }
 .bu-foot-lock { display: inline-flex; align-items: center; gap: 6px; font-size: .8rem; color: var(--muted); cursor: help; }
 .bu-foot-lock .ic { width: 15px; height: 15px; }
+/* „Löschen“ gesperrt: Hülle trägt den Tooltip (der deaktivierte Knopf selbst nimmt keine Maus) */
+.bu-loesch-zu { display: inline-flex; cursor: help; }
+
+/* Bestätigung „Eintrag löschen?“ (components/buchungen/LoeschDialog.tsx) – Dialog wie §9.4, schmal */
+.lo-dialog { --drawer-w: 380px; }
+.lo-dialog .drawer-head h2 .ic { color: var(--neg); }
+.lo-dialog .drawer-body p { margin: 0; line-height: 1.5; }
+.lo-zus { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0; font-size: .86rem; }
+.lo-zus dt { color: var(--muted); }
+.lo-zus dd { margin: 0; color: var(--text); overflow-wrap: anywhere; }
+.lo-hinweise { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.lo-hinweise .hint { font-size: .8rem; }
 
 /* Kacheln: Kategorie, Zahlungsweg, Beleg-Art (Radio-Stil) */
 .bu-tiles { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; }
@@ -357,6 +369,30 @@
 .bu-spalte > section { padding: 18px 0; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 12px; }
 .bu-spalte > section:last-child { border-bottom: 0; }
 @media (max-width: 1000px) { .bu-spalten { grid-template-columns: minmax(0, 1fr); } .bu-spalte + .bu-spalte { border-top: 1px solid var(--border); } }
+
+/* „Beleg erstellen“: Live-Vorschau als dritte Spalte (schmaler: unter den beiden Spalten), Umschalter im Beleg-Kopf */
+.bu-spalten.mit-vorschau { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, .85fr); }
+.bu-vorschau { position: sticky; top: 0; min-width: 0; padding: 18px 0; display: flex; flex-direction: column; gap: 10px; }
+.bu-vorschau-kopf { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: .8rem; font-weight: 650; color: var(--text-2); }
+.bu-vorschau-kopf small { font-weight: 500; color: var(--muted); }
+.bu-vorschau .sheet-desk { padding: 14px; }
+.bu-vorschau .hint .ic { flex: none; }
+@media (max-width: 1360px) {
+  .bu-spalten.mit-vorschau { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .bu-spalten.mit-vorschau .bu-vorschau { grid-column: 1 / -1; position: static; border-top: 1px solid var(--border); }
+}
+@media (max-width: 1000px) { .bu-spalten.mit-vorschau { grid-template-columns: minmax(0, 1fr); } }
+.bu-vs-btn { margin-left: 2px; }
+.bu-vs-btn.on { color: var(--accent-text); background: var(--accent-soft); }
+
+/* Positionen im Beleg-Kasten: schmaler als in der Maske */
+.bu-pos .bl-pos-line2 { grid-template-columns: 50px 62px 8px minmax(70px, 1fr) 8px minmax(70px, auto); gap: 4px; }
+.bu-pos .bl-pos-total b { font-size: 1.05rem; }
+.bu-bank-hint { display: flex; align-items: flex-start; gap: 0; }
+.bu-bank-hint .ic { flex: none; margin-top: 3px; }
+.bu-bank-hint:not(.warn) .ic { color: var(--accent-text); }
+.bu-leistung-aus { margin-top: -6px; }
+.bu-bezahlt-hint .ic { color: var(--pos); }
 
 /* Gewählte Kachel zusätzlich mit Häkchen (nicht nur Farbe) */
 .bu-zw-opt { position: relative; }

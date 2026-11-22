@@ -10,6 +10,8 @@
 //!   Quittung, Eigenbeleg und schon bezahlter Rechnung die Zahlung (Einnahme bzw. Ausgabe mit `rechnung_id`; eine schon
 //!   erfasste Zahlung wird stattdessen verknüpft). Das PDF setzt danach das Frontend aus dem Schnappschuss (Tectonic),
 //!   `beleg_pdf_ablegen` legt es genau einmal ab.
+//! - Nachträglich zu einer schon gebuchten Einnahme (`zu_buchung_ausstellen`, „Buchung bearbeiten“ → „Beleg
+//!   erstellen“): Quittung bzw. bezahlte Rechnung über genau deren Betrag, verknüpft statt neu gebucht.
 //! - Danach nur noch Status (Rechnung offen ⇄ bezahlt per Buchung bzw. Gegenbuchung, Angebot offen/abgelehnt,
 //!   angenommen = in eine Rechnung umgewandelt) und Storno: Stornobeleg (Art 'storno') mit eigener Nummer aus dem Kreis
 //!   des Originals, negativen Positionen und Gegenbuchung der Zahlung. Trigger aus Migration 0007 sichern das ab.
@@ -31,9 +33,9 @@ use std::path::Path;
 
 use crate::belege;
 use crate::buchungen::{
-    datum_de, datum_lesen, festgeschrieben_bis, festgeschrieben_meldung, gegenbuchung_in,
-    in_transaktion, ist_festgeschrieben, kategorie_pruefen, protokollieren, text_oder_nichts,
-    verbindung, zeile_json,
+    self, BuchungEingabe, datum_de, datum_lesen, festgeschrieben_bis, festgeschrieben_meldung,
+    gegenbuchung_in, in_transaktion, ist_festgeschrieben, kategorie_pruefen, protokollieren,
+    text_oder_nichts, verbindung, zeile_json,
 };
 use crate::datenbank::{self, db_fehler};
 use crate::kunden;
@@ -1180,6 +1182,13 @@ async fn zahlung_verknuepfen(
     if zahl(&z, "rechnung_id").is_some() {
         return Err(format!("Die Zahlung {nr} gehört schon zu einem Beleg."));
     }
+    let bis = festgeschrieben_bis(tx).await?;
+    let datum = text(&z, "zahlungsdatum").unwrap_or_default();
+    if zahl(&z, "festgeschrieben").unwrap_or(0) != 0 || ist_festgeschrieben(&bis, &datum) {
+        return Err(format!(
+            "Die Zahlung {nr} ist festgeschrieben – ein Beleg lässt sich nicht mehr verknüpfen."
+        ));
+    }
     if zahl(&z, "betrag_cent") != Some(e.summe_cent) {
         return Err(format!(
             "Der Beleg ({}) passt nicht zum Betrag der Zahlung {nr}.",
@@ -1251,17 +1260,23 @@ async fn einnahme_kategorie(
     erste.ok_or_else(|| "Es gibt keine aktive Einnahme-Kategorie.".to_string())
 }
 
-/// Beschreibung der Buchung: Betreff, sonst erste Position, sonst die Belegart.
+/// Beschreibung der Buchung: Betreff, sonst erste Position (bei mehreren „… und 2 weitere“), sonst die Belegart.
+/// Gegenstück im Frontend: buchungstextAus (src/lib/rechnungen.ts).
 fn buchungstext(betreff: Option<&str>, positionen: &[Position], art: &str) -> String {
     betreff
         .map(|b| b.lines().next().unwrap_or(b).trim().to_string())
         .filter(|b| !b.is_empty())
         .or_else(|| {
-            positionen
-                .first()
-                .map(|p| p.beschreibung.replace('\n', " "))
+            let erste = positionen.first()?.beschreibung.replace('\n', " ");
+            let erste = erste.trim();
+            if erste.is_empty() {
+                return None;
+            }
+            Some(match positionen.len() - 1 {
+                0 => erste.to_string(),
+                weitere => format!("{erste} und {weitere} weitere"),
+            })
         })
-        .filter(|b| !b.is_empty())
         .unwrap_or_else(|| art_name(art).to_string())
 }
 
@@ -1320,6 +1335,134 @@ pub async fn ausstellen(
     .await
 }
 
+/// Beleg nachträglich zu einer schon gebuchten Einnahme („Buchung bearbeiten“ → „Beleg erstellen“, §6.4): Quittung
+/// oder bereits bezahlte Rechnung, in EINER Transaktion ausgestellt (Nummer, Kundenschnappschuss, snapshot_json wie
+/// `ausstellen`) und mit der Buchung verknüpft (`buchungen.rechnung_id`, Belegnummer) – es entsteht keine zweite
+/// Einnahme. `buchung`: geänderte Angaben der Buchung (Betrag, Kunde …), vorher über den normalen Änderungsweg samt
+/// Protokoll gespeichert (None = unverändert). Kunde, Zahlungsweg und Kategorie des Belegs kommen aus der Buchung; die
+/// Positionen müssen ihren Betrag genau ergeben, das Belegdatum ist ihr Zahlungstag. Hing die Einnahme an einem
+/// Termin („ohne Beleg“ abgeschlossen), ist er danach mit Beleg erledigt.
+pub async fn zu_buchung_ausstellen(
+    conn: &mut SqliteConnection,
+    buchung_id: i64,
+    buchung: Option<&BuchungEingabe>,
+    daten: &EntwurfEingabe,
+    a: &AusstellenEingabe,
+    zeitpunkt: &str,
+) -> Result<BelegErgebnis, String> {
+    if daten.art != "quittung" && daten.art != "rechnung" {
+        return Err(
+            "Zu einer Einnahme lässt sich nur eine Quittung oder Rechnung ausstellen.".into(),
+        );
+    }
+    let (jahr_heute, _, _) = datum_lesen("Heutiges Datum", &a.heute)?;
+    in_transaktion(conn, async |tx| {
+        let neuer_kunde = match buchung {
+            Some(b) => {
+                buchungen::aendern_ohne_dateien_in(tx, buchung_id, b, zeitpunkt)
+                    .await?
+                    .kunde_neu
+            }
+            None => false,
+        };
+        let z = freie_einnahme(tx, buchung_id).await?;
+        let nr = text(&z, "nummer").unwrap_or_default();
+        let zahlungsdatum = text(&z, "zahlungsdatum").unwrap_or_default();
+        let kunde = zahl(&z, "kunde_id");
+        if daten.kunde_id.is_some() && daten.kunde_id != kunde {
+            return Err(format!(
+                "Der Beleg gehört zum Kunden der Einnahme {nr} – bitte den Kunden oben ändern."
+            ));
+        }
+        if text_oder_nichts(&daten.kunde_name).is_some() && !neuer_kunde {
+            return Err(format!(
+                "Der Beleg gehört zum Kunden der Einnahme {nr} – ein neuer Kunde wird oben eingetragen."
+            ));
+        }
+        if daten.datum != zahlungsdatum {
+            return Err(format!(
+                "Der Beleg trägt den Zahlungstag der Einnahme {nr} ({}).",
+                datum_de(&zahlungsdatum)
+            ));
+        }
+        let mut d = daten.clone();
+        d.kunde_id = kunde;
+        d.kunde_name = None;
+        d.zahlungsart = text(&z, "zahlungsart");
+        d.bezahlt_am = (d.art == "rechnung").then(|| zahlungsdatum.clone());
+        d.termin_id = None;
+        d.zusatz.insert("buchung_id".into(), buchung_id.into());
+        let e = pruefen(&d)?;
+        ausstellbar_pruefen(&e)?;
+        let betrag = zahl(&z, "betrag_cent").unwrap_or_default();
+        if e.summe_cent != betrag {
+            return Err(format!(
+                "Die Positionen ergeben {}, die Einnahme {nr} beträgt {} – bitte die Positionen anpassen oder den Betrag oben ändern.",
+                euro(e.summe_cent),
+                euro(betrag)
+            ));
+        }
+        let mut a = a.clone();
+        a.kategorie_id = zahl(&z, "kategorie_id");
+        let id = entwurf_schreiben(tx, None, &e, zeitpunkt).await?;
+        let ergebnis = ausstellen_in(tx, id, &e, &a, jahr_heute, zeitpunkt).await?;
+        if let Some(t) = zahl(&z, "termin_id") {
+            termine::mit_beleg_erledigen_in(tx, t, zeitpunkt).await?;
+        }
+        Ok(ergebnis)
+    })
+    .await
+}
+
+/// Einnahme, zu der sich nachträglich ein Beleg ausstellen lässt: gebuchte Zahlung, nicht storniert, noch ohne eigenen
+/// Beleg und nicht festgeschrieben (wie `belegNachholbar` in src/lib/buchungen.ts).
+async fn freie_einnahme(tx: &mut SqliteConnection, id: i64) -> Result<Map<String, Value>, String> {
+    let Some(z) = zeile_json(tx, "buchungen", id).await? else {
+        return Err("Die Einnahme gibt es nicht.".into());
+    };
+    let nr = text(&z, "nummer").unwrap_or_default();
+    if text(&z, "typ").as_deref() != Some("einnahme") {
+        return Err(format!(
+            "Die Buchung {nr} ist eine Ausgabe – Quittung und Rechnung gehören zu Einnahmen."
+        ));
+    }
+    if text(&z, "art").as_deref() != Some("zahlung") {
+        return Err(format!(
+            "Die Buchung {nr} ist eine Abschreibung oder Pauschale."
+        ));
+    }
+    let storniert = gibt_es(
+        tx,
+        "SELECT count(*) FROM buchungen WHERE storno_von_id = ?",
+        id,
+    )
+    .await?;
+    if storniert || zahl(&z, "storno_von_id").is_some() {
+        return Err(format!("Die Einnahme {nr} ist storniert."));
+    }
+    if let Some(r) = zahl(&z, "rechnung_id") {
+        let beleg: Option<String> =
+            sqlx::query_scalar("SELECT nummer FROM rechnungen WHERE id = ?")
+                .bind(r)
+                .fetch_optional(&mut *tx)
+                .await
+                .map_err(db_fehler)?
+                .flatten();
+        return Err(format!(
+            "Zur Einnahme {nr} gibt es schon den Beleg {}.",
+            beleg.unwrap_or_default()
+        ));
+    }
+    let bis = festgeschrieben_bis(tx).await?;
+    let datum = text(&z, "zahlungsdatum").unwrap_or_default();
+    if zahl(&z, "festgeschrieben").unwrap_or(0) != 0 || ist_festgeschrieben(&bis, &datum) {
+        return Err(format!(
+            "Die Einnahme {nr} ist festgeschrieben und lässt sich nicht mehr mit einem Beleg verknüpfen (GoBD)."
+        ));
+    }
+    Ok(z)
+}
+
 async fn ausstellen_in(
     tx: &mut SqliteConnection,
     id: i64,
@@ -1359,7 +1502,16 @@ async fn ausstellen_in(
         _ => einnahme_kategorie(tx, a.kategorie_id, &e.positionen).await?,
     };
     if art == "quittung" || art == "rechnung" {
-        kategorie_pruefen(tx, kategorie, "einnahme", None).await?;
+        // die Kategorie einer schon erfassten Einnahme bleibt erlaubt, auch wenn sie inzwischen archiviert ist
+        let bisher: Option<i64> = match e.buchung_id {
+            Some(b) => sqlx::query_scalar("SELECT kategorie_id FROM buchungen WHERE id = ?")
+                .bind(b)
+                .fetch_optional(&mut *tx)
+                .await
+                .map_err(db_fehler)?,
+            None => None,
+        };
+        kategorie_pruefen(tx, kategorie, "einnahme", bisher).await?;
         sqlx::query("UPDATE rechnungspositionen SET kategorie_id = ? WHERE rechnung_id = ?")
             .bind(kategorie)
             .bind(id)
@@ -2078,6 +2230,27 @@ pub async fn beleg_ausstellen(
     self::ausstellen(&mut c, id, &daten, &ausstellen, &datenbank::zeitstempel()).await
 }
 
+/// Frontend: `invoke('beleg_zu_buchung', { buchungId, buchung, daten, ausstellen })` (buchung null = unverändert).
+#[tauri::command]
+pub async fn beleg_zu_buchung(
+    instanzen: tauri::State<'_, DbInstances>,
+    buchung_id: i64,
+    buchung: Option<BuchungEingabe>,
+    daten: EntwurfEingabe,
+    ausstellen: AusstellenEingabe,
+) -> Result<BelegErgebnis, String> {
+    let mut c = verbindung(&instanzen).await?;
+    zu_buchung_ausstellen(
+        &mut c,
+        buchung_id,
+        buchung.as_ref(),
+        &daten,
+        &ausstellen,
+        &datenbank::zeitstempel(),
+    )
+    .await
+}
+
 /// Frontend: `invoke('beleg_bezahlt', { id, datum, zahlungsart, heute, termin })` (termin null = ohne Termin).
 #[tauri::command]
 pub async fn beleg_bezahlt(
@@ -2291,6 +2464,29 @@ mod tests {
         let _ = std::fs::remove_dir_all(&p);
         std::fs::create_dir_all(&p).unwrap();
         p
+    }
+
+    #[test]
+    fn buchungstext_aus_betreff_oder_positionen() {
+        let pos = |t: &str| Position {
+            beschreibung: t.into(),
+            menge: 1.0,
+            einheit: None,
+            einzelpreis_cent: 100,
+            kategorie_id: None,
+        };
+        let drei = [pos("Golf  "), pos("Passat"), pos("Polo")];
+        assert_eq!(
+            buchungstext(Some("Fuhrpark\nOktober"), &drei, "rechnung"),
+            "Fuhrpark"
+        );
+        assert_eq!(
+            buchungstext(Some("  "), &drei, "rechnung"),
+            "Golf und 2 weitere"
+        );
+        assert_eq!(buchungstext(None, &drei[..1], "quittung"), "Golf");
+        assert_eq!(buchungstext(None, &[pos(" ")], "quittung"), "Quittung");
+        assert_eq!(buchungstext(None, &[], "rechnung"), "Rechnung");
     }
 
     #[test]
@@ -2743,6 +2939,277 @@ mod tests {
             assert_eq!(verweis, Some(r.id.to_string()));
             let nummer = spalte(&mut c, "buchungen", "belegnummer", b.id).await;
             assert_eq!(nummer.as_deref(), Some("QU-2026-001"));
+        });
+    }
+
+    /// Einnahme ohne Kunden über 65 € (PayPal, 14.10.).
+    fn einnahme_ohne_beleg() -> BuchungEingabe {
+        BuchungEingabe {
+            typ: "einnahme".into(),
+            zahlungsdatum: "2026-10-14".into(),
+            belegdatum: None,
+            betrag_cent: 6_500,
+            privatanteil_prozent: 0,
+            kategorie_id: 1,
+            kunde_id: None,
+            neuer_kunde: None,
+            lieferant: None,
+            zahlungsart: "paypal".into(),
+            belegnummer: Some("Papier".into()),
+            beschreibung: "Garten".into(),
+            heute: HEUTE.into(),
+            belege: vec![],
+            termin_id: None,
+        }
+    }
+
+    /// Quittung zu einer Einnahme: zwei Positionen über zusammen 65 €, Kunde und Zahlungsweg kommen aus der Buchung.
+    fn quittung_zur_einnahme() -> EntwurfEingabe {
+        EntwurfEingabe {
+            kunde_name: None,
+            kunde_adresse: None,
+            zahlungsart: Some("bar".into()),
+            positionen: vec![
+                position("Rasen mähen", 1.0, 5_000),
+                position("Hecke", 1.0, 1_500),
+            ],
+            ..quittung()
+        }
+    }
+
+    #[test]
+    fn beleg_nachtraeglich_zur_einnahme() {
+        lauf(async {
+            let mut c = test_db().await;
+            let ohne = Path::new("/kladdy-test-ohne-belegablage");
+            let b = buchungen::anlegen(&mut c, ohne, &einnahme_ohne_beleg(), JETZT)
+                .await
+                .unwrap();
+            let vorher = protokoll(&mut c).await.len();
+            let d = quittung_zur_einnahme();
+            let r = zu_buchung_ausstellen(&mut c, b.id, None, &d, &frontend("quittung"), SPAETER)
+                .await
+                .unwrap();
+            assert_eq!(r.nummer.as_deref(), Some("QU-2026-001"));
+            assert_eq!(r.status, "bezahlt");
+            assert_eq!(
+                (r.buchung_id, r.buchung_nummer.as_deref()),
+                (Some(b.id), Some(b.nummer.as_str()))
+            );
+            // verknüpft statt neu gebucht
+            assert_eq!(anzahl(&mut c, "SELECT count(*) FROM buchungen").await, 1);
+            let verweis = spalte(&mut c, "buchungen", "CAST(rechnung_id AS TEXT)", b.id).await;
+            assert_eq!(verweis, Some(r.id.to_string()));
+            let nummer = spalte(&mut c, "buchungen", "belegnummer", b.id).await;
+            assert_eq!(nummer.as_deref(), Some("QU-2026-001"));
+            // Betrag und Text der Buchung bleiben, der Beleg nimmt ihren Zahlungsweg
+            assert_eq!(
+                anzahl(&mut c, "SELECT betrag_cent FROM buchungen").await,
+                6_500
+            );
+            let text = spalte(&mut c, "buchungen", "beschreibung", b.id).await;
+            assert_eq!(text.as_deref(), Some("Garten"));
+            let za = spalte(&mut c, "rechnungen", "zahlungsart", r.id).await;
+            assert_eq!(za.as_deref(), Some("paypal"));
+            let s = schnappschuss(&mut c, r.id).await;
+            assert_eq!(s["dokument"]["nummer"], "QU-2026-001");
+            assert_eq!(s["dokument"]["buchung_nr"], b.nummer.as_str());
+            assert_eq!(s["dokument"]["zahlungsweg"], "paypal");
+            assert_eq!(
+                s["dokument"]["positionen"].as_array().map(Vec::len),
+                Some(2)
+            );
+            // Protokoll: Beleg angelegt und ausgestellt, Buchung verknüpft
+            let p = protokoll(&mut c).await;
+            assert_eq!(
+                p[vorher..].to_vec(),
+                vec![
+                    ("rechnungen".into(), r.id, "neu".into()),
+                    ("buchungen".into(), b.id, "geaendert".into()),
+                    ("rechnungen".into(), r.id, "geaendert".into()),
+                ]
+            );
+            // ein zweiter Beleg zur selben Einnahme geht nicht
+            let f = zu_buchung_ausstellen(&mut c, b.id, None, &d, &frontend("quittung"), SPAETER)
+                .await
+                .unwrap_err();
+            assert!(f.contains("schon den Beleg QU-2026-001"), "{f}");
+            assert_eq!(anzahl(&mut c, "SELECT count(*) FROM rechnungen").await, 1);
+        });
+    }
+
+    #[test]
+    fn beleg_zur_einnahme_mit_geaendertem_betrag_und_neuem_kunden() {
+        lauf(async {
+            let mut c = test_db().await;
+            let ohne = Path::new("/kladdy-test-ohne-belegablage");
+            let b = buchungen::anlegen(&mut c, ohne, &einnahme_ohne_beleg(), JETZT)
+                .await
+                .unwrap();
+            // Rechnung „bereits bezahlt“ über 60 €: die Positionen passen erst, wenn der Betrag oben geändert ist
+            let d = EntwurfEingabe {
+                kunde_name: Some("Anna Schmidt".into()),
+                zahlungsart: Some("bank".into()),
+                bezahlt_am: Some("2026-10-14".into()),
+                positionen: vec![position("Rasen mähen", 2.0, 3_000)],
+                ..rechnung()
+            };
+            let f = zu_buchung_ausstellen(&mut c, b.id, None, &d, &frontend("rechnung"), SPAETER)
+                .await
+                .unwrap_err();
+            assert!(f.contains("neuer Kunde wird oben"), "{f}");
+            let ohne_kunde = EntwurfEingabe {
+                kunde_name: None,
+                ..d.clone()
+            };
+            let f = zu_buchung_ausstellen(
+                &mut c,
+                b.id,
+                None,
+                &ohne_kunde,
+                &frontend("rechnung"),
+                SPAETER,
+            )
+            .await
+            .unwrap_err();
+            assert!(f.contains("Kunden angeben"), "{f}");
+            let falsch = EntwurfEingabe {
+                kunde_name: None,
+                ..quittung_zur_einnahme()
+            };
+            let falsch = EntwurfEingabe {
+                positionen: vec![position("Rasen mähen", 2.0, 3_000)],
+                ..falsch
+            };
+            let f =
+                zu_buchung_ausstellen(&mut c, b.id, None, &falsch, &frontend("quittung"), SPAETER)
+                    .await
+                    .unwrap_err();
+            assert!(f.contains("Positionen ergeben 60,00"), "{f}");
+            assert!(f.contains("beträgt 65,00"), "{f}");
+            assert_eq!(anzahl(&mut c, "SELECT count(*) FROM rechnungen").await, 0);
+            let kreis = "SELECT naechste FROM nummernkreise WHERE id = 'rechnung'";
+            assert_eq!(anzahl(&mut c, kreis).await, 1);
+            // Betrag und Kunde oben geändert: normaler Änderungsweg, dann der Beleg – alles in einer Transaktion
+            let geaendert = BuchungEingabe {
+                betrag_cent: 6_000,
+                neuer_kunde: Some("Anna Schmidt".into()),
+                ..einnahme_ohne_beleg()
+            };
+            let r = zu_buchung_ausstellen(
+                &mut c,
+                b.id,
+                Some(&geaendert),
+                &d,
+                &frontend("rechnung"),
+                SPAETER,
+            )
+            .await
+            .unwrap();
+            assert_eq!(
+                (r.nummer.as_deref(), r.status.as_str()),
+                (Some("RE-2026-001"), "bezahlt")
+            );
+            assert_eq!(r.buchung_id, Some(b.id));
+            assert_eq!(anzahl(&mut c, "SELECT count(*) FROM buchungen").await, 1);
+            assert_eq!(anzahl(&mut c, "SELECT count(*) FROM kunden").await, 1);
+            assert_eq!(
+                anzahl(&mut c, "SELECT betrag_cent FROM buchungen").await,
+                6_000
+            );
+            let kunde = anzahl(&mut c, "SELECT kunde_id FROM buchungen").await;
+            assert_eq!(
+                anzahl(&mut c, "SELECT kunde_id FROM rechnungen").await,
+                kunde
+            );
+            let am = spalte(&mut c, "rechnungen", "bezahlt_am", r.id).await;
+            assert_eq!(am.as_deref(), Some("2026-10-14"));
+            let za = spalte(&mut c, "rechnungen", "zahlungsart", r.id).await;
+            assert_eq!(za.as_deref(), Some("paypal"));
+            let s = schnappschuss(&mut c, r.id).await;
+            assert_eq!(s["dokument"]["quittiert"]["am"], "2026-10-14");
+            let betrag = "SELECT count(*) FROM protokoll WHERE tabelle = 'buchungen' AND aktion = 'geaendert'
+                            AND json_extract(neu_json, '$.betrag_cent') = 6000";
+            assert_eq!(anzahl(&mut c, betrag).await, 1);
+        });
+    }
+
+    #[test]
+    fn beleg_zur_einnahme_nur_wenn_frei() {
+        lauf(async {
+            let mut c = test_db().await;
+            let ohne = Path::new("/kladdy-test-ohne-belegablage");
+            let d = quittung_zur_einnahme();
+            // Ausgabe
+            let ausgabe = BuchungEingabe {
+                typ: "ausgabe".into(),
+                kategorie_id: 3,
+                lieferant: Some("Aral".into()),
+                ..einnahme_ohne_beleg()
+            };
+            let a = buchungen::anlegen(&mut c, ohne, &ausgabe, JETZT)
+                .await
+                .unwrap();
+            let f = zu_buchung_ausstellen(&mut c, a.id, None, &d, &frontend("quittung"), SPAETER)
+                .await
+                .unwrap_err();
+            assert!(f.contains("Ausgabe"), "{f}");
+            // anderes Datum als der Zahlungstag
+            let b = buchungen::anlegen(&mut c, ohne, &einnahme_ohne_beleg(), JETZT)
+                .await
+                .unwrap();
+            let spaeter = EntwurfEingabe {
+                datum: "2026-10-15".into(),
+                ..d.clone()
+            };
+            let f =
+                zu_buchung_ausstellen(&mut c, b.id, None, &spaeter, &frontend("quittung"), SPAETER)
+                    .await
+                    .unwrap_err();
+            assert!(f.contains("Zahlungstag"), "{f}");
+            // Angebot passt nicht
+            let angebot = EntwurfEingabe {
+                art: "angebot".into(),
+                ..d.clone()
+            };
+            let f =
+                zu_buchung_ausstellen(&mut c, b.id, None, &angebot, &frontend("angebot"), SPAETER)
+                    .await
+                    .unwrap_err();
+            assert!(f.contains("nur eine Quittung oder Rechnung"), "{f}");
+            // storniert
+            buchungen::stornieren(&mut c, b.id, HEUTE, JETZT)
+                .await
+                .unwrap();
+            let f = zu_buchung_ausstellen(&mut c, b.id, None, &d, &frontend("quittung"), SPAETER)
+                .await
+                .unwrap_err();
+            assert!(f.contains("storniert"), "{f}");
+            // festgeschrieben – auch der Weg über die Beleg-Maske (zusatz.buchung_id) verknüpft nicht mehr
+            let alt = buchungen::anlegen(&mut c, ohne, &einnahme_ohne_beleg(), JETZT)
+                .await
+                .unwrap();
+            sqlx::query("INSERT INTO festschreibungen (bis_datum, am) VALUES ('2026-10-14', ?)")
+                .bind(JETZT)
+                .execute(&mut c)
+                .await
+                .unwrap();
+            let f = zu_buchung_ausstellen(&mut c, alt.id, None, &d, &frontend("quittung"), SPAETER)
+                .await
+                .unwrap_err();
+            assert!(f.contains("festgeschrieben"), "{f}");
+            let mut zusatz = Map::new();
+            zusatz.insert("buchung_id".into(), alt.id.into());
+            let maske = EntwurfEingabe {
+                zusatz,
+                datum: "2026-10-15".into(),
+                ..d.clone()
+            };
+            let f = stelle_aus(&mut c, &maske).await.unwrap_err();
+            assert!(f.contains("festgeschrieben"), "{f}");
+            assert_eq!(anzahl(&mut c, "SELECT count(*) FROM rechnungen").await, 0);
+            let kreis = "SELECT naechste FROM nummernkreise WHERE id = 'quittung'";
+            assert_eq!(anzahl(&mut c, kreis).await, 1);
         });
     }
 

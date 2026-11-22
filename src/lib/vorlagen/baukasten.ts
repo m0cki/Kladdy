@@ -6,6 +6,7 @@
 import { BAUSTEINE, BAUSTEIN_TYPEN, aufloesen, quittungAngaben, type Baustein, type BausteinTyp, type Einstellung } from './bausteine';
 import type { Belegart } from './dokument';
 import { klartext } from './formatierung';
+import { metaZusammenfassung } from './meta';
 import { STANDARD_DESIGN, designFuer } from './standard';
 
 /** Name der eigenen Kopie je Art (Tabelle `vorlagen`, lib/queries/vorlagen.ts). */
@@ -30,7 +31,7 @@ export const erlaubteTypen = (art: Belegart): BausteinTyp[] => BAUSTEIN_TYPEN.fi
 export const nurErlaubte = (liste: readonly Baustein[], art: Belegart): Baustein[] => liste.filter((b) => BAUSTEINE[b.typ].arten.includes(art));
 
 /** Kurzinfo in der Bausteinliste: erster gefüllter Text ohne Formatierung (Zeilenumbrüche als „ · “), sonst die Beschreibung.
- *  Quittungsangaben: die gedruckten Angaben („Betrag · Datum · Erhalten von …“), mit den eigenen Bezeichnungen. */
+ *  Quittungsangaben und Belegdaten: die gedruckten Angaben („Betrag · Datum · Erhalten von …“), mit den eigenen Bezeichnungen. */
 export function zusammenfassung(b: Baustein): string {
   const def = BAUSTEINE[b.typ];
   const r = aufloesen(b);
@@ -50,7 +51,9 @@ export function zusammenfassung(b: Baustein): string {
     ];
     return teile.flatMap(([an, t]) => (an ? [t] : [])).join(' · ');
   }
-  const texte = def.felder.filter((f) => f.typ === 'text' || f.typ === 'textarea').map((f) => klartext(r.text(f.key)).trim());
+  // Belegdaten: gedruckte Angaben in ihrer Reihenfolge, mit eigenen Beschriftungen
+  if (b.typ === 'anschrift_meta') return metaZusammenfassung(r);
+  const texte = def.felder.filter((f) => !f.intern && (f.typ === 'text' || f.typ === 'textarea')).map((f) => klartext(r.text(f.key)).trim());
   const text = texte.find(Boolean);
   return text ? text.replace(/\s*\n\s*/g, ' · ') : def.beschreibung;
 }

@@ -59,6 +59,16 @@
 .sheet .blk-logo-slot { width: 30mm; height: 16mm; display: grid; place-items: center; border: .3mm dashed var(--slot); border-radius: 2mm; color: var(--slot-text); font-size: 7pt; letter-spacing: .12em; text-transform: uppercase; }
 .sheet.sh-a5q .blk-kopf { min-height: 10mm; }
 .sheet.sh-a5q .blk-logo, .sheet.sh-a5q .blk-logo-slot { height: 10mm; }
+/* Kopf: Höhe des Logos aus der Vorlage (--logo-h, Blatt.tsx; PDF: vorlage.ts kopf), Lage links/Mitte/rechts */
+.sheet .blk-kopf, .sheet.sh-a5q .blk-kopf { min-height: var(--logo-h, 16mm); }
+.sheet .blk-kopf .blk-logo, .sheet .blk-kopf .blk-logo-slot { height: var(--logo-h, 16mm); }
+.sheet .blk-kopf.links { flex-direction: row-reverse; }
+.sheet .blk-kopf.links .blk-kopf-l { text-align: right; }
+.sheet .blk-kopf.links .blk-logo { justify-content: flex-start; }
+.sheet .blk-kopf.links .blk-logo img { object-position: left top; }
+.sheet .blk-kopf.mitte { flex-direction: column; align-items: center; gap: 2mm; min-height: 0; text-align: center; }
+.sheet .blk-kopf.mitte .blk-logo { order: -1; max-width: 100mm; justify-content: center; }
+.sheet .blk-kopf.mitte .blk-logo img { max-width: 100mm; object-position: center top; }
 /* Firmenkopf (Text): Name groß und dunkel, darunter Untertitel und Kontaktzeilen, feine Linie (wie vorlage.ts) */
 .sheet .blk-fk { display: flex; justify-content: space-between; align-items: flex-start; gap: 8mm; }
 .sheet .blk-fk.linie { padding-bottom: 2.5mm; border-bottom: .25mm solid var(--haar); }
@@ -219,6 +229,9 @@
 /* Vorlagen: direkt bearbeitbare Texte im Blatt sind leise unterstrichen (Klick bearbeitet sie) */
 .sheet.editable .blk-tx { text-decoration: underline dotted color-mix(in oklab, var(--accent) 50%, transparent); text-underline-offset: 2px; text-decoration-thickness: 1px; cursor: text; }
 .sheet.editable .blk-tx:hover { background: color-mix(in oklab, var(--accent) 8%, transparent); }
+/* Firmenname im Kopf: Klick öffnet die Firmendaten (Vorlagen-Seite) */
+.sheet.editable .blk-fd { cursor: pointer; border-radius: 1mm; text-decoration: underline dotted color-mix(in oklab, var(--accent) 50%, transparent); text-underline-offset: 2px; text-decoration-thickness: 1px; }
+.sheet.editable .blk-fd:hover { background: color-mix(in oklab, var(--accent) 8%, transparent); }
 @media screen { .sheet .sh-mark { display: none; } }
 /* ohne Logo: der Platzhalter erscheint erst, wenn man auf den Kopf zeigt oder ihn wählt */
 .sheet.editable .blk-logo-slot { opacity: 0; transition: opacity .15s; }

@@ -155,11 +155,35 @@ export const mengeText = (menge: number): string => MENGE.format(mengeTausendste
 export const datumText = (iso: string | null | undefined): string => (iso ? `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}` : '');
 const tagMonat = (iso: string): string => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.`;
 
-/** Leistungsdatum oder -zeitraum: „01.10.2026“, „01.10.–07.10.2026“, über den Jahreswechsel voll. */
-export function leistungText(doc: Pick<BelegDokument, 'leistung_von' | 'leistung_bis'>): string {
+/** Datumsformat der Belegdaten (Baustein „Anschrift & Belegdaten“): kurz „21.11.2026“ (Standard), lang „21. November 2026“. */
+export type Datumsformat = 'kurz' | 'lang';
+const MONATE = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'] as const;
+const monatName = (iso: string): string | undefined => MONATE[Number(iso.slice(5, 7)) - 1];
+const tagZahl = (iso: string): string => String(Number(iso.slice(8, 10)));
+
+/** 'YYYY-MM-DD' ⇒ '9. Oktober 2026' ('' bei leer; unlesbar ⇒ kurz) */
+export function datumLang(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const m = monatName(iso);
+  return m && /^\d{4}-\d{2}-\d{2}/.test(iso) ? `${tagZahl(iso)}. ${m} ${iso.slice(0, 4)}` : datumText(iso);
+}
+
+/** Datum im gewählten Format. */
+export const datumFormat = (iso: string | null | undefined, format: Datumsformat = 'kurz'): string => (format === 'lang' ? datumLang(iso) : datumText(iso));
+
+/** Leistungsdatum oder -zeitraum: „01.10.2026“, „01.10.–07.10.2026“, über den Jahreswechsel voll.
+ *  Lang: „1. Oktober 2026“, „1.–7. Oktober 2026“, „28. Oktober – 3. November 2026“, über den Jahreswechsel voll. */
+export function leistungText(doc: Pick<BelegDokument, 'leistung_von' | 'leistung_bis'>, format: Datumsformat = 'kurz'): string {
   const a = doc.leistung_von;
   const b = doc.leistung_bis;
   if (!a) return '';
+  if (format === 'lang') {
+    if (!b || b === a) return datumLang(a);
+    const lesbar = !!monatName(a) && !!monatName(b);
+    if (lesbar && a.slice(0, 7) === b.slice(0, 7)) return `${tagZahl(a)}.–${datumLang(b)}`;
+    if (lesbar && a.slice(0, 4) === b.slice(0, 4)) return `${tagZahl(a)}. ${monatName(a)} – ${datumLang(b)}`;
+    return `${datumLang(a)} – ${datumLang(b)}`;
+  }
   if (!b || b === a) return datumText(a);
   return a.slice(0, 4) === b.slice(0, 4) ? `${tagMonat(a)}–${datumText(b)}` : `${datumText(a)}–${datumText(b)}`;
 }

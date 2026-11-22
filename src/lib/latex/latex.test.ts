@@ -651,3 +651,115 @@ describe('Blanko-Formular zum Ausfüllen von Hand', () => {
     expect(rumpf(t)).not.toContain(String.raw`\KLuecke`);
   });
 });
+
+describe('Belegdaten individuell (Beschriftung, Reihenfolge, Datumsformat)', () => {
+  const rumpf = (t: string) => t.slice(t.indexOf(String.raw`\begin{document}`));
+  const meta = (b: Partial<Baustein> = {}, art: Belegart = 'rechnung', blanko = false) =>
+    rumpf(mainTex(art, [{ typ: 'anschrift_meta', ...b }], '#6366f1', { blanko }).tex);
+  const NR = String.raw`{\ifdefempty{\Nummer}{\textcolor{leer}{\itshape Entwurf}}{\textbf{\Nummer}}}`;
+
+  it('ohne neue Felder: Ausgabe wie bisher', () => {
+    const t = meta();
+    expect(t).toContain(
+      [
+        String.raw`\KMeta{Rechnungs-Nr.}` + NR,
+        String.raw`\KMeta{Datum}{\Datum}`,
+        String.raw`\ifdefempty{\Leistungsdatum}{}{\KMeta{\LeistungsdatumLabel}{\Leistungsdatum}}`,
+        String.raw`\ifdefempty{\Kundennummer}{}{\KMeta{Kunden-Nr.}{\Kundennummer}}`,
+      ].join('\n'),
+    );
+    expect(t).not.toMatch(/Lang\}/);
+  });
+
+  it('Reihenfolge, eigene Beschriftungen (escaped, formatiert) und langes Datum', () => {
+    const t = meta({ reihenfolge: 'faellig,datum,nr', faellig: true, nr_label: 'Rechnung & Nr. <b>100%</b>', leistung_label: 'Erbracht am', datumsformat: 'lang' });
+    expect(klammernOk(t)).toBe(true);
+    expect(t).toContain(
+      [
+        String.raw`\ifdefempty{\Faellig}{}{\KMeta{Fällig am}{\FaelligLang}}`,
+        String.raw`\KMeta{Datum}{\DatumLang}`,
+        String.raw`\KMeta{Rechnung \& Nr. \textbf{100\%}}` + NR,
+        String.raw`\ifdefempty{\Leistungsdatum}{}{\KMeta{Erbracht am}{\LeistungsdatumLang}}`,
+      ].join('\n'),
+    );
+    // eigene Beschriftung ersetzt das automatische „Leistungsdatum/-zeitraum“
+    expect(t).not.toContain(String.raw`\LeistungsdatumLabel`);
+  });
+
+  it('LaTeX-Befehle in Beschriftungen werden zu Text, Platzhalter zu Makros', () => {
+    const t = meta({ datum_label: String.raw`\input{/etc/passwd} {firma}` });
+    expect(klammernOk(t)).toBe(true);
+    expect(t).not.toContain(String.raw`\input{`);
+    expect(t).toContain(String.raw`\textbackslash{}input\{/etc/passwd\}`);
+    expect(t).toMatch(/\\KMeta\{[^\n]*\\Firma[^\n]*\}\{\\Datum\}/);
+  });
+
+  it('abgeschaltete Angaben fehlen, Angebot nie mit Leistungsdatum', () => {
+    const t = meta({ nr: false, kundennr: false });
+    expect(t).not.toContain('Rechnungs-Nr.');
+    expect(t).not.toContain(String.raw`\Kundennummer`);
+    expect(meta({ leistung: true }, 'angebot')).not.toContain(String.raw`\Leistungsdatum`);
+    expect(meta({ faellig: true }, 'angebot')).toContain(String.raw`\KMeta{Gültig bis}{\Faellig}`);
+  });
+
+  it('Blanko: eigene Beschriftung und Reihenfolge bleiben, Werte als Schreiblinie', () => {
+    const t = meta({ reihenfolge: 'datum', nr_label: 'Nr.' }, 'quittung', true);
+    expect(t.indexOf(String.raw`\KMeta{Datum}{\KLuecke}`)).toBeGreaterThan(-1);
+    expect(t.indexOf(String.raw`\KMeta{Datum}{\KLuecke}`)).toBeLessThan(t.indexOf(String.raw`\KMeta{Nr.}{\KLuecke}`));
+    expect(t).not.toContain(String.raw`\DatumLang`);
+  });
+
+  it('daten.tex: lange Datumsangaben', () => {
+    const d = datenTex(rechnung());
+    expect(makro(d, 'DatumLang')).toBe('18. Oktober 2026');
+    expect(makro(d, 'LeistungsdatumLang')).toBe('12.–18. Oktober 2026');
+    expect(makro(d, 'FaelligLang')).toBe('1. November 2026');
+    expect(makro(datenTex({ ...rechnung(), faellig_am: null }), 'FaelligLang')).toBe('');
+  });
+});
+
+describe('Kopf mit Logo: Lage und Größe', () => {
+  const kopf = (b: Partial<Baustein>, art: Belegart = 'rechnung') => mainTex(art, [{ typ: 'kopf', ...b }], '#6366f1').tex;
+
+  it('Standard wie bisher: Logo rechts, 16 mm (A4) bzw. 10 mm (A5)', () => {
+    expect(kopf({})).toContain(String.raw`\rule[-16mm]{0pt}{16mm}`);
+    expect(kopf({})).toContain('height=16mm,width=60mm');
+    expect(kopf({}, 'quittung')).toContain('height=10mm,width=60mm');
+    expect(kopf({ logopos: 'quatsch', logogroesse: 'riesig' })).toBe(kopf({}));
+  });
+
+  it('links: Logo-Spalte zuerst, Text rechtsbündig; Größe in mm', () => {
+    const t = kopf({ logopos: 'links', logogroesse: '25' });
+    expect(klammernOk(t)).toBe(true);
+    expect(t).toContain(String.raw`\rule[-25mm]{0pt}{25mm}`);
+    expect(t.indexOf('height=25mm,width=60mm')).toBeLessThan(t.indexOf(String.raw`\Firma\par`));
+    expect(t).toContain(String.raw`\raggedleft`);
+  });
+
+  it('mitte: Logo über dem zentrierten Namen, bis 100 mm breit', () => {
+    const t = kopf({ logopos: 'mitte', logogroesse: '12' });
+    expect(klammernOk(t)).toBe(true);
+    expect(t).toContain(String.raw`{\centering`);
+    expect(t).toContain(String.raw`\includegraphics[height=12mm,width=100mm,keepaspectratio]{\LogoDatei}\par\vspace{2mm}`);
+    expect(t.indexOf('height=12mm')).toBeLessThan(t.indexOf(String.raw`\Firma\par`));
+  });
+
+  it('Logo aus: Lage spielt keine Rolle (kein Bild, kein Platz dafür)', () => {
+    const t = kopf({ logo: false, logopos: 'mitte' });
+    expect(t).not.toContain(String.raw`\includegraphics`);
+    expect(t).not.toContain(String.raw`{\centering`);
+  });
+});
+
+describe('Bankverbindung ohne BIC', () => {
+  it('ohne BIC steht in der Zeile die Bank (kein & innerhalb von \\ifdefempty, Tabelle bleibt stabil)', () => {
+    const t = mainTex('rechnung', [{ typ: 'zahlung' }], '#6366f1').tex;
+    expect(t).toContain(
+      String.raw`\textcolor{grau}{\ifdefempty{\BIC}{Bank}{BIC}} & \ifdefempty{\BIC}{\Bank}{\BIC\ifdefempty{\Bank}{}{ · \Bank}}\\`,
+    );
+    expect(klammernOk(t)).toBe(true);
+    const ohneBic = datenTex({ ...rechnung(), firma: { ...rechnung().firma, bic: '' } });
+    expect(makro(ohneBic, 'BIC')).toBe('');
+    expect(makro(ohneBic, 'IBAN')).not.toBe('');
+  });
+});
