@@ -527,6 +527,25 @@ pub async fn aendern(
     .await
 }
 
+/// Ändert eine freie Zahlung in der Transaktion des Aufrufers, ohne Dateien (rechnungen.rs: Beleg nachträglich zu
+/// einer Einnahme – eine Änderung von Betrag, Kunde usw. läuft über denselben Weg samt Protokoll wie `aendern`).
+pub(crate) async fn aendern_ohne_dateien_in(
+    tx: &mut SqliteConnection,
+    id: i64,
+    daten: &BuchungEingabe,
+    zeitpunkt: &str,
+) -> Result<BuchungErgebnis, String> {
+    let g = pruefen(daten)?;
+    if g.termin_id.is_some() {
+        return Err("Einen Termin verknüpft nur das Erfassen einer neuen Einnahme.".into());
+    }
+    if !g.belege.is_empty() {
+        return Err("Dateien gehören hier an den Beleg, nicht an die Buchung.".into());
+    }
+    let mut keine = Vec::new();
+    aendern_in(tx, Path::new(""), id, &g, zeitpunkt, &mut keine).await
+}
+
 async fn aendern_in(
     tx: &mut SqliteConnection,
     ablage: &Path,

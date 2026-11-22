@@ -6,7 +6,7 @@
  * Optik und Verhalten wie referenz/prototyp/js/pages/buchungen.js; Logik in lib/buchungen.ts, Daten in lib/queries/buchungen.ts. */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { PAPIER_BELEG } from '../lib/ertrag';
 import {
   ArrowLeftRight,
@@ -40,8 +40,7 @@ import {
   listenSummen,
   listenVorgabe,
   markiere,
-  quittungNachholbar,
-  quittungZuBuchungPfad,
+  belegNachholbar,
   sperre,
   zahlungswegName,
   type BuchungZeile,
@@ -476,7 +475,6 @@ function Liste({
 function Zeile({ b, q }: { b: BuchungZeile; q: string }) {
   const s = sperre(b);
   const storniert = s === 'storniert';
-  const navigate = useNavigate();
   const wer = gegenueber(b);
   const nr = b.belegnummer || b.rechnung_nummer || '';
   const za = b.zahlungsart;
@@ -595,13 +593,13 @@ function Zeile({ b, q }: { b: BuchungZeile; q: string }) {
                   <FileUp />
                 </button>
               ) : null}
-              {quittungNachholbar(b) ? (
+              {belegNachholbar(b) ? (
                 <button
                   type="button"
                   className="icon-btn sm"
-                  title={`Quittung aus Kladdy zu ${b.nummer} ausstellen (verknüpft diese Einnahme, bucht nichts doppelt)`}
-                  aria-label="Quittung ausstellen"
-                  onClick={() => navigate(quittungZuBuchungPfad(b))}
+                  title={`Beleg aus Kladdy zu ${b.nummer} erstellen (verknüpft diese Einnahme, bucht nichts doppelt)`}
+                  aria-label="Beleg erstellen"
+                  onClick={() => bearbeiten(b.id, { beleg: 'quittung' })}
                 >
                   <ReceiptText />
                 </button>

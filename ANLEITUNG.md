@@ -786,6 +786,25 @@ Nummer ausgestellt statt ein neuer angelegt – im Prototyp heißt der Kunden-Pa
      samt „Für den Beleg fehlt noch: …“; der Zustand wird je Mac gemerkt. Speichern legt Beleg **und** Einnahme in einer Transaktion an
      und verknüpft beide (Toast „Einnahme gespeichert · QU-2026-105 erstellt“ mit „Beleg öffnen“). Eine „noch offene“
      Rechnung erscheint unter Belege → Offen; die Einnahme entsteht erst beim Zahlungseingang.
+     **Pflichtangaben fehlen:** Toast „Für die Quittung fehlt noch: …“ mit „In der Maske ergänzen“ – die Maske übernimmt das
+     ganze Formular der Schublade (Positionen, Leistungsdatum/-zeitraum, Zahlungsziel, Vorlage, Anschrift; als
+     Navigations-Zustand, nicht in der Adresse) und gilt dort als ungespeichert.
+   - **Beleg nachträglich („Buchung bearbeiten“):** Bei einer Einnahme ohne eigenen Beleg (nicht storniert, nicht
+     festgeschrieben, keine Pauschale/AfA) zeigt „Beleg zur Einnahme“ zwei Wege: **Beleg erstellen** · **Ohne eigenen Beleg**
+     (Start, so wie gebucht). Dasselbe öffnet das Beleg-Symbol an der Zeile in Ein- & Ausgänge (gleich mit „Beleg erstellen“).
+     Erlaubt sind **Quittung** oder **Rechnung „bereits bezahlt“** (keine offene Rechnung, kein Zuordnen – das Geld ist schon
+     gebucht). Gleiche Bedienung wie beim Erfassen (Positionen, Vorlage, Anschrift, Leistungsdatum, Vorschau), vorbelegt mit
+     einer Position aus Betrag und Text der Buchung; Kunde, Zahlungstag und Zahlungsweg kommen aus der Buchung. Der Betrag
+     oben bleibt der Betrag der Einnahme: Ergeben die Positionen eine andere Summe, steht die Meldung „Die Positionen ergeben …,
+     die Einnahme beträgt … – bitte die Positionen anpassen oder den Betrag oben ändern.“ – nie eine stille Anpassung. Wer
+     oben etwas ändert (Betrag, Kunde, Datum …), ändert die Buchung über den normalen Änderungsweg mit Protokoll.
+     Speichern = **ein** Rust-Command `beleg_zu_buchung` in **einer** Transaktion: ggf. die Änderung der Buchung, dann
+     Ausstellen wie üblich (Nummer atomar, Kunden-Schnappschuss, `snapshot_json`, PDF) und Verknüpfen mit **dieser** Einnahme
+     (`rechnung_id`, Beleg-Nr.) – es entsteht **keine zweite Einnahme**; ein Termin der Buchung wird „mit Beleg“ erledigt.
+     Protokoll: Beleg neu · Buchung geändert · Beleg geändert. Rust lehnt ab: Ausgabe, schon mit Beleg, storniert,
+     festgeschrieben, anderer Tag als der Zahlungstag, Summe ≠ Betrag. Toast „Quittung QU-… erstellt · mit Einnahme …
+     verknüpft“ mit „Beleg öffnen“ (kein „Rückgängig“: ein Storno nähme die Einnahme mit). Fehlen Pflichtangaben, geht es
+     über „In der Maske ergänzen“ weiter (Maske mit `buchung=…`, „Ausstellen & verknüpfen“).
    - **Schritt 2 (optional):** „Unterschriebenes Exemplar anhängen“ – Scan/Foto ergänzt den Beleg (`scan_beleg_id`), ersetzt ihn nicht.
 7. Speichern (⌘↩), „Speichern & neu“ (⇧⌘↩). Toast mit Rückgängig.
 
@@ -860,7 +879,7 @@ Kundentermine planen und dazu auf Wunsch schon die **Quittung (oder Rechnung) vo
   PDF, speichert es als Beleg, friert die Daten ein (`snapshot_json`, Kundendaten als Schnappschuss) und legt einen neuen
   Kunden an, falls der Name noch unbekannt ist. Danach keine Änderung mehr, nur noch **Stornorechnung**.
 - Aktionen: PDF öffnen, im Finder zeigen, **per Mail senden** (`mailto:`), als bezahlt markieren (Datum + Zahlungsweg ⇒
-  Einnahme), duplizieren, Angebot ⇒ Rechnung umwandeln, unterschriebenes Exemplar anhängen.
+  Einnahme; Toast mit „Einnahme ansehen“, in der Maske ist „gebucht als 2026-0042“ ein Link auf die Buchung), duplizieren, Angebot ⇒ Rechnung umwandeln, unterschriebenes Exemplar anhängen.
 - **Quittung** ⇒ A5 quer, „Betrag in Worten“ automatisch; bis 250 € Kleinbetragsrechnung (Hinweis in der Maske).
 - **Eigenbeleg (Ersatzbeleg)** für Ausgaben ohne Originalbeleg: Datum, Betrag, Zahlungsempfänger (Geschäft), Zweck, Grund,
   Kategorie, Unterschriftszeile ⇒ PDF **und** direkt als Ausgabe erfasst.

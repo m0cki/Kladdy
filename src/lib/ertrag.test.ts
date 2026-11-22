@@ -9,6 +9,7 @@ import {
   betragInPosition,
   ertragBuchungstext,
   ertragFaellig,
+  ertragNachtraeglich,
   ertragOeffnen,
   ertragPosition,
   ertragPruefen,
@@ -20,15 +21,19 @@ import {
   hinweis35a,
   karteiAnschrift,
   maskenPfad,
+  maskenUebergabe,
+  maskenZustand,
   naechsteBelegNummer,
   papierGewaehlt,
   offeneRechnungen,
   offenFaellig,
   rechnungOffen,
+  summenAbweichung,
   vorlageFuer,
   type Ertrag,
   type ErtragKontext,
 } from './ertrag';
+import { formatBetrag } from './money';
 import type { Nummernkreis } from './numbering';
 import { neuesFormular, type BelegFormular, type BelegZeile, type KundeAnschrift } from './rechnungen';
 import { BEISPIEL_FIRMA } from './vorlagen/beispiel';
@@ -340,6 +345,59 @@ describe('Beleg aus der Schublade', () => {
     );
     expect(maskenPfad('eigenbeleg', { betrag: null, datum: '', name: 'Aral', bezahlt: false })).toBe('/belege/neu?art=eigenbeleg&name=Aral');
     expect(maskenPfad('rechnung', { bezahlt: true })).toBe('/belege/neu?art=rechnung&bezahlt=1');
+    expect(maskenPfad('quittung', { betrag: 6_000, buchung: 42 })).toBe('/belege/neu?art=quittung&betrag=6000&buchung=42');
+  });
+
+  it('„In der Maske ergänzen“ nimmt das ganze Formular als Zustand mit (Positionen, Leistung, Zahlungsziel)', () => {
+    const e = ertrag({
+      art: 'rechnung',
+      bezahlt: true,
+      positionen: [ertragPosition('Rasen mähen', 4_000), ertragPosition('Hecke', 2_000)],
+      leistungVon: '2026-10-01',
+      leistungBis: '2026-10-03',
+      zielTage: '21',
+    });
+    const f = belegVorbereiten(formular(), e, ctx).formular;
+    const zurueck = maskenUebergabe(maskenZustand(f));
+    expect(zurueck).toEqual(f);
+    expect(zurueck).toMatchObject({ art: 'rechnung', leistungVon: '2026-10-01', leistungBis: '2026-10-03', zielTage: '21' });
+    expect(zurueck?.positionen.map((p) => p.beschreibung)).toEqual(['Rasen mähen', 'Hecke']);
+    // History-Zustand aus anderer Quelle bzw. unvollständig ⇒ nichts übernehmen
+    expect(maskenUebergabe(null)).toBeNull();
+    expect(maskenUebergabe(undefined)).toBeNull();
+    expect(maskenUebergabe({ usr: 'x', key: 'y' })).toBeNull();
+    expect(maskenUebergabe({ formular: { ...f, art: 'angebot' } })).toBeNull();
+    expect(maskenUebergabe({ formular: { ...f, positionen: [] } })).toBeNull();
+    expect(maskenUebergabe({ formular: { ...f, positionen: [{ beschreibung: 'x', menge: 1 }] } })).toBeNull();
+    expect(maskenUebergabe({ formular: { ...f, datum: null } })).toBeNull();
+  });
+});
+
+describe('Beleg nachträglich zu einer gebuchten Einnahme', () => {
+  it('startet ohne eigenen Beleg, Rechnung nur „bereits bezahlt“', () => {
+    const e = ertragNachtraeglich('rechnung');
+    expect(e).toMatchObject({ weg: 'ohne', art: 'rechnung', bezahlt: true });
+    expect(rechnungOffen({ ...e, weg: 'beleg' })).toBe(false);
+    expect(ertragNachtraeglich('quittung')).toMatchObject({ weg: 'ohne', art: 'quittung' });
+  });
+
+  it('die Positionen müssen den Betrag der Einnahme genau ergeben', () => {
+    const e = ertrag({ positionen: [ertragPosition('Rasen mähen', 5_000), ertragPosition('Hecke', 1_500)] });
+    expect(summenAbweichung(e, 6_500)).toBeNull();
+    const text = summenAbweichung(e, 6_000);
+    expect(text).toContain(formatBetrag(6_500));
+    expect(text).toContain(formatBetrag(6_000));
+    expect(text).toContain('Betrag oben ändern');
+    // ohne lesbaren Betrag meldet die Betragsprüfung selbst
+    expect(summenAbweichung(e, null)).toBeNull();
+    expect(summenAbweichung(e, 0)).toBeNull();
+  });
+
+  it('Hinweis nennt die vorhandene Einnahme – es entsteht keine zweite', () => {
+    const e = { ...ertragNachtraeglich('quittung'), weg: 'beleg' as const };
+    expect(belegHinweis(e, '2026-0042')).toContain('mit der Einnahme 2026-0042 verknüpft');
+    expect(belegHinweis(e, '2026-0042')).toContain('keine zweite Einnahme');
+    expect(belegHinweis(e)).not.toContain('keine zweite');
   });
 });
 

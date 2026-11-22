@@ -8,6 +8,9 @@
  *   Zeitraum, Zahlungsziel) stehen links unter dem Datum: BelegDatumFelder.
  * - Offene Rechnung zuordnen: Liste der offenen Rechnungen; die Wahl übernimmt Betrag, Text und Kunde.
  * - Ohne eigenen Beleg: die Dateifläche darunter (zeichnet die Schublade selbst).
+ * Nachträglich (`buchung` gesetzt, „Buchung bearbeiten“ einer Einnahme ohne eigenen Beleg): nur „Beleg erstellen“ und
+ * „Ohne eigenen Beleg“; Rechnung nur „bereits bezahlt“; die Positionen müssen den Betrag der Einnahme genau ergeben
+ * (summenAbweichung) – gespeichert über beleg_zu_buchung, es entsteht keine zweite Einnahme.
  * Logik in lib/ertrag.ts, gespeichert wird in ErfassenSchublade (beleg_ausstellen bzw. beleg_bezahlt). */
 import { CircleCheck, Clock, Eye, EyeOff, FileText, Info, Landmark, NotebookPen, Paperclip, ReceiptEuro, TriangleAlert, User } from 'lucide-react';
 import type { Formular } from '../../lib/buchungen';
@@ -24,6 +27,7 @@ import {
   offenFaellig,
   papierGewaehlt,
   rechnungOffen,
+  summenAbweichung,
   vorlageFuer,
   type BelegVorbereitet,
   type Ertrag,
@@ -31,7 +35,7 @@ import {
   type ErtragsArt,
   type Ertragsweg,
 } from '../../lib/ertrag';
-import { formatBetrag } from '../../lib/money';
+import { formatBetrag, parseBetrag } from '../../lib/money';
 import type { ErtragStamm } from '../../lib/queries/ertrag';
 import { anschriftText, type BelegZeile, type PositionFormular } from '../../lib/rechnungen';
 import { heute } from '../../lib/zeitraum';
@@ -61,22 +65,28 @@ interface Props {
   onOffen: (z: BelegZeile) => void;
   /** „Nur buchen“: Nummer der Papierquittung (Formularfeld belegnummer) */
   onNummer: (nummer: string) => void;
+  /** Nummer der schon gebuchten Einnahme: Beleg nachträglich (keine offene Rechnung, kein zweites Buchen) */
+  buchung?: string | null;
 }
 
 const ART_ICON = { quittung: ReceiptEuro, rechnung: FileText } as const;
 
 export function BelegZumErtrag(props: Props) {
-  const { form, ertrag, setErtrag, stamm, ladeFehler, fehler, onWeg, onOffen, onNummer } = props;
+  const { form, ertrag, setErtrag, stamm, ladeFehler, fehler, onWeg, onOffen, onNummer, buchung } = props;
   const h = heute();
   const art = ertrag.art;
   const ArtIcon = ART_ICON[art];
   const naechste = stamm ? naechsteBelegNummer(stamm.kreise, art, form.zahlungsdatum, h) : null;
   const offene = stamm?.offene ?? [];
-  const wege: { weg: Ertragsweg; icon: typeof Clock; label: string; sub: string }[] = [
+  const alleWege: { weg: Ertragsweg; icon: typeof Clock; label: string; sub: string }[] = [
     { weg: 'beleg', icon: ArtIcon, label: 'Beleg erstellen', sub: naechste ?? (art === 'rechnung' ? 'Rechnung' : 'Quittung') },
     { weg: 'offen', icon: Clock, label: 'Offene Rechnung zuordnen', sub: offene.length ? `${offene.length} offen` : 'keine offen' },
-    { weg: 'ohne', icon: NotebookPen, label: 'Nur buchen', sub: 'Papier oder Datei' },
+    buchung
+      ? { weg: 'ohne', icon: NotebookPen, label: 'Ohne eigenen Beleg', sub: 'bleibt wie gebucht' }
+      : { weg: 'ohne', icon: NotebookPen, label: 'Nur buchen', sub: 'Papier oder Datei' },
   ];
+  // nachträglich: das Geld ist schon gebucht – eine offene Rechnung zuzuordnen hieße, es doppelt zu buchen
+  const wege = buchung ? alleWege.filter((w) => w.weg !== 'offen') : alleWege;
 
   return (
     <>
@@ -112,7 +122,7 @@ export function BelegZumErtrag(props: Props) {
         <BelegKasten {...props} stamm={stamm} naechste={naechste} />
       ) : null}
       {stamm && ertrag.weg === 'offen' ? <OffeneListe offene={offene} ertrag={ertrag} heute={h} fehler={fehler?.text} onOffen={onOffen} /> : null}
-      {ertrag.weg === 'ohne' ? (
+      {ertrag.weg === 'ohne' && !buchung ? (
         <NurBuchen
           buchung={stamm ? naechsteBelegNummer(stamm.kreise, 'buchung', h, h) : null}
           papier={papierGewaehlt(ertrag, form.zahlungsart)}
@@ -187,8 +197,10 @@ function BelegKasten({
   onPositionen,
   vorschau,
   onVorschau,
+  buchung,
 }: Omit<Props, 'stamm'> & { stamm: ErtragStamm; naechste: string | null }) {
   const art = ertrag.art;
+  const abweichung = buchung ? summenAbweichung(ertrag, parseBetrag(form.betrag)) : null;
   const rechnung = art === 'rechnung';
   const vorlagen = stamm.vorlagen[art];
   const vorlage = vorlageFuer(ertrag, stamm.vorlagen);
@@ -272,7 +284,15 @@ function BelegKasten({
             ))}
           </select>
         </div>
-        {rechnung ? (
+        {rechnung && buchung ? (
+          <div className="field">
+            <span className="field-label">Status</span>
+            <p className="hint bu-bezahlt-hint" title="Die Einnahme ist schon gebucht – die Rechnung wird als bezahlt ausgestellt.">
+              <CircleCheck />
+              bereits bezahlt
+            </p>
+          </div>
+        ) : rechnung ? (
           <div className="field">
             <span className="field-label">Status</span>
             <Seg
@@ -317,7 +337,7 @@ function BelegKasten({
         <div className="field full bu-pos">
           <span className="field-label">
             Positionen
-            <small className="muted">stehen auf dem Beleg · die Summe ist der Betrag</small>
+            <small className="muted">{buchung ? 'stehen auf dem Beleg · die Summe muss den Betrag ergeben' : 'stehen auf dem Beleg · die Summe ist der Betrag'}</small>
           </span>
           <PositionenEditor
             positionen={ertrag.positionen}
@@ -330,12 +350,17 @@ function BelegKasten({
             <p className="hint neg bu-err" role="alert">
               {fehler.text}
             </p>
-          ) : vorbereitet && !offen ? (
+          ) : abweichung ? (
+            <p className="hint warn" role="status">
+              <TriangleAlert />
+              {abweichung}
+            </p>
+          ) : vorbereitet && !offen && !buchung ? (
             <p className="hint">Die Einnahme heißt in Ein- &amp; Ausgänge „{vorbereitet.buchungstext}“.</p>
           ) : null}
         </div>
       </div>
-      <p className="hint bu-doc-hint">{belegHinweis(ertrag)}</p>
+      <p className="hint bu-doc-hint">{belegHinweis(ertrag, buchung ?? null)}</p>
       {nimmtBelege ? (
         <details className="bu-scan" open={belege.length > 0 || fehler?.feld === 'dateien'}>
           <summary>
@@ -375,11 +400,14 @@ export function BelegDatumFelder({
   ertrag,
   setErtrag,
   zielStandard,
+  nachtraeglich = false,
 }: {
   form: Formular;
   ertrag: Ertrag;
   setErtrag: (teil: Partial<Ertrag>) => void;
   zielStandard: number;
+  /** Beleg zu einer schon gebuchten Einnahme: das Datum oben ist deren Zahlungstag */
+  nachtraeglich?: boolean;
 }) {
   const datum = form.zahlungsdatum;
   const von = ertrag.leistungVon || datum;
@@ -477,7 +505,9 @@ export function BelegDatumFelder({
       {ertrag.bezahlt ? (
         <p className="hint full bu-bezahlt-hint">
           <CircleCheck />
-          Bereits bezahlt: Zahlungsdatum = Rechnungsdatum – die Einnahme wird an diesem Tag gebucht.
+          {nachtraeglich
+            ? 'Bereits bezahlt: Rechnungsdatum = Zahlungstag der Einnahme.'
+            : 'Bereits bezahlt: Zahlungsdatum = Rechnungsdatum – die Einnahme wird an diesem Tag gebucht.'}
         </p>
       ) : null}
     </>

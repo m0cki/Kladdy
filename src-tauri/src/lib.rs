@@ -178,6 +178,7 @@ pub fn run() {
             rechnungen::beleg_entwurf_loeschen,
             rechnungen::beleg_ausstellen,
             rechnungen::beleg_bezahlt,
+            rechnungen::beleg_zu_buchung,
             rechnungen::beleg_offen,
             rechnungen::beleg_angebot_status,
             rechnungen::beleg_umwandeln,
